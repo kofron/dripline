@@ -1,0 +1,12 @@
+{application, dripline,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { dripline_app, []}},
+  {env, []}
+ ]}.
