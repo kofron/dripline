@@ -7,7 +7,7 @@
 -on_load(init/0).
 
 init() ->
-    erlang:load_nif("../priv/dripline_backplane",0).
+    erlang:load_nif("priv/dripline_backplane",0).
 
 start() ->
     ok.
