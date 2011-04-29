@@ -24,6 +24,13 @@ static ERL_NIF_TERM start(ErlNifEnv* env,
   return enif_make_tuple2(env,enif_make_atom(env,"ok"),ret);
 }
 
+static ERL_NIF_TERM get_handle(ErlNifEnv* env,
+			       int argc,
+			       const ERL_NIF_TERM argv[])
+{
+
+}
+
 static void unload_cleanup(ErlNifEnv* env, void* arg)
 {
 }
