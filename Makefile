@@ -3,6 +3,7 @@ C_SRC=$(wildcard priv/*.c)
 C_OBJ=$(C_SRC:.c=.so)
 ERL_ROOT=$(shell escript get_root.erl)
 NIF_INC=$(ERL_ROOT)/usr/include
+CFLAGS=-std=c99
 LDFLAGS=-shared -fPIC
 
 # we need to add these flags for LD if we're on OSX to
@@ -21,7 +22,7 @@ erl_src:
 
 %.so: %.c
 	@echo building shared library $@...
-	@gcc $(LDFLAGS) -I$(NIF_INC) $< -o $@
+	@gcc $(CFLAGS) $(LDFLAGS) -I$(NIF_INC) $< -o $@
 
 # clean up
 clean: clean_emacs clean_priv
