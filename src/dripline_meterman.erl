@@ -5,16 +5,26 @@
 -module(dripline_meterman).
 -behavior(gen_fsm).
 
+% states!
+-export([idle/2,idle/3]).
+
 % gen_fsm exports
 -export([start_link/1,init/1,terminate/3,code_change/4]).
 -export([handle_info/3,handle_event/3,handle_sync_event/4]).
 
+% states
+idle(_Event, _From, StateData) ->
+    {reply, ok, idle, StateData}.
+idle(_Event, StateData) ->
+    {next_state, idle, StateData}.
+
+% gen_fsm exports
 start_link(SlotName) ->
     gen_fsm:start_link({local, ?MODULE},?MODULE,[SlotName],[]).
 
 init([SlotName]) ->
     io:format("got slot name ~p~n",[SlotName]),
-    ok.
+    {ok,idle,nodata}.
 
 terminate(_Reason,_StateName,_StateData) ->
     ok.
