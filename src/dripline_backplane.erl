@@ -6,12 +6,16 @@
 -export([scan/0]).
 -on_load(init/0).
 
+% dialyzer type specifications.  
+-type card_slot() :: cardA | cardB | cardC | cardD.
+-type card_model() :: ios320 | ios330 | ios408.
+
+% loads the NIF shared library for the backplane.
+-spec init() -> ok | term().
 init() ->
     erlang:load_nif("priv/dripline_backplane",0).
 
 % scan the I/O server backplane for installed cards.  
--type card_model() :: ios320 | ios330 | ios408.
--type card_slot() :: cardA | cardB | cardC | cardD.
 -spec scan() -> [{card_slot(),card_model()}].
 scan() ->
     erlang:error("NIF library not loaded!").
