@@ -24,5 +24,11 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
+    DriplineMMSup = {dripline_meterman_sup,
+		     {dripline_meterman_sup,start_link,[]},
+		     permanent,
+		     brutal_kill,
+		     supervisor,
+		     [dripline_meterman_sup]},
+    {ok, { {one_for_one, 5, 10}, [DriplineMMSup]} }.
 
