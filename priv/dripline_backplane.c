@@ -3,7 +3,6 @@
  * NIF interface to the I/O server backplane.  Allows for scanning
  * of the bus for cards and initialization routines for the I/O carrier.
  */
-
 #include "erl_nif.h"
 #include "stdio.h"
 
@@ -13,22 +12,24 @@ struct backplane {
 typedef struct backplane backplane;
 static ErlNifResourceType* backplane_rsrc;
 
-static ERL_NIF_TERM start(ErlNifEnv* env, 
-			  int argc, 
-			  const ERL_NIF_TERM argv[])
+/* scan/3
+ * scan the backplane for installed cards.  returns a proplist to erlang
+ * in the form of [{slot::atom(), model::atom()}]
+ */
+static ERL_NIF_TERM scan(ErlNifEnv* env, 
+			 int argc, 
+			 const ERL_NIF_TERM argv[])
 {
-  backplane* bp_handle = enif_alloc_resource(backplane_rsrc,
-					     sizeof(backplane));
-  ERL_NIF_TERM ret = enif_make_resource(env,bp_handle);
-  enif_release_resource(bp_handle);
-  return enif_make_tuple2(env,enif_make_atom(env,"ok"),ret);
-}
+  // There are 4 card slots.  Iterate over all of them and read the PROM
+  ERL_NIF_TERM res[4];
 
-static ERL_NIF_TERM get_handle(ErlNifEnv* env,
-			       int argc,
-			       const ERL_NIF_TERM argv[])
-{
-
+  // Obviously this does absolutely nothing right now but return a dummy
+  for(unsigned i = 0; i < 4; i++) {
+    res[i] = enif_make_tuple2(env,
+			      enif_make_atom(env,"cardA"),
+			      enif_make_atom(env,"ios320"));
+  }
+  return enif_make_list_from_array(env,res,4);
 }
 
 static void unload_cleanup(ErlNifEnv* env, void* arg)
@@ -49,7 +50,7 @@ static int load_init(ErlNifEnv* env,
 }
 
 static ErlNifFunc backplane_funcs[] = {
-  {"start",0,start}
+  {"scan",0,scan}
 };
 
 ERL_NIF_INIT(dripline_backplane,backplane_funcs,&load_init,
