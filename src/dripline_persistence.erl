@@ -15,6 +15,9 @@
 % internal state record
 -record(state,{dets_table}).
 
+% API
+-export([enqueue/1]).
+
 % states!
 -export([idle/2]).
 %-export([dets_scan/2,dets_read/2,dets_write/2]).
@@ -27,6 +30,10 @@
 -export([start_link/0,init/1,terminate/3,code_change/4]).
 -export([handle_info/3,handle_event/3,handle_sync_event/4]).
 
+% API
+enqueue(DataPoint) ->
+    ok.
+
 % states
 idle(_Event,StateData) ->
     {next_state, idle, StateData}.
@@ -35,7 +42,7 @@ idle(_Event,StateData) ->
 start_link() ->
     gen_fsm:start_link({local, ?MODULE}, ?MODULE,[],[]).
 
-init() ->
+init([]) ->
     {ok,idle,#state{},?immediately}.
 
 terminate(_Reason,_StateName,_StateData) ->
