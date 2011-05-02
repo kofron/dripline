@@ -11,13 +11,23 @@
 read(Card) -> 
     case legal_card(Card) of
 	true ->
-	    ;
+	    route_read_request(Card);
 	false ->
-	    erlang:error("Card invalid!")
+	    invalid_card_req(Card,read)
     end.
     
+-spec route_read_request(atom()) -> term().
+route_read_request(Card) ->
+    gen_fsm:sync_send_event(Card,read).
+
+invalid_card_req(Card,Op) when is_atom(Op), is_atom(Card) ->
+    erlang:error("invalid operation " ++
+		     atom_to_list(Op) ++
+		     " for card " ++
+		     atom_to_list(Card)).
+
 % 
--spec legal_card(term(())) -> boolean().
+-spec legal_card(term()) -> boolean().
 legal_card(cardA) ->
     true;
 legal_card(cardB) ->
@@ -28,7 +38,3 @@ legal_card(cardD) ->
     true;
 legal_card(_) ->
     false.
-
-
-
-
