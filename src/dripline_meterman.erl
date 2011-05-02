@@ -9,7 +9,7 @@
 -export([idle/2,idle/3]).
 
 % gen_fsm exports
--export([start_link/1,init/1,terminate/3,code_change/4]).
+-export([start_link/2,init/1,terminate/3,code_change/4]).
 -export([handle_info/3,handle_event/3,handle_sync_event/4]).
 
 % states
@@ -19,11 +19,11 @@ idle(_Event, StateData) ->
     {next_state, idle, StateData}.
 
 % gen_fsm exports
-start_link(SlotName) ->
-    gen_fsm:start_link({local, ?MODULE},?MODULE,[SlotName],[]).
+start_link(SlotName,CardModel) ->
+    gen_fsm:start_link(?MODULE,[SlotName,CardModel],[]).
 
-init([SlotName]) ->
-    io:format("got slot name ~p~n",[SlotName]),
+init([SlotName,CardModel]) ->
+    io:format("got slot name ~p with model ~p~n",[SlotName,CardModel]),
     {ok,idle,nodata}.
 
 terminate(_Reason,_StateName,_StateData) ->
