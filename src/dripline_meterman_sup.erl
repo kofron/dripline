@@ -22,8 +22,7 @@ init([]) ->
 spawn_agent() ->
     timer:sleep(1000),
     Cards = dripline_backplane:scan(),
-    lists:foreach(fun({Slot,Model}) ->
-			  io:format("~p/~p~n",[Slot,Model]),
-			  Args = [Slot,Model],
-			  supervisor:start_child(?MODULE,Args) end,
+    lists:foreach(fun({_Slot,_Model}=Spec) ->
+			  S = erlang:tuple_to_list(Spec),
+			  {ok,_P} = supervisor:start_child(?MODULE,S) end,
 		  Cards).
