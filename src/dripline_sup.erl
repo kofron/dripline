@@ -25,11 +25,17 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    DriplineHWSup = {dripline_ios_card_sup,
+		     {dripline_ios_card_sup,start_link,[]},
+		     permanent,
+		     brutal_kill,
+		     supervisor,
+		     [dripline_ios_card_sup]},
     DriplineMMSup = {dripline_meterman_sup,
 		     {dripline_meterman_sup,start_link,[]},
 		     permanent,
 		     brutal_kill,
 		     supervisor,
 		     [dripline_meterman_sup]},
-    {ok, { {one_for_one, 5, 10}, [DriplineMMSup]} }.
+    {ok, { {one_for_one, 5, 10}, [DriplineHWSup,DriplineMMSup]} }.
 
