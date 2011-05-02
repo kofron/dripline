@@ -8,11 +8,13 @@
 % internal state record
 -record(state,{read_f :: fun(),
 	       write_f :: fun(),
-	       cycle_time = 1000 :: integer()}).
+	       cycle_time = 1000 :: integer(),
+	       attached_data = [] :: term()}).
 
 % states!
 -export([idle/2]).
 -export([read/2]).
+-export([write/2]).
 
 % definitions
 -define(immediately,0).
@@ -23,16 +25,21 @@
 
 % state
 idle(timeout, #state{cycle_time=C}=StateData) when C > 0 ->
+    io:format("meterman returned to idle state with ~pms to spare.~n",[C]),
     {next_state, read, StateData#state{cycle_time=1000}, C};
 idle(timeout, StateData) ->
     {next_state, read, StateData#state{cycle_time=1000}, ?immediately}.
 read(timeout, #state{read_f=F}=StateData) ->
+    io:format("meterman hit read state.~n"),
     {Data,DT} = time_execution(F),
-    StateP = attach_data(StateData,Data)
+    io:format("DT = ~p~n",[DT]),
+    StateP = attach_data(StateData,Data),
     {next_state, write, decrement_cycle_time(StateP,DT), ?immediately}.
-write(timeout, #state{write_f=F}=StateData) ->
-    {_,DT} = time_execution(F),
-    {next_state, idle, decrement_cycle_time(StateData,DT), ?immediately}.
+write(timeout, #state{write_f=W,attached_data=D}=StateData) ->
+    io:format("meterman hit write state.~n"),
+    {_,DT} = time_execution(W,D),
+    StateP = detach_data(StateData),
+    {next_state, idle, decrement_cycle_time(StateP,DT), ?immediately}.
 
 % gen_fsm exports
 start_link(SlotName,CardModel) ->
@@ -40,7 +47,8 @@ start_link(SlotName,CardModel) ->
 
 init([SlotName,_CardModel]) ->
     FRead = fun() -> dripline:read(SlotName) end,
-    {ok,idle,#state{read_f = FRead},?immediately}.
+    FWrite = fun(X) -> dripline_persistence:enqueue(X) end,
+    {ok,idle,#state{read_f = FRead,write_f = FWrite},?immediately}.
 
 terminate(_Reason,_StateName,_StateData) ->
     ok.
@@ -70,5 +78,10 @@ decrement_cycle_time(#state{cycle_time=C}=S,DT) ->
 time_execution(F) ->
     T0 = erlang:now(),
     D = F(),
-    DT = 1000*timer:now_diff(erlang:now(),T0),
+    DT = timer:now_diff(erlang:now(),T0)/1000,
     {D,DT}.
+time_execution(F,A) ->
+    T0 = erlang:now(),
+    D = F(A),
+    DT = timer:now_diff(erlang:now(),T0)/1000,
+    {D,DT}.    
