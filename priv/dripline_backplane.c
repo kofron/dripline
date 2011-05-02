@@ -24,11 +24,19 @@ static ERL_NIF_TERM scan(ErlNifEnv* env,
   ERL_NIF_TERM res[4];
 
   // Obviously this does absolutely nothing right now but return a dummy
-  for(unsigned i = 0; i < 4; i++) {
-    res[i] = enif_make_tuple2(env,
-			      enif_make_atom(env,"cardA"),
-			      enif_make_atom(env,"ios320"));
-  }
+ res[0] = enif_make_tuple2(env,
+			   enif_make_atom(env,"cardA"),
+			   enif_make_atom(env,"ios320"));
+ res[1] = enif_make_tuple2(env,
+			   enif_make_atom(env,"cardB"),
+			   enif_make_atom(env,"ios330"));
+ res[2] = enif_make_tuple2(env,
+			   enif_make_atom(env,"cardC"),
+			   enif_make_atom(env,"ios408"));
+ res[3] = enif_make_tuple2(env,
+			   enif_make_atom(env,"cardD"),
+			   enif_make_atom(env,"nocard"));
+
   return enif_make_list_from_array(env,res,4);
 }
 
