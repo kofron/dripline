@@ -6,26 +6,43 @@
 -module(dripline_ios_card).
 -behavior(gen_fsm).
 
+% internal state record
+-record(state,{slot,model}).
+
 % states!
--export([idle/2,idle/3]).
+-export([ready/2,ready/3]).
 
 % gen_fsm exports
 -export([start_link/2,init/1,terminate/3,code_change/4]).
 -export([handle_info/3,handle_event/3,handle_sync_event/4]).
 
 % states
-idle(_Event, _From, StateData) ->
-    {reply, ok, idle, StateData}.
-idle(_Event, StateData) ->
-    {next_state, idle, StateData}.
+ready(read, _From, StateData) ->
+    T = erlang:now(),
+    D = fake_data(),
+    {reply, pack_ios_data(T,D), ready, StateData};
+ready(_Event, _From, StateData) ->
+    {reply, ok, ready, StateData}.
+ready(_Event, StateData) ->
+    {next_state, ready, StateData}.
+
+% internal
+fake_data() ->
+    fake_data(20,[]).
+fake_data(N,Acc) when N >= 0 ->
+    fake_data(N-1,Acc ++ [{N,0.0}]);
+fake_data(_,Acc) ->
+    Acc.
+pack_ios_data({MS,S,US}=_T,D) ->
+    EpochSecs = erlang:round(1000000*MS + S + 0.000001*US),
+    [{timestamp,EpochSecs},D].
 
 % gen_fsm exports
 start_link(SlotName,CardModel) ->
     gen_fsm:start_link({local,SlotName},?MODULE,[SlotName,CardModel],[]).
 
 init([SlotName,CardModel]) ->
-    io:format("ios got slot name ~p with model ~p~n",[SlotName,CardModel]),
-    {ok,idle,nodata}.
+    {ok,ready,#state{slot=SlotName,model=CardModel}}.
 
 terminate(_Reason,_StateName,_StateData) ->
     ok.
