@@ -38,3 +38,4 @@ clean_priv:
 clean_emacs:
 	@echo cleaning up after emacs...
 	@find . -name '*~' | xargs -I{} rm {}
+	@find . -name '*#' | xargs -I{} rm {}	
