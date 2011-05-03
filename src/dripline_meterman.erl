@@ -25,18 +25,14 @@
 
 % state
 idle(timeout, #state{cycle_time=C}=StateData) when C > 0 ->
-    io:format("meterman returned to idle state with ~pms to spare.~n",[C]),
     {next_state, read, StateData#state{cycle_time=1000}, C};
 idle(timeout, StateData) ->
     {next_state, read, StateData#state{cycle_time=1000}, ?immediately}.
 read(timeout, #state{read_f=F}=StateData) ->
-    io:format("meterman hit read state.~n"),
     {Data,DT} = time_execution(F),
-    io:format("DT = ~p~n",[DT]),
     StateP = attach_data(StateData,Data),
     {next_state, write, decrement_cycle_time(StateP,DT), ?immediately}.
 write(timeout, #state{write_f=W,attached_data=D}=StateData) ->
-    io:format("meterman hit write state.~n"),
     {_,DT} = time_execution(W,D),
     StateP = detach_data(StateData),
     {next_state, idle, decrement_cycle_time(StateP,DT), ?immediately}.
