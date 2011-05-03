@@ -78,10 +78,10 @@ decrement_cycle_time(#state{cycle_time=C}=S,DT) ->
 time_execution(F) ->
     T0 = erlang:now(),
     D = F(),
-    DT = timer:now_diff(erlang:now(),T0)/1000,
+    DT = erlang:round(timer:now_diff(erlang:now(),T0)/1000),
     {D,DT}.
 time_execution(F,A) ->
     T0 = erlang:now(),
     D = F(A),
-    DT = timer:now_diff(erlang:now(),T0)/1000,
+    DT = erlang:round(timer:now_diff(erlang:now(),T0)/1000),
     {D,DT}.    
