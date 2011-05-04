@@ -33,7 +33,7 @@ read(timeout, #state{read_f=F}=StateData) ->
     StateP = attach_data(StateData,Data),
     {next_state, write, decrement_cycle_time(StateP,DT), ?immediately}.
 write(timeout, #state{write_f=W,attached_data=D}=StateData) ->
-    {_,DT} = time_execution(W,D),
+    {ok,DT} = time_execution(W,D),
     StateP = detach_data(StateData),
     {next_state, idle, decrement_cycle_time(StateP,DT), ?immediately}.
 
