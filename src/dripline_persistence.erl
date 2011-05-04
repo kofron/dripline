@@ -13,7 +13,7 @@
 -behavior(gen_fsm).
 
 % internal state record
--record(state,{dets_table}).
+-record(state,{raw_queue,dets_table}).
 
 % API
 -export([enqueue/1]).
@@ -32,24 +32,30 @@
 
 % API
 enqueue(DataPoint) ->
-    ok.
+    gen_fsm:send_all_state_event(?MODULE,{enqueue,DataPoint}).
 
 % states
 idle(_Event,StateData) ->
     {next_state, idle, StateData}.
+
+% internal
+mutate_state_add_data(#state{raw_queue=Q}=State, Data) ->
+    State#state{raw_queue = queue:in(Data,Q)}.
 
 % gen_fsm defs
 start_link() ->
     gen_fsm:start_link({local, ?MODULE}, ?MODULE,[],[]).
 
 init([]) ->
-    {ok,idle,#state{},?immediately}.
+    Q = queue:new(),
+    {ok,idle,#state{raw_queue = Q},?immediately}.
 
 terminate(_Reason,_StateName,_StateData) ->
     ok.
 
-handle_event(_Event,StateName,StateData) ->
-    {next_state, StateName, StateData}.
+handle_event({enqueue,Data},StateName,StateData) ->
+    NewStateData = mutate_state_add_data(StateData,Data),
+    {next_state, StateName, NewStateData}.
 
 handle_sync_event(_Event,_From,StateName,StateData) ->
     {reply, ok, StateName, StateData}.
