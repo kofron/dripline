@@ -17,10 +17,10 @@
 -export([handle_info/3,handle_event/3,handle_sync_event/4]).
 
 % states
-ready(read, _From, StateData) ->
+ready(read, _From, #state{slot=S}=StateData) ->
     T = erlang:now(),
     D = fake_data(),
-    {reply, pack_ios_data(T,D), ready, StateData};
+    {reply, pack_ios_data(T,D,S), ready, StateData};
 ready(_Event, _From, StateData) ->
     {reply, ok, ready, StateData}.
 ready(_Event, StateData) ->
@@ -33,9 +33,11 @@ fake_data(N,Acc) when N >= 0 ->
     fake_data(N-1,Acc ++ [{N,0.0}]);
 fake_data(_,Acc) ->
     Acc.
-pack_ios_data({MS,S,US}=_T,D) ->
+pack_ios_data({MS,S,US}=_T,D,Slot) ->
     EpochSecs = erlang:round(1000000*MS + S + 0.000001*US),
-    [{timestamp,EpochSecs},D].
+    tag_ios_data([{timestamp,EpochSecs},{data,D}],Slot).
+tag_ios_data(D,Slot) ->
+    D ++ [{card,Slot}].
 
 % gen_fsm exports
 start_link(SlotName,CardModel) ->
