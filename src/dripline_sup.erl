@@ -1,4 +1,3 @@
-
 -module(dripline_sup).
 
 -behaviour(supervisor).
@@ -10,8 +9,7 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, 
-			 permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -25,25 +23,22 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    DriplinePrWrk = {dripline_persistence,
-		     {dripline_persistence, start_link,[]},
-		     permanent,
-		     brutal_kill,
-		     supervisor,
-		     [dripline_persistence]},
-    DriplineHWSup = {dripline_ios_card_sup,
-		     {dripline_ios_card_sup,start_link,[]},
-		     permanent,
-		     brutal_kill,
-		     supervisor,
-		     [dripline_ios_card_sup]},
-    DriplineMMSup = {dripline_meterman_sup,
-		     {dripline_meterman_sup,start_link,[]},
-		     permanent,
-		     brutal_kill,
-		     supervisor,
-		     [dripline_meterman_sup]},
-    {ok, { {one_for_one, 5, 10}, [DriplinePrWrk,
-				  DriplineHWSup,
-				  DriplineMMSup]} }.
+    application:start(nprocreg),
+    application:load(mochiweb),
+    BindAddress = "0.0.0.0",
+    Port = 8000,
+    ServerName = nitrogen,
+%    DocRoot = "./site/static",
+    
+    io:format("attempting to start mochiweb...\n"),
+    
+    MochiOpts = [
+		 {name, ServerName},
+		 {ip, BindAddress},
+		 {port, Port},
+		 {loop, fun dripline_mochiweb:loop/1}
+		],
+    mochiweb_http:start(MochiOpts),
+
+    {ok, { {one_for_one, 5, 10}, []} }.
 
