@@ -3,4 +3,5 @@
 #*
 ebin/*
 rebar
+lib/
 priv/*.so
