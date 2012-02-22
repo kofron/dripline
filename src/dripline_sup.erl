@@ -23,22 +23,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    application:start(nprocreg),
-    application:load(mochiweb),
-    BindAddress = "0.0.0.0",
-    Port = 8000,
-    ServerName = nitrogen,
-%    DocRoot = "./site/static",
-    
-    io:format("attempting to start mochiweb...\n"),
-    
-    MochiOpts = [
-		 {name, ServerName},
-		 {ip, BindAddress},
-		 {port, Port},
-		 {loop, fun dripline_mochiweb:loop/1}
-		],
-    mochiweb_http:start(MochiOpts),
-
     {ok, { {one_for_one, 5, 10}, []} }.
 
