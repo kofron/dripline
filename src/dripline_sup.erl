@@ -23,5 +23,6 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, []} }.
-
+    SuperStrategy = {one_for_one, 5, 10},
+    ChildSpec = ?CHILD(dripline_conn_mgr,worker),
+    {ok, { SuperStrategy, [ChildSpec] }}.
