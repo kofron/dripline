@@ -47,7 +47,7 @@ handle_sync_event(_Event, _From, StateName, StateData) ->
 handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
 	io:format("Got done: ~p~n",[LastSeq]),
 	{next_state, connecting, StateData,1};
-handle_info({change, _Ref, ChangeData}, waiting, StateData) ->
+handle_info({change, _Ref, {ChangeData}}, waiting, StateData) ->
 	io:format("~p~n",[ChangeData]),
 	{next_state, waiting, StateData}.
 
