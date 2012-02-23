@@ -19,9 +19,7 @@ get() ->
 	gen_server:call(?MODULE,new_conn).
 
 handle_call(new_conn, _From, #state{conn_gen = F} = StateData) ->
-	{reply, F(), StateData};
-handle_call(_Req, _From, StateData) ->
-	{reply, ok, StateData}.
+	{reply, F(), StateData}.
 
 handle_cast(_Req, StateData) ->
 	{noreply, StateData}.
@@ -43,8 +41,8 @@ init([DBHost,DBPort]) ->
 		{ok, _} ->
 			F = fun() -> couchbeam:server_connection(DBHost,DBPort) end,
 			{ok, #state{conn_gen = F}};
-		_ ->
-			{error, no_db_conn}
+		Else ->
+			Else
 	end.
 
 terminate(_Rsn, _StateData) ->
