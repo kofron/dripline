@@ -24,5 +24,6 @@ start_link() ->
 
 init([]) ->
     SuperStrategy = {one_for_one, 5, 10},
-    ChildSpec = ?CHILD(dripline_conn_mgr,worker),
-    {ok, { SuperStrategy, [ChildSpec] }}.
+    ConnMgr = ?CHILD(dripline_conn_mgr,worker),
+    ConfMon = ?CHILD(dripline_conf_mon,worker),
+    {ok, { SuperStrategy, [ConnMgr,ConfMon] }}.
