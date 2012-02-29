@@ -1,4 +1,4 @@
--module(dripline_conf_mon).
+-module(dripline_cmd_mon).
 -behavior(gen_fsm).
 
 %% internal state data record
@@ -40,7 +40,7 @@ start_link() ->
 
 init([]) ->
 	S = dripline_conn_mgr:get(),
-	{ok, Db} = couchbeam:open_db(S,"dripline_conf"),
+	{ok, Db} = couchbeam:open_db(S,"dripline_cmd"),
 	{ok, connecting, #state{db_handle = Db, lastSeqNo = 0}, 1}.
 
 handle_event(_Event, StateName, StateData) ->
