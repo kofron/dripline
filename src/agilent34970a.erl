@@ -1,17 +1,19 @@
 -module(agilent34970a).
 -behavior(gen_server).
 
--behaviour(gen_server).
-
 %% API
--export([start_link/2]).
+-export([start_link/3]).
+-export([read/2]).
+
+%% DEBUG
+-export([channel_tuple_list_to_channel_spec/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {id, gpib_addr, epro_handle}).
--define(SERVER, ?MODULE).
+-record(req_data, {from, ref}).
+-record(state, {id, gpib_addr, epro_handle, c_req}).
 
 %%====================================================================
 %% API
@@ -22,6 +24,16 @@
 %%--------------------------------------------------------------------
 start_link(InstrumentID,PrologixID,BusAddress) ->
   gen_server:start_link({local, InstrumentID}, ?MODULE, [InstrumentID,PrologixID,BusAddress], []).
+
+
+%%--------------------------------------------------------------------
+%% Function: read(Instrument, ChannelSpec) -> 
+%%										{ok, Result} | {error, Error}
+%% Description: Asks for data from the device by querying the prologix
+%% handle.  Returns error codes (if generated) from the device itself
+%%--------------------------------------------------------------------
+read(InstrumentID,ChannelSpec) ->
+	gen_server:call(InstrumentID,{read,ChannelSpec}).
 
 %%====================================================================
 %% gen_server callbacks
@@ -46,9 +58,13 @@ init([InstrumentID,PrologixID,BusAddress]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-handle_call(_Request, _From, State) ->
-  Reply = ok,
-  {reply, Reply, State}.
+handle_call({read,Channels}, From, #state{epro_handle = H}=StateData) ->
+	ReadStr = read_channel_string(Channels),
+	AddrStr = "++addr 9\n",
+	{ok, R} = eprologix_cmdr:send_query(H,[AddrStr|ReadStr]),
+	OutgoingReq = #req_data{from=From,ref = R},
+	NewStateData = StateData#state{c_req = OutgoingReq},
+	{noreply, NewStateData}.
 
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
@@ -65,8 +81,10 @@ handle_cast(_Msg, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
-  {noreply, State}.
+handle_info({R,Data}, #state{c_req=#req_data{from=F,ref=R}}=StateData) ->
+	gen_server:reply(F,Data),
+	NewStateData = StateData#state{c_req=none},
+	{noreply, NewStateData}.
 
 %%--------------------------------------------------------------------
 %% Function: terminate(Reason, State) -> void()
@@ -88,3 +106,40 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+channel_tuple_to_int({CardNumber,ChannelNumber}) ->
+	100*CardNumber + ChannelNumber.
+
+channel_tuple_list_to_channel_spec([]) ->
+	"";
+channel_tuple_list_to_channel_spec(Tuples) ->
+	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
+	channel_ints_to_channel_spec(lists:sort(IntChannels),false,[]).
+
+channel_ints_to_channel_spec([], false, Acc) ->
+	lists:reverse(Acc);
+channel_ints_to_channel_spec([], H0, Acc) ->
+	Str = io_lib:format(":~p",[H0]), 
+	lists:reverse([Str|Acc]);
+
+channel_ints_to_channel_spec([H1,H2|T],false,Acc) when H2 == (H1 + 1) ->
+	Str = io_lib:format("~p",[H1]),
+	channel_ints_to_channel_spec(T,H2,[Str|Acc]);
+
+channel_ints_to_channel_spec([H|T],H0,Acc) when H == (H0 + 1) ->
+	channel_ints_to_channel_spec(T,H,Acc);
+
+channel_ints_to_channel_spec([S],false,Acc) ->
+	Str = io_lib:format("~p",[S]),
+	channel_ints_to_channel_spec([],false,[Str|Acc]);
+
+channel_ints_to_channel_spec([H|T],false,Acc) ->
+	Str = io_lib:format("~p",[H]),
+	channel_ints_to_channel_spec(T,false,[Str ++ ","|Acc]);
+
+channel_ints_to_channel_spec([_H|_T]=L,H0,Acc) ->
+	Str = io_lib:format(":~p",[H0]),
+	channel_ints_to_channel_spec(L,false,[Str ++ ","|Acc]).
+
+read_channel_string(ChannelList) ->
+	ChannelSpec = channel_tuple_list_to_channel_spec(ChannelList),
+	"MEAS:VOLT:DC? 10,0.003, (@" ++ ChannelSpec ++ ")".
