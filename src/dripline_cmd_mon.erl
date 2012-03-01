@@ -20,8 +20,8 @@
 		terminate/3, code_change/4]).
 
 % states
-connecting(timeout, #state{db_handle=Db}=StateData) ->
-	case couchbeam_changes:stream(Db,self(),[continuous,include_docs]) of
+connecting(timeout, #state{db_handle=Db,lastSeqNo=N}=StateData) ->
+	case couchbeam_changes:stream(Db,self(),[continuous,include_docs,{since,N}]) of
 		{ok, _StartRef, ChPid} -> 
 			{next_state, waiting, StateData#state{change_proc = ChPid}};
 		{error, _Error} ->
@@ -40,7 +40,12 @@ start_link() ->
 init([]) ->
 	S = dripline_conn_mgr:get(),
 	{ok, Db} = couchbeam:open_db(S,"dripline_cmd"),
-	{ok, connecting, #state{db_handle = Db, lastSeqNo = 0}, 1}.
+	LastSeqNo = get_last_seq(Db),
+	InitialState = #state{
+		db_handle = Db,
+		lastSeqNo = LastSeqNo
+	},
+	{ok, connecting, InitialState, 0}.
 
 handle_event(_Event, StateName, StateData) ->
 	{next_state, StateName, StateData}.
@@ -60,3 +65,10 @@ terminate(_Reason, _StateName, _StateData) ->
 
 code_change(_Vsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Internal Functions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_last_seq(DbHandle) ->
+	{ok,{Info}} = couchbeam:db_info(DbHandle),
+	proplists:get_value(<<"update_seq">>,Info).
