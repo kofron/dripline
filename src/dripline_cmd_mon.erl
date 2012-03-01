@@ -21,7 +21,7 @@
 
 % states
 connecting(timeout, #state{db_handle=Db}=StateData) ->
-	case couchbeam_changes:stream(Db,self(),[continuous]) of
+	case couchbeam_changes:stream(Db,self(),[continuous,include_docs]) of
 		{ok, _StartRef, ChPid} -> 
 			{next_state, waiting, StateData#state{change_proc = ChPid}};
 		{error, _Error} ->
@@ -52,6 +52,7 @@ handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
 handle_info({change, _Ref, {ChangeData}}, waiting, StateData) ->
 	LastSeq = proplists:get_value(<<"seq">>,ChangeData),
+	dripline_dispatch:dispatch(ChangeData),
 	{next_state, waiting, StateData}.
 
 terminate(_Reason, _StateName, _StateData) ->
