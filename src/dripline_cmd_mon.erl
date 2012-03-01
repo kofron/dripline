@@ -67,13 +67,12 @@ handle_sync_event({notify,DocId,RevNo}, _From, StateName, #state{revs=R}=StateDa
 handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
 handle_info({change, _Ref, {ChangeData}}, waiting, #state{revs=R}=StateData) ->
-%	dripline_dispatch:dispatch(ChangeData),
 	NewStateData = case ignore_update(ChangeData,R) of
 		true ->
 			StateData;
 		false ->
 			NewRevs = update_rev_data(ChangeData,R),
-			io:format("~p~n",[ChangeData]),
+			dripline_dispatch:dispatch(ChangeData),		
 			StateData#state{revs=NewRevs}
 	end,
 	{next_state, waiting, NewStateData}.
