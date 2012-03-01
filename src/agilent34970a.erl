@@ -4,9 +4,7 @@
 %% API
 -export([start_link/3]).
 -export([read/2]).
-
-%% DEBUG
--export([channel_tuple_list_to_channel_spec/1]).
+-export([locator_to_ch_data/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -34,6 +32,21 @@ start_link(InstrumentID,PrologixID,BusAddress) ->
 %%--------------------------------------------------------------------
 read(InstrumentID,ChannelSpec) ->
 	gen_server:call(InstrumentID,{read,ChannelSpec}).
+
+%%--------------------------------------------------------------------
+%% Function: locator_to_ch_data(LocatorBinary) -> {ok,Locator}
+%%												|  {error,bad_locator}
+%% Description: parses a locator as stored in the couch database into
+%% a format that the instrument understands.
+%%--------------------------------------------------------------------
+locator_to_ch_data(LocatorBinary) ->
+	LocatorString = erlang:binary_to_list(LocatorBinary),
+	case io_lib:fread("{~u,~u}",LocatorString) of
+		{ok, [CardNumber,ChannelNumber], []} ->
+			{CardNumber,ChannelNumber};
+		_Error ->
+			{error, bad_locator}
+	end.
 
 %%====================================================================
 %% gen_server callbacks
