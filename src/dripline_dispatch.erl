@@ -29,8 +29,9 @@ dispatch_instr(Db,CmdDoc, InstrDoc) ->
 
 update_doc(Db, CmdDoc, CmdResult) ->
 	UpDoc = couchbeam_doc:set_value(<<"result">>,CmdResult,CmdDoc),
+	NewRev = couchbeam_doc:get_value(<<"_rev">>,CmdDoc),
 	UpRes = couchbeam:save_doc(Db,UpDoc),
-	io:format("~p:~p~n",[UpDoc,UpRes]).
+	io:format("~p~n",[NewRev]).
 
 parse_f_a(CmdDoc) ->
 	io:format("~p~n",[CmdDoc]),
