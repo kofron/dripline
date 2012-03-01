@@ -21,7 +21,6 @@
 
 % states
 connecting(timeout, #state{db_handle=Db}=StateData) ->
-	io:format("(re)connecting to db:~p~n",[Db]),
 	case couchbeam_changes:stream(Db,self(),[continuous]) of
 		{ok, _StartRef, ChPid} -> 
 			{next_state, waiting, StateData#state{change_proc = ChPid}};
@@ -53,7 +52,6 @@ handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
 handle_info({change, _Ref, {ChangeData}}, waiting, StateData) ->
 	LastSeq = proplists:get_value(<<"seq">>,ChangeData),
-	io:format("(~p): ~p~n",[LastSeq,ChangeData]),
 	{next_state, waiting, StateData}.
 
 terminate(_Reason, _StateName, _StateData) ->
