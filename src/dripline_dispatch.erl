@@ -12,9 +12,10 @@ dispatch_doc(CmdDoc) ->
 			ok;
 		DocId ->
 			Conn = dripline_conn_mgr:get(),
-			{ok, Db} = couchbeam:open_db(Conn,"dripline_conf"),
-			{ok, InstrDoc} = couchbeam:open_doc(Db,DocId),
-			dispatch_instr(Db,CmdDoc,InstrDoc)
+			{ok, ConfDb} = couchbeam:open_db(Conn,"dripline_conf"),
+		{ok,CmdDb} = couchbeam:open_db(Conn,"dripline_cmd"),
+			{ok, InstrDoc} = couchbeam:open_doc(ConfDb,DocId),
+			dispatch_instr(CmdDb,CmdDoc,InstrDoc)
 	end.
 
 dispatch_instr(Db,CmdDoc, InstrDoc) ->
@@ -28,8 +29,8 @@ dispatch_instr(Db,CmdDoc, InstrDoc) ->
 
 update_doc(Db, CmdDoc, CmdResult) ->
 	UpDoc = couchbeam_doc:set_value(<<"result">>,CmdResult,CmdDoc),
-	couchbeam:save_doc(Db,UpDoc),
-	io:format("~p~n",[CmdResult]).
+	UpRes = couchbeam:save_doc(Db,UpDoc),
+	io:format("~p:~p~n",[UpDoc,UpRes]).
 
 parse_f_a(CmdDoc) ->
 	io:format("~p~n",[CmdDoc]),
