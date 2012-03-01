@@ -32,11 +32,10 @@ update_doc(Db, CmdDoc, CmdResult) ->
 	NewRev = couchbeam_doc:get_value(<<"_rev">>,CmdDoc),
 	Id = couchbeam_doc:get_value(<<"_id">>,CmdDoc),
 	NewRevNo = strip_rev_no(NewRev) + 1,
-	dripline_cmd_mon:notify(Id,NeRevNo),
+	spawn(fun() -> dripline_cmd_mon:notify(Id,NewRevNo) end),
 	UpRes = couchbeam:save_doc(Db,UpDoc).
 
 parse_f_a(CmdDoc) ->
-	io:format("~p~n",[CmdDoc]),
 	{read,[{1,1}]}.
 
 binary_to_atom(B) ->
