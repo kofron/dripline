@@ -106,6 +106,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+%%--------------------------------------------------------------------
+%% Function: channel_tuple_to_int({integer(),integer()}) -> integer()
+%% Description: Converts from "human syntax", which is to say {card,
+%% channel}, to the syntax that the 34970 likes for channel 
+%% designations.
+%%--------------------------------------------------------------------
 channel_tuple_to_int({CardNumber,ChannelNumber}) ->
 	100*CardNumber + ChannelNumber.
 
