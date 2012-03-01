@@ -30,8 +30,10 @@ dispatch_instr(Db,CmdDoc, InstrDoc) ->
 update_doc(Db, CmdDoc, CmdResult) ->
 	UpDoc = couchbeam_doc:set_value(<<"result">>,CmdResult,CmdDoc),
 	NewRev = couchbeam_doc:get_value(<<"_rev">>,CmdDoc),
-	UpRes = couchbeam:save_doc(Db,UpDoc),
-	io:format("~p~n",[NewRev]).
+	Id = couchbeam_doc:get_value(<<"_id">>,CmdDoc),
+	NewRevNo = strip_rev_no(NewRev) + 1,
+	dripline_cmd_mon:notify(Id,NeRevNo),
+	UpRes = couchbeam:save_doc(Db,UpDoc).
 
 parse_f_a(CmdDoc) ->
 	io:format("~p~n",[CmdDoc]),
@@ -39,3 +41,8 @@ parse_f_a(CmdDoc) ->
 
 binary_to_atom(B) ->
 	erlang:list_to_atom(erlang:binary_to_list(B)).
+
+strip_rev_no(BinRev) ->
+	[NS,_] = string:tokens(binary_to_list(BinRev),"-"),
+	{N,[]} = string:to_integer(NS),
+	N.
