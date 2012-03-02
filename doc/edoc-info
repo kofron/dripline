@@ -1,0 +1,5 @@
+{application,dripline}.
+{packages,[]}.
+{modules,[agilent34970a,dripline,dripline_app,dripline_cmd_mon,
+          dripline_conf_mgr,dripline_conf_mon,dripline_conn_mgr,
+          dripline_dispatch,dripline_instr_sup,dripline_sup]}.
