@@ -67,7 +67,8 @@ notify(DocId,RevNo) ->
 %% @end
 %%---------------------------------------------------------------------%%
 connecting(timeout, #state{db_handle=Db,lastSeqNo=N}=StateData) ->
-	case couchbeam_changes:stream(Db,self(),[continuous,include_docs,{since,N}]) of
+	StreamOpts = [continuous,include_docs,{since,N}],
+	case couchbeam_changes:stream(Db,self(),StreamOpts) of
 		{ok, _StartRef, ChPid} -> 
 			{next_state, waiting, StateData#state{change_proc = ChPid}};
 		{error, _Error} ->
@@ -107,21 +108,21 @@ handle_event(_Event, StateName, StateData) ->
 %% @todo we should clear the ignore flag after receiving a given update
 %%		and maybe even log a warning if we don't get it after a certain
 %%		amount of time.
-handle_sync_event({notify,DocId,RevNo}, _From, StateName, #state{revs=R}=StateData) ->
-	NewRevs = dict:update(DocId, fun(_) -> RevNo end,R),
-	NewStateData = StateData#state{revs=NewRevs},
-	{reply, ok, StateName, NewStateData}.
+handle_sync_event({notify,Id,RNo}, _F, SName, #state{revs=R}=SData) ->
+	NewRevs = dict:update(Id, fun(_) -> RNo end,R),
+	NewStateData = SData#state{revs=NewRevs},
+	{reply, ok, SName, NewStateData}.
 
-handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
+handle_info({change, _R, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
-handle_info({change, _Ref, {ChangeData}}, waiting, #state{revs=R}=StateData) ->
+handle_info({change, _R, {ChangeData}}, waiting, #state{revs=R}=SData) ->
 	NewStateData = case ignore_update(ChangeData,R) of
 		true ->
-			StateData;
+			SData;
 		false ->
 			NewRevs = update_rev_data(ChangeData,R),
 			dripline_dispatch:dispatch(ChangeData),		
-			StateData#state{revs=NewRevs}
+			SData#state{revs=NewRevs}
 	end,
 	{next_state, waiting, NewStateData}.
 
@@ -165,22 +166,6 @@ update_rev_data(ChangeData,RevisionInfo) ->
 	BinRev = couchbeam_doc:get_value(<<"_rev">>,Doc),
 	Rev = strip_rev_no(BinRev),
 	dict:store(Id,Rev,RevisionInfo).
-
-%%---------------------------------------------------------------------%%
-%% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision
-%% 		sequence number.  this is very useful for notifying the monitor
-%%		that a sequence number is about to be changed by e.g. us.
-%% @end
-%%---------------------------------------------------------------------%%
--spec strip_rev_no(binary()) -> integer().
-strip_rev_no(BinRev) ->
-	[NS,_] = string:tokens(binary_to_list(BinRev),"-"),
-	{N,[]} = string:to_integer(NS),
-	N.
-strip_rev_no(BinRev) ->
-	[NS,_] = string:tokens(binary_to_list(BinRev),"-"),
-	{N,[]} = string:to_integer(NS),
-	N.
 
 %%---------------------------------------------------------------------%%
 %% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision

@@ -27,14 +27,15 @@
 %%% internal state record %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
-			channels, 
-			instruments
+			chs, 
+			ins
 		}).
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
 %%%%%%%%%%%%%%%%%%%%%%
-lookup(channel,binary()) -> {ok,term()} | {error,{bad_channel,binary()}}.
+-spec lookup(channel,binary()) -> 
+		{ok,term()} | {error,{bad_channel,binary()}}.
 lookup(channel,ChName) ->
 	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
 
@@ -47,17 +48,17 @@ start_link() ->
 init([]) ->
 	SConn = dripline_conn_mgr:get(),
 	{ok, Db} = couchbeam:open_db(SConn,"dripline_conf"),
-	{ok, AllInstruments} = couchbeam_view:fetch(Db,{"objects","instruments"}),
+	{ok, AllInstr} = couchbeam_view:fetch(Db,{"objects","instruments"}),
 	{ok, AllChannels} = couchbeam_view:fetch(Db,{"objects","channels"}),
 	ChanDict = generate_channel_dict(AllChannels),
-	InstDict = generate_instrument_dict(AllInstruments),
+	InstDict = generate_instrument_dict(AllInstr),
 	InitialState = #state{
-		channels = ChanDict,
-		instruments = InstDict
+		chs = ChanDict,
+		ins = InstDict
 	},
 	{ok, InitialState}.
 
-handle_call({lookup,{ch,Name}}, _From, #state{channels=Ch,instruments=In}=StateData) ->
+handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
 			normalize_instrument_name(Value,In);

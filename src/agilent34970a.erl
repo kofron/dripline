@@ -1,44 +1,63 @@
+%% @doc the agilent 34970a is a "data acquisition/switch unit", which 
+%% 		means it carries a number of multifunction modules, such as
+%%		ADC banks, general purpose switches, RF muxers, and so on.  
+%%		They are controlled via either GPIB or RS232 - currently the
+%% 		module only supports the GPIB interface.
+%% @author jared kofron <jared.kofron@gmail.com>
+%% @todo write/configure functions
 -module(agilent34970a).
 -behavior(gen_server).
 
-%% API
--export([start_link/3]).
+%%%%%%%%%%%
+%%% API %%%
+%%%%%%%%%%%
 -export([read/2]).
 -export([locator_to_ch_data/1]).
 
-%% gen_server callbacks
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_server api and callbacks %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-export([start_link/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% internal record definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(req_data, {from, ref}).
 -record(state, {id, gpib_addr, epro_handle, c_req}).
 
-%%====================================================================
-%% API
-%%====================================================================
-%%--------------------------------------------------------------------
-%% Function: start_link() -> {ok,Pid} | ignore | {error,Error}
-%% Description: Starts the server
-%%--------------------------------------------------------------------
-start_link(InstrumentID,PrologixID,BusAddress) ->
-  gen_server:start_link({local, InstrumentID}, ?MODULE, [InstrumentID,PrologixID,BusAddress], []).
+%%%%%%%%%%%%%%%%%%
+%%% Data Types %%%
+%%%%%%%%%%%%%%%%%%
+-type channel_spec() :: {integer(),integer()}.
 
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% API definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%
 
-%%--------------------------------------------------------------------
-%% Function: read(Instrument, ChannelSpec) -> 
-%%										{ok, Result} | {error, Error}
-%% Description: Asks for data from the device by querying the prologix
-%% handle.  Returns error codes (if generated) from the device itself
-%%--------------------------------------------------------------------
+%%---------------------------------------------------------------------%%
+%% @doc read/2 maps a request for data onto the correct instrument and
+%%		synchronously returns either data or a descriptive error.  Error
+%%		codes that are returned are from the instrument itself.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec read(atom(),channel_spec()) -> binary() | {error, term()}.
 read(InstrumentID,ChannelSpec) ->
 	gen_server:call(InstrumentID,{read,ChannelSpec}).
 
-%%--------------------------------------------------------------------
-%% Function: locator_to_ch_data(LocatorBinary) -> {ok,Locator}
-%%												|  {error,bad_locator}
-%% Description: parses a locator as stored in the couch database into
-%% a format that the instrument understands.
-%%--------------------------------------------------------------------
+%%---------------------------------------------------------------------%%
+%% @doc locator_to_ch_data is part of a generic instrument interface.  
+%%		essentially it allows us to take a string that is human readable
+%%		and turn it into something that the instrument understands as 
+%%		referring to a channel.  This is nice because in the database,
+%%		the amount of information that the user needs to know about the
+%%		instrument itself is reduced.
+%% @todo maybe this should get moved into a behavior?
+%% @end
+%%---------------------------------------------------------------------%%
+-spec locator_to_ch_data(binary()) -> 
+		channel_spec() | {error, bad_locator}.
 locator_to_ch_data(LocatorBinary) ->
 	LocatorString = erlang:binary_to_list(LocatorBinary),
 	case io_lib:fread("{~u,~u}",LocatorString) of
@@ -52,25 +71,24 @@ locator_to_ch_data(LocatorBinary) ->
 %% gen_server callbacks
 %%====================================================================
 
-%%--------------------------------------------------------------------
-%% Function: init(Args) -> {ok, State} |
-%%                         {ok, State, Timeout} |
-%%                         ignore               |
-%%                         {stop, Reason}
-%% Description: Initiates the server
-%%--------------------------------------------------------------------
-init([InstrumentID,PrologixID,BusAddress]) ->
-	{ok, #state{gpib_addr=BusAddress,id=InstrumentID,epro_handle=PrologixID}}.
+%%---------------------------------------------------------------------%%
+%% @doc start_link/3 starts the instrument interface with a specific 
+%%		prologix device and bus address.  note that we are just assuming
+%%		that we can actually talk to the bus - init/1 succeeds no matter
+%%		what.
+%% @todo maybe we shouldn't succeed if the bus isn't available.
+%% @end
+%%---------------------------------------------------------------------%%
+start_link(InstrumentID,PrologixID,BusAddress) ->
+	Args = [InstrumentID,PrologixID,BusAddress],
+	gen_server:start_link({local, InstrumentID}, ?MODULE, Args, []).
 
-%%--------------------------------------------------------------------
-%% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
-%%                                      {reply, Reply, State, Timeout} |
-%%                                      {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, Reply, State} |
-%%                                      {stop, Reason, State}
-%% Description: Handling call messages
-%%--------------------------------------------------------------------
+init([InstrumentID,PrologixID,BusAddress]) ->
+	InitialState = #state{
+		gpib_addr=BusAddress,id=InstrumentID,epro_handle=PrologixID
+	},
+	{ok, InitialState}.
+
 handle_call({read,Channels}, From, #state{epro_handle = H}=StateData) ->
 	ReadStr = read_channel_string(Channels),
 	AddrStr = "++addr 9\n",
@@ -79,62 +97,60 @@ handle_call({read,Channels}, From, #state{epro_handle = H}=StateData) ->
 	NewStateData = StateData#state{c_req = OutgoingReq},
 	{noreply, NewStateData}.
 
-%%--------------------------------------------------------------------
-%% Function: handle_cast(Msg, State) -> {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, State}
-%% Description: Handling cast messages
-%%--------------------------------------------------------------------
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% Function: handle_info(Info, State) -> {noreply, State} |
-%%                                       {noreply, State, Timeout} |
-%%                                       {stop, Reason, State}
-%% Description: Handling all non call/cast messages
-%%--------------------------------------------------------------------
 handle_info({R,Data}, #state{c_req=#req_data{from=F,ref=R}}=StateData) ->
 	gen_server:reply(F,Data),
 	NewStateData = StateData#state{c_req=none},
 	{noreply, NewStateData}.
 
-%%--------------------------------------------------------------------
-%% Function: terminate(Reason, State) -> void()
-%% Description: This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any necessary
-%% cleaning up. When it returns, the gen_server terminates with Reason.
-%% The return value is ignored.
-%%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
   ok.
 
-%%--------------------------------------------------------------------
-%% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% Description: Convert process state when code is changed
-%%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
-%%--------------------------------------------------------------------
-%%% Internal functions
-%%--------------------------------------------------------------------
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Internal functions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%--------------------------------------------------------------------
-%% Function: channel_tuple_to_int({integer(),integer()}) -> integer()
-%% Description: Converts from "human syntax", which is to say {card,
-%% channel}, to the syntax that the 34970 likes for channel 
-%% designations.
-%%--------------------------------------------------------------------
+%%---------------------------------------------------------------------%%
+%% @doc channel_tuple_to_int/1 takes a tuple {CardNumber,ChannelNumber}
+%% 		and converts it to the data that the agilent is expecting, which
+%%		is a single integer.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_tuple_to_int({integer(),integer()}) -> integer().
 channel_tuple_to_int({CardNumber,ChannelNumber}) ->
 	100*CardNumber + ChannelNumber.
 
+%%---------------------------------------------------------------------%%
+%% @doc channel_tuple_list_to_channel_spec is a very fun function.  
+%%		it takes a list of tuples [{integer(),integer()}] and produces a
+%%		string that the agilent 34970a is expecting, which is of the form
+%%		"101,105,301...".  the cool part is range detection.  the 
+%%		instrument takes ranges in the form of 101:105, which means all
+%%		channels between 1 and 5 on card 1.  this function will 
+%%		automagically produce the appropriate range queries if ranges
+%%		are found in the list of tuples.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_tuple_list_to_channel_spec([channel_spec()]) -> string().
 channel_tuple_list_to_channel_spec([]) ->
 	"";
 channel_tuple_list_to_channel_spec(Tuples) ->
 	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
 	channel_ints_to_channel_spec(lists:sort(IntChannels),false,[]).
 
+%%---------------------------------------------------------------------%%
+%% @doc channel_ints_to_channel_spec is where the magic happens in terms
+%%		of generating the actual data to be sent to the instrument.  
+%% @see channel_tuple_list_to_channel_spec
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_ints_to_channel_spec([channel_spec()],atom(),string()) ->
+		string().
 channel_ints_to_channel_spec([], false, Acc) ->
 	lists:reverse(Acc);
 channel_ints_to_channel_spec([], H0, Acc) ->
@@ -160,6 +176,12 @@ channel_ints_to_channel_spec([_H|_T]=L,H0,Acc) ->
 	Str = io_lib:format(":~p",[H0]),
 	channel_ints_to_channel_spec(L,false,[Str ++ ","|Acc]).
 
+%%---------------------------------------------------------------------%%
+%% @doc read_channel_string takes a string and returns the command string
+%%		to be sent over GPIB to read from the instrument.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec read_channel_string(string()) -> string().
 read_channel_string(ChannelList) ->
 	ChannelSpec = channel_tuple_list_to_channel_spec(ChannelList),
 	"MEAS:VOLT:DC? 10,0.003, (@" ++ ChannelSpec ++ ")".
