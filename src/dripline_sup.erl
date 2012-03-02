@@ -1,3 +1,12 @@
+%% @doc dripline_sup is the top-level supervisor for the dripline
+%%		application.  It starts all of the managers and monitors
+%%		that listen to couchdb for changes and manage state.
+%% @author jared kofron <jared.kofron@gmail.com>
+%% @version 0.1a
+%% @todo Once we start getting config data from the database itself,
+%% 		we're going to need to be more sophisticated than this in terms
+%% 		of the tree structure.
+
 -module(dripline_sup).
 
 -behaviour(supervisor).
@@ -9,7 +18,14 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(I, Type), {
+							I, 
+							{I, start_link, []}, 
+							permanent, 
+							5000, 
+							Type, 
+							[I]
+						}).
 
 %% ===================================================================
 %% API functions

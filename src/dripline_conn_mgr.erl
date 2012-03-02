@@ -1,23 +1,42 @@
+%% @doc dripline_conn_mgr is one of the dripline core 'managers'.  it
+%% 		has a very simple task - hand out connections to the database
+%%		when it is asked to.  for now it is incredibly simple and just
+%%		provides a connection to anybody, anytime.  this may require some
+%%		form of connection pooling in the future - this module is 
+%%		designed to guarantee an API.
+%% @author jared kofron <jared.kofron@gmail.com>
+%% @version 0.1a
 -module(dripline_conn_mgr).
 -behavior(gen_server).
 
-% internal server state
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% server state record %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{conn_gen}).
 
-% API
+%%%%%%%%%%%
+%%% API %%%
+%%%%%%%%%%%
 -export([get/0]).
 
-% starting and linking
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_server API and callbacks %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([start_link/0]).
 
-% gen_server callbacks
 -export([init/1,handle_call/3,handle_cast/2,handle_info/2,
 		terminate/2,code_change/3]).
 
-% API definitions
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% API definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%
+-spec get() -> any().
 get() ->
 	gen_server:call(?MODULE,new_conn).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_server API and callback definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 handle_call(new_conn, _From, #state{conn_gen = F} = StateData) ->
 	{reply, F(), StateData}.
 

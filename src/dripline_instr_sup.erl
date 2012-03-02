@@ -1,3 +1,11 @@
+%% @doc dripline_instr_sup is the OTP supervisor module that is 
+%%		responsible for supervising all 'instrument' API modules.
+%%		right now it is really pretty limited in the sense that
+%%		the instruments are hard-coded in.
+%% @version 0.1a
+%% @todo We should be getting configuration data from the database
+%%		itself and generating childspecs dynamically.
+%% @author jared kofron <jared.kofron@gmail.com>
 -module(dripline_instr_sup).
 
 -behaviour(supervisor).
