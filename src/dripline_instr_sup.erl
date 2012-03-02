@@ -56,4 +56,16 @@ init([]) ->
 		worker,
 		[agilent34790a]
 	},
-    {ok, { SuperStrategy, [SwitchMux,ADCMux] }}.
+	HFSweeper = {
+		hf_sweeper,
+		{
+			hp8340b,
+			start_link,
+			[hf_sweeper,right_box,19]
+		},
+		permanent,
+		5000,
+		worker,
+		[hf_sweeper]
+	},
+    {ok, { SuperStrategy, [SwitchMux,ADCMux,HFSweeper] }}.
