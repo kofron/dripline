@@ -139,6 +139,8 @@ channel_tuple_to_int({CardNumber,ChannelNumber}) ->
 -spec channel_tuple_list_to_channel_spec([channel_spec()]) -> string().
 channel_tuple_list_to_channel_spec([]) ->
 	"";
+channel_tuple_list_to_channel_spec({_,_}=SingleTuple) ->
+	channel_tuple_list_to_channel_spec([SingleTuple]);
 channel_tuple_list_to_channel_spec(Tuples) ->
 	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
 	channel_ints_to_channel_spec(lists:sort(IntChannels),false,[]).
