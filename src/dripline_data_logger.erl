@@ -50,17 +50,14 @@ init([Call,Interval,MaxIterations]) ->
 	},
 	{ok, interrogating, InitialState, 0}.
 
-handle_event(Event, StateName, StateData) ->
-	io:format("got event: ~p~n",[Event]),
-	{next_state, StateName, StateData}.
+handle_event(_Event, _StateName, StateData) ->
+	{stop, unexpected_event, StateData}.
 
-handle_sync_event(Event,_From,StateName,StateData) ->
-	io:format("got sync event:~p~n",[Event]),
-	{reply, ok, StateName, StateData}.
+handle_sync_event(_Event,_From,_StateName,StateData) ->
+	{stop, unexpected_sync_event, StateData}.
 
-handle_info(Info, StateName, StateData) ->
-	io:format("got info:~p~n",[Info]),
-	{next_state, StateName, StateData}.
+handle_info(_Info, _StateName, StateData) ->
+	{stop, unexpected_info, StateData}.
 
 terminate(_Reason, _StateName, _StateData) ->
 	ok.
@@ -82,7 +79,7 @@ interrogating(timeout,#state{call=C}=StateData) ->
 	{next_state, writing, NewStateData, 0}.
 
 writing(timeout,#state{c_res=R,elapsed=T}=StateData) ->
-	{Time, _} = timer:tc(fun() -> R end),
+	{Time, _} = timer:tc(fun() -> write_couch_data(R) end),
 	NewStateData = StateData#state{
 		c_res = none,
 		elapsed = T + Time
@@ -103,6 +100,10 @@ sleeping(timeout,#state{elapsed=E,cur_it=C,max_it=M,interval=I}=SData) ->
 	end,
 	Branch.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% internal functions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%---------------------------------------------------------------------%%
 %% @doc calc_sleep_time/2 is a utility function that is unfortunately 
 %%		necessary due to the mix of units that we have to deal with.  the
@@ -113,3 +114,19 @@ sleeping(timeout,#state{elapsed=E,cur_it=C,max_it=M,interval=I}=SData) ->
 -spec calc_sleep_time(integer(),integer()) -> integer().
 calc_sleep_time(ElapsedTime, IntervalTime) ->
 	erlang:round(((IntervalTime*1000000) - ElapsedTime)/1000).
+
+%%---------------------------------------------------------------------%%
+%% @doc write_couch_data/1 takes a binary value as returned by an 
+%%		instrument and pushes it to the couchdb backend as a new 
+%%		document.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec write_couch_data(binary()) -> {ok, binary()} | {error, term()}.
+write_couch_data(Data) ->
+	% create the new document
+	NewDoc = {[]},
+	D0 = couchbeam_doc:set_value("data",Data,NewDoc),
+	% OK, get a handle to the database and write it.
+	SConn = dripline_conn_mgr:get(),
+	{ok, Db} = couchbeam:open_or_create_db(SConn,"dripline_logged_data"),
+	couchbeam:save_doc(Db,D0).
