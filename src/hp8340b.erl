@@ -27,7 +27,7 @@
 %%%%%%%%%%%%%%%%%%
 %%% Data Types %%%
 %%%%%%%%%%%%%%%%%%
--type channel_spec() :: 'PL' | 'CW' | 'FA' | 'FB' | 'ST'.
+-type channel_spec() :: string().
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API definitions %%%
@@ -45,11 +45,11 @@
 %%---------------------------------------------------------------------%%
 -spec locator_to_ch_data(binary()) -> 
 		channel_spec() | {error,bad_locator}.
-locator_to_ch_data(<<"power_level">>) -> 'PL';
-locator_to_ch_data(<<"cw_freq">>) -> 'CW';
-locator_to_ch_data(<<"sweep_start_freq">>) -> 'FA';
-locator_to_ch_data(<<"sweep_stop_freq">>) -> 'FB';
-locator_to_ch_data(<<"sweep_time">>) -> 'ST';
+locator_to_ch_data(<<"power_level">>) -> "PL";
+locator_to_ch_data(<<"cw_freq">>) -> "CW";
+locator_to_ch_data(<<"sweep_start_freq">>) -> "FA";
+locator_to_ch_data(<<"sweep_stop_freq">>) -> "FB";
+locator_to_ch_data(<<"sweep_time">>) -> "ST";
 locator_to_ch_data(_Other) -> {error,bad_locator}.
 
 %%---------------------------------------------------------------------%%
@@ -100,10 +100,10 @@ handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	WriteStr = write_channel_string(Channels,NewValue),
 	AddrStr = addr_string(A),
-	{ok, R} = eprologix_cmdr:send_query(H,[AddrStr|WriteStr]),
+	{ok, R} = eprologix_cmdr:send_command(H,[AddrStr|WriteStr]),
 	OutgoingReq = #req_data{from=From,ref = R},
 	NewStateData = StateData#state{c_req = OutgoingReq},
-	{noreply, NewStateData}.
+	{reply, ok, NewStateData}.
 
 handle_cast(_Cast,StateData) ->
 	{noreply, StateData}.
@@ -133,4 +133,11 @@ read_channel_string(CHString) ->
 
 -spec write_channel_string(string(),string()) -> string().
 write_channel_string(CHString,Value) ->
-	CHString ++ Value ++ "GZ".
+	CHString ++ Value ++ unit_string(CHString).
+
+-spec unit_string(string()) -> string().
+unit_string("CW") -> "MZ";
+unit_string("FA") -> unit_string("CW");
+unit_string("FB") -> unit_string("CW");
+unit_string("PL") -> "DB";
+unit_string("ST") -> "MS".
