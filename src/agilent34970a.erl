@@ -12,7 +12,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([read/2]).
--export([locator_to_ch_data/1]).
+-export([locator_to_ch_spec/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -30,6 +30,7 @@
 %%%%%%%%%%%%%%%%%%
 %%% Data Types %%%
 %%%%%%%%%%%%%%%%%%
+-type locator() :: binary().
 -type channel_spec() :: {integer(),integer()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -42,12 +43,13 @@
 %%		codes that are returned are from the instrument itself.
 %% @end
 %%---------------------------------------------------------------------%%
--spec read(atom(),channel_spec()) -> binary() | {error, term()}.
-read(InstrumentID,ChannelSpec) ->
+-spec read(atom(),locator()) -> binary() | {error, term()}.
+read(InstrumentID,Locator) ->
+	ChannelSpec = locator_to_ch_spec(Locator),
 	gen_server:call(InstrumentID,{read,ChannelSpec}).
 
 %%---------------------------------------------------------------------%%
-%% @doc locator_to_ch_data is part of a generic instrument interface.  
+%% @doc locator_to_ch_spec is part of a generic instrument interface.  
 %%		essentially it allows us to take a string that is human readable
 %%		and turn it into something that the instrument understands as 
 %%		referring to a channel.  This is nice because in the database,
@@ -56,9 +58,9 @@ read(InstrumentID,ChannelSpec) ->
 %% @todo maybe this should get moved into a behavior?
 %% @end
 %%---------------------------------------------------------------------%%
--spec locator_to_ch_data(binary()) -> 
+-spec locator_to_ch_spec(binary()) -> 
 		channel_spec() | {error, bad_locator}.
-locator_to_ch_data(LocatorBinary) ->
+locator_to_ch_spec(LocatorBinary) ->
 	LocatorString = erlang:binary_to_list(LocatorBinary),
 	case io_lib:fread("{~u,~u}",LocatorString) of
 		{ok, [CardNumber,ChannelNumber], []} ->
