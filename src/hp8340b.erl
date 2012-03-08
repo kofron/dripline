@@ -35,7 +35,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 %%---------------------------------------------------------------------%%
-%% @doc locator_to_ch_data is part of a generic instrument interface.  
+%% @doc locator_to_ch_spec is part of a generic instrument interface.  
 %%		essentially it allows us to take a string that is human readable
 %%		and turn it into something that the instrument understands as 
 %%		referring to a channel.  This is nice because in the database,
