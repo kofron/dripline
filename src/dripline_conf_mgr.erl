@@ -34,10 +34,15 @@
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
 %%%%%%%%%%%%%%%%%%%%%%
--spec lookup(channel,binary()) -> 
-		{ok,term()} | {error,{bad_channel,binary()}}.
+-spec lookup(atom(),binary()) -> {ok,term()} | {error,term()}.
 lookup(channel,ChName) ->
-	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
+	gen_server:call(?MODULE,{lookup,{ch,ChName}});
+lookup(module,ChName) ->
+	gen_server:call(?MODULE,{lookup,{md,ChName}});
+lookup(instrument_id,ChName) ->
+	gen_server:call(?MODULE,{lookup,{id,ChName}});
+lookup(locator,ChName) ->
+	gen_server:call(?MODULE,{lookup,{lc,ChName}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
@@ -64,6 +69,36 @@ handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
 			normalize_instrument_name(Value,In);
 		error ->
 			{error, {bad_channel,Name}}
+	end,
+	{reply, Reply, StateData};
+handle_call({lookup,{md,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
+	Reply = case dict:find(Name,Ch) of
+		{ok, Value} ->
+			D = normalize_instrument_name(Value,In),
+			{ok, Module} = dict:find(module,D),
+			Module;
+		error ->
+			{error, {no_module,Name}}
+	end,
+	{reply, Reply, StateData};
+handle_call({lookup,{id,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
+	Reply = case dict:find(Name,Ch) of
+		{ok, Value} ->
+			D = normalize_instrument_name(Value,In),
+			{ok, Instr} = dict:find(id,D),
+			Instr;
+		error ->
+			{error, {no_name, Name}}
+	end,
+	{reply, Reply, StateData};
+handle_call({lookup,{lc,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
+	Reply = case dict:find(Name,Ch) of
+		{ok, Value} ->
+			D = normalize_instrument_name(Value,In),
+			{ok, Locator} = dict:find(locator,D),
+			Locator;
+		error ->
+			{error, {no_locator, Name}}
 	end,
 	{reply, Reply, StateData}.
 
@@ -95,12 +130,12 @@ normalize_instrument_name(Value,In) ->
 	Result = case dict:find(InstrDoc,In) of
 		{ok, Value2} ->
 			ModName = binary_to_atom(couchbeam_doc:get_value(<<"instrument_model">>,Value2)),
-			InstrName = couchbeam_doc:get_value(<<"name">>,Value2),
+			InstrName = binary_to_atom(couchbeam_doc:get_value(<<"name">>,Value2)),
 			Locator = couchbeam_doc:get_value(<<"locator">>,Value),
 			dict:from_list([
 				{id,InstrName},
-				{locator,ModName:locator_to_ch_data(Locator)},
-				{read, fun(X) -> ModName:read(binary_to_atom(InstrName),X) end}
+				{module,ModName},
+				{locator,Locator}
 			]);
 		error ->
 			{error, {bad_instrument, InstrDoc}}
