@@ -9,7 +9,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([read/2,write/3]).
--export([locator_to_ch_data/1]).
+-export([locator_to_ch_spec/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -27,6 +27,7 @@
 %%%%%%%%%%%%%%%%%%
 %%% Data Types %%%
 %%%%%%%%%%%%%%%%%%
+-type locator() :: binary().
 -type channel_spec() :: string().
 
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -43,24 +44,27 @@
 %% @todo maybe this should get moved into a behavior?
 %% @end
 %%---------------------------------------------------------------------%%
--spec locator_to_ch_data(binary()) -> 
+-spec locator_to_ch_spec(locator()) -> 
 		channel_spec() | {error,bad_locator}.
-locator_to_ch_data(<<"power_level">>) -> "PL";
-locator_to_ch_data(<<"cw_freq">>) -> "CW";
-locator_to_ch_data(<<"sweep_start_freq">>) -> "FA";
-locator_to_ch_data(<<"sweep_stop_freq">>) -> "FB";
-locator_to_ch_data(<<"sweep_time">>) -> "ST";
-locator_to_ch_data(_Other) -> {error,bad_locator}.
+locator_to_ch_spec(<<"power_level">>) -> "PL";
+locator_to_ch_spec(<<"cw_freq">>) -> "CW";
+locator_to_ch_spec(<<"sweep_start_freq">>) -> "FA";
+locator_to_ch_spec(<<"sweep_stop_freq">>) -> "FB";
+locator_to_ch_spec(<<"sweep_time">>) -> "ST";
+locator_to_ch_spec(_Other) -> {error,bad_locator}.
 
 %%---------------------------------------------------------------------%%
 %% @doc read/2 maps a request for data onto the correct instrument and
 %%		synchronously returns either data or a descriptive error.  Error
-%%		codes that are returned are from the instrument itself.
+%%		codes that are returned are from the instrument itself.  Because
+%%		these are externally facing functions, we use locators instead
+%%		of channel specs.
 %% @end
 %%---------------------------------------------------------------------%%
--spec read(atom(),channel_spec()) -> binary() | {error,term()}.
-read(InstrumentID,ChannelSpec) ->
-	gen_server:call(InstrumentID,{read,ChannelSpec}).
+-spec read(atom(),locator()) -> binary() | {error,term()}.
+read(InstrumentID,Locator) ->
+	CHSpec = locator_to_ch_spec(Locator),
+	gen_server:call(InstrumentID,{read,CHSpec}).
 
 %%---------------------------------------------------------------------%%
 %% @doc write/3 maps a write request onto the correct instrument and 
@@ -68,9 +72,11 @@ read(InstrumentID,ChannelSpec) ->
 %%		error tuple.  Error codes come from the instrument.
 %% @end
 %%---------------------------------------------------------------------%%
--spec write(atom(),channel_spec(),binary()) -> ok | {error,term()}.
-write(InstrumentID,ChannelSpec,NewValue) ->
-	gen_server:call(InstrumentID,{write,{ChannelSpec,NewValue}}).
+-spec write(atom(),locator(),binary()) -> ok | {error,term()}.
+write(InstrumentID,Locator,NewValue) ->
+	Value = unpack_value(NewValue),
+	CHSpec = locator_to_ch_spec(Locator),
+	gen_server:call(InstrumentID,{write,{CHSpec,Value}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks definitions %%%
@@ -141,3 +147,7 @@ unit_string("FA") -> unit_string("CW");
 unit_string("FB") -> unit_string("CW");
 unit_string("PL") -> "DB";
 unit_string("ST") -> "MS".
+
+-spec unpack_value(binary()) -> string().
+unpack_value(B) ->
+	erlang:binary_to_list(B).
