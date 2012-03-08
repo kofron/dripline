@@ -79,7 +79,7 @@ interrogating(timeout,#state{call=C}=StateData) ->
 	{next_state, writing, NewStateData, 0}.
 
 writing(timeout,#state{c_res=R,elapsed=T}=StateData) ->
-	{Time, _} = timer:tc(fun() -> write_couch_data(R) end),
+	{Time, _} = timer:tc(fun() -> write_couch_spec(R) end),
 	NewStateData = StateData#state{
 		c_res = none,
 		elapsed = T + Time
@@ -116,13 +116,13 @@ calc_sleep_time(ElapsedTime, IntervalTime) ->
 	erlang:round(((IntervalTime*1000000) - ElapsedTime)/1000).
 
 %%---------------------------------------------------------------------%%
-%% @doc write_couch_data/1 takes a binary value as returned by an 
+%% @doc write_couch_spec/1 takes a binary value as returned by an 
 %%		instrument and pushes it to the couchdb backend as a new 
 %%		document.
 %% @end
 %%---------------------------------------------------------------------%%
--spec write_couch_data(binary()) -> {ok, binary()} | {error, term()}.
-write_couch_data(Data) ->
+-spec write_couch_spec(binary()) -> {ok, binary()} | {error, term()}.
+write_couch_spec(Data) ->
 	% create the new document
 	NewDoc = {[]},
 	D0 = couchbeam_doc:set_value("data",Data,NewDoc),
