@@ -5,45 +5,58 @@
 %%		appropriate actors.  The result is then sent back to the
 %%		database.
 %% @version 0.1a
-%% @todo This module should very probably be a gen_fsm.
 %% @author Jared Kofron <jared.kofron@gmail.com>
 -module(dripline_dispatch).
+-behavior(gen_fsm).
 
-%%%%%%%%%%%%%%%%%%%%%%
-%%% Module exports %%%
-%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%
+%%% Exported API %%%
+%%%%%%%%%%%%%%%%%%%%
 -export([dispatch/1]).
 
-%%%%%%%%%%%%%%%%%%%%%
-%%% API Functions %%%
-%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%
+%%% gen_fsm API %%%
+%%%%%%%%%%%%%%%%%%%
+-export([start_link/0]).
+-export([init/1, handle_event/3, handle_sync_event/4, handle_info/3, 
+		terminate/3, code_change/4]).
+
+%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_fsm states %%%
+%%%%%%%%%%%%%%%%%%%%%%
+-export([waiting/2,sending/2]).
+-export([resolve_type/2,resolve_function/2,resolve_module/2,resolve_args/2]).
+-export([finishing/2]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% internal state records %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-record(state,{cur_doc,call}).
+
+%%%%%%%%%%%%%%
+%%% Macros %%%
+%%%%%%%%%%%%%%
+-define(NOW,0).
+
+%%%%%%%%%%%%%
+%%% Types %%%
+%%%%%%%%%%%%%
+-type call() :: {atom(),atom(),[term()]}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Exported API Definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%---------------------------------------------------------------------%%
 %% @doc dispatch/1 receives updates from the changes feed via the 
 %% 		changes monitors.  it extracts the documents from the change data
-%%		and passes them down for further processing.
+%%		and fires them off to the fsm for processing.
 %% @end
 %%---------------------------------------------------------------------%%
 -spec dispatch(ejson:ejson_object()) -> {ok | {error, term()}}.
 dispatch(CouchDBChangeLine) ->
 	Doc = proplists:get_value(<<"doc">>,CouchDBChangeLine),
-	dispatch_doc(Doc).
-
-%%---------------------------------------------------------------------%%
-%% @doc dispatch_doc/1 is called directly by dispatch/1 and processes 
-%% 		only the document portion of the change line.  the document is 
-%%		then passed to another function depending on its 'type'.
-%% @end
-%%---------------------------------------------------------------------%%
--spec dispatch_doc(ejson:ejson_object()) -> {ok | {error, term()}}.
-dispatch_doc(CmdDoc) ->
-	Type = couchbeam_doc:get_value(<<"type">>,CmdDoc),
-	case Type of
-		<<"query">> ->
-			dispatch_query(CmdDoc);
-		_ ->
-			{error,{unknown_cmd_type,Type}}
-	end.
+	gen_fsm:send_all_state_event(?MODULE,{process,Doc}).
 
 %%---------------------------------------------------------------------%%
 %% @doc dispatch_query/1 is called by dispatch_doc/1 when the document
@@ -110,6 +123,94 @@ fetch_channel_info(QueryString) ->
 	end, 2, QueryString),
 	merge_commands(QS1).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_fsm API and callback definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+start_link() ->
+	gen_fsm:start_link({local,?MODULE},?MODULE,[],[]).
+
+init([]) ->
+	InitialState = #state{call = new_call()},
+	{ok, waiting, InitialState, 0}.
+
+handle_event({process, Doc}, waiting, StateData) ->
+	NewStateData = StateData#state{cur_doc = Doc},
+	{next_state, resolve_type, NewStateData, ?NOW}.
+
+handle_sync_event(_Ev, _F, waiting, SData) ->
+	{reply, ok, waiting, SData}.
+
+handle_info(_Info, waiting, StateData) ->
+	{next_state, waiting, StateData}.
+
+terminate(_Reason, _StateName, _StateData) ->
+	ok.
+
+code_change(_Vsn, StateName, StateData, _Extra) ->
+	{ok, StateName, StateData}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_fsm state definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+waiting(_Event,StateData) ->
+	{next_state, waiting, StateData}.
+
+resolve_type(timeout,#state{cur_doc=Doc}=StateData) ->
+	NextState = case couchbeam_doc:get_value(<<"type">>,Doc) of
+		<<"command">> -> 
+			resolve_module;
+		<<"system">> ->
+			finishing
+	end,
+	{next_state, NextState, StateData, ?NOW}.
+
+resolve_module(timeout,#state{cur_doc=Doc,call=C}=StateData) ->
+	Cmd = couchbeam_doc:get_value(<<"command">>,Doc),
+	ChName = couchbeam_doc:get_value(<<"channel">>,Cmd),
+	Module = dripline_conf_mgr:lookup(module,ChName),
+	NextStateData = StateData#state{call=set_call(m,Module,C)},
+	{next_state,resolve_function,NextStateData,?NOW}.
+
+resolve_function(timeout,#state{cur_doc=Doc,call=C}=StateData) ->
+	Cmd = couchbeam_doc:get_value(<<"command">>,Doc),
+	F = case couchbeam_doc:get_value(<<"do">>,Cmd) of
+				<<"get">> ->
+					read;
+				<<"set">> ->
+					write
+	end,
+	NextStateData = StateData#state{call=set_call(f,F,C)},
+	{next_state,resolve_args,NextStateData,?NOW}.
+
+resolve_args(timeout,#state{cur_doc=Doc,call=C}=StateData) ->
+	Cmd = couchbeam_doc:get_value(<<"command">>,Doc),
+	ChName = couchbeam_doc:get_value(<<"channel">>,Cmd),
+	Instr = dripline_conf_mgr:lookup(instrument_id,ChName),
+	Locator = dripline_conf_mgr:lookup(locator,ChName),
+	BaseArgs = [Instr,Locator],
+	AllArgs = case get_call(f,C) of
+		read ->
+			BaseArgs;
+		write ->
+			V = couchbeam_doc:get_value(<<"value">>,Cmd),
+			BaseArgs ++ [V]
+	end,
+	NewCall = set_call(a,AllArgs,C),
+	NextStateData = StateData#state{call=NewCall},
+	{next_state,sending,NextStateData,?NOW}.
+
+sending(timeout,#state{call=C}=StateData) ->
+	io:format("~p~n",[C]),
+	{next_state,finishing,StateData,?NOW}.
+
+finishing(timeout,StateData) ->
+	NextStateData = StateData#state{cur_doc=none,call=new_call()},
+	{next_state,waiting,NextStateData}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Internal Functions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %%---------------------------------------------------------------------%%
 %% @doc merge_commands takes a list of channel query data and merges it 
 %% 		in an intelligent way such that requests made to the same 
@@ -160,3 +261,34 @@ merge_dict_keys(_K,V1,V2) when is_list(V2) ->
 	[V1|V2];
 merge_dict_keys(_K,V1,V2) ->
 	[V1,V2].
+
+%%---------------------------------------------------------------------%%
+%% @doc new_call/0 generates a raw call.
+%%---------------------------------------------------------------------%%
+-spec new_call() -> call().
+new_call() ->
+	{none,none,[]}.
+
+%%---------------------------------------------------------------------%%
+%% @doc get_call/2 is a way to inspect MFA values.
+%%---------------------------------------------------------------------%%
+-spec get_call(atom(),call()) -> call().
+get_call(m,{A,_,_}) ->
+	A;
+get_call(f,{_,B,_}) ->
+	B;
+get_call(a,{_,_,C}) ->
+	C.
+
+%%---------------------------------------------------------------------%%
+%% @doc set_call/3 is a way to manipulate the mfa tuple stored by the 
+%%		fsm.  this is just to abstract it away in case we change it in 
+%%		the future.
+%%---------------------------------------------------------------------%%
+-spec set_call(atom(),term(),call()) -> call().
+set_call(m,M,{_,B,C}) ->
+	{M,B,C};
+set_call(f,F,{A,_,C}) ->
+	{A,F,C};
+set_call(a,Ar,{A,B,_}) ->
+	{A,B,Ar}.
