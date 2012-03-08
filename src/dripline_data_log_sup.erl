@@ -45,4 +45,4 @@ init([]) ->
 		worker,
 		[dripline_data_logger]
 	},
-    {ok, { SuperStrategy, [TestLogger] }}.
+    {ok, { SuperStrategy, [] }}.
