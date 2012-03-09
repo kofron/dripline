@@ -10,7 +10,6 @@
 		id :: binary(),
 		instr :: binary(),
 		model :: atom(),
-		module :: atom(),
 		locator :: term()
 	}).
 
@@ -18,6 +17,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([new/0,get_fields/2,get_fields/3,set_field/3]).
+-export([synthesize_fun/1,synthesize_fun/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API Definitions %%% 
@@ -33,7 +33,6 @@ new() ->
 		id = <<>>,
 		instr = none,
 		model = none,
-		module = none,
 		locator = none
 	}.
 
@@ -49,8 +48,6 @@ set_field(instr, V, R) when is_record(R,cd) ->
 	R#cd{instr=V};
 set_field(model, V, R) when is_record(R,cd) ->
 	R#cd{model=V};
-set_field(module, V, R) when is_record(R,cd) ->
-	R#cd{module=V};
 set_field(locator, V, R) when is_record(R,cd) ->
 	R#cd{locator=V};
 set_field(Any, _V, R) when is_record(R,cd) ->
@@ -69,8 +66,6 @@ get_fields(model,#cd{model=Md}) ->
 	{ok,Md};
 get_fields(instr,#cd{instr=In}) ->
 	{ok,In};
-get_fields(module,#cd{module=Ml}) ->
-	{ok,Ml};
 get_fields(locator,#cd{locator=Lc}) ->
 	{ok,Lc};
 get_fields(Any,_Rec) when is_atom(Any) ->
@@ -86,3 +81,23 @@ get_fields([H|T],Rec,Acc) ->
 		{ok,Data} ->
 			get_fields(T,Rec,[Data|Acc])
 	end.
+
+%%---------------------------------------------------------------------%%
+%% @doc synthesize_fun/1 takes a channel data structure and generates a
+%%		fun of arity 0 that will read the channel in question.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec synthesize_fun(record()) -> fun(() -> binary()).
+synthesize_fun(#cd{instr=I,model=M,locator=L}) ->
+	fun() -> M:read(I,L) end.
+
+%%---------------------------------------------------------------------%%
+%% @doc synthesize_fun/2 takes a channel data structure and a value to 
+%%		write to the channel and generates a fun of arity 0 that will
+%%		perform the writing.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec synthesize_fun(record(),binary()) -> fun(() -> binary()).
+synthesize_fun(#cd{instr=I,model=M,locator=L},V) ->
+	fun() -> M:write(I,L,V) end.
+
