@@ -142,8 +142,7 @@ get_call_data(Id,[In|Ins]) ->
 	case couchbeam_doc:get_id(In) of
 		Id ->
 			Name = couchbeam_doc:get_value(<<"name">>,In),
-			BModel = couchbeam_doc:get_value(<<"instrument_model">>,In),
-			Model = binary_to_atom(BModel),
+			Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
 			{ok, [Name,Model]};
 		_NotId ->
 			get_call_data(Id,Ins)

@@ -88,7 +88,11 @@ get_fields([H|T],Rec,Acc) ->
 %% @end
 %%---------------------------------------------------------------------%%
 -spec synthesize_fun(record()) -> fun(() -> binary()).
-synthesize_fun(#cd{instr=I,model=M,locator=L}) ->
+synthesize_fun(#cd{instr=BI,model=BM,locator=L}) ->
+	[I,M] = lists:map(fun(X) -> 
+						dripline_util:binary_to_atom(X) 
+					end, 
+					[BI,BM]),
 	fun() -> M:read(I,L) end.
 
 %%---------------------------------------------------------------------%%
