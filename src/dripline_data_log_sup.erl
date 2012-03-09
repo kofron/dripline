@@ -1,4 +1,4 @@
-B1;%% @doc dripline_data_log_sup is responsible for supervisiing all of the2c
+%% @doc dripline_data_log_sup is responsible for supervisiing all of the2c
 %%		data loggers in the system.  it is directly responsible for the 
 %%		permanent loggers and the supervisor for transient loggers, but
 %%		does not directly control the transient loggers themselves.
