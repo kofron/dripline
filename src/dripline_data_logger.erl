@@ -82,8 +82,8 @@ interrogating(timeout,#state{call=C}=StateData) ->
 	end,
 	{next_state, writing, NewStateData, 0}.
 
-writing(timeout,#state{c_res=R,elapsed=T}=StateData) ->
-	{Time, _} = timer:tc(fun() -> write_couch_spec(R) end),
+writing(timeout,#state{id=Id,c_res=R,elapsed=T}=StateData) ->
+	{Time, _} = timer:tc(fun() -> write_couch_spec(Id,R) end),
 	NewStateData = StateData#state{
 		c_res = none,
 		elapsed = T + Time
@@ -131,16 +131,18 @@ calc_sleep_time(ElapsedTime, IntervalTime) ->
 	erlang:round(((IntervalTime*1000000) - ElapsedTime)/1000).
 
 %%---------------------------------------------------------------------%%
-%% @doc write_couch_spec/1 takes a binary value as returned by an 
-%%		instrument and pushes it to the couchdb backend as a new 
-%%		document.
+%% @doc write_couch_spec/2 takes a binary value as returned by an 
+%%		instrument and the ID of the channel that has been read
+%%		and pushes it to the couchdb backend as a new document.
 %% @end
 %%---------------------------------------------------------------------%%
--spec write_couch_spec(binary()) -> {ok, binary()} | {error, term()}.
-write_couch_spec(Data) ->
+-spec write_couch_spec(binary(),binary()) 
+		-> {ok, binary()} | {error, term()}.
+write_couch_spec(Id,Data) ->
 	% create the new document
 	NewDoc = {[]},
-	D0 = couchbeam_doc:set_value("data",Data,NewDoc),
+	D0 = couchbeam_doc:set_value("uncalibrated_value",Data,NewDoc),
+	D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
 	% OK, get a handle to the database and write it.
 	SConn = dripline_conn_mgr:get(),
 	{ok, Db} = couchbeam:open_or_create_db(SConn,"dripline_logged_data"),
