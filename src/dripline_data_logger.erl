@@ -155,7 +155,8 @@ write_couch_spec(Id,Data) ->
 %% @doc generate_timestamp takes an erlang time tuple and returns a
 %%		binary string that is the correct format e.g. 2011-12-08 06:02:26
 %%---------------------------------------------------------------------%%
--spec generate_timestamp(datetime()) -> binary().
+-spec generate_timestamp(calendar:datetime()) -> binary().
 generate_timestamp({{Y,M,D},{HH,MM,SS}}) ->
-	S = io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B"),
+	Args = [Y,M,D,HH,MM,SS],
+	S = io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",Args),
 	erlang:list_to_binary(lists:flatten(S)).
