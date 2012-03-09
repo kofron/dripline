@@ -143,7 +143,19 @@ write_couch_spec(Id,Data) ->
 	NewDoc = {[]},
 	D0 = couchbeam_doc:set_value("uncalibrated_value",Data,NewDoc),
 	D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
+	Now = calendar:localtime(),
+	TStamp = generate_timestamp(Now),
+	D2 = couchbeam_doc:set_value("timestamp_localstring",TStamp,D1),
 	% OK, get a handle to the database and write it.
 	SConn = dripline_conn_mgr:get(),
 	{ok, Db} = couchbeam:open_or_create_db(SConn,"dripline_logged_data"),
-	couchbeam:save_doc(Db,D1).
+	couchbeam:save_doc(Db,D2).
+
+%%---------------------------------------------------------------------%%
+%% @doc generate_timestamp takes an erlang time tuple and returns a
+%%		binary string that is the correct format e.g. 2011-12-08 06:02:26
+%%---------------------------------------------------------------------%%
+-spec generate_timestamp(datetime()) -> binary().
+generate_timestamp({{Y,M,D},{HH,MM,SS}}) ->
+	S = io_lib:format("~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B"),
+	erlang:list_to_binary(lists:flatten(S)).
