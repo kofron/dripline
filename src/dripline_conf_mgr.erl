@@ -57,7 +57,7 @@ init([]) ->
 handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
-			Value;
+			{ok, Value};
 		error ->
 			{error, {bad_channel,Name}}
 	end,
@@ -127,12 +127,7 @@ generate_channel_dict([H|T],Instr,Acc) ->
 			Err
 	end.
 
-%%---------------------------------------------------------------------%%
-%% @doc binary_to_atom simply converts a binary string into an atom.
-%% @end
-%%---------------------------------------------------------------------%%
-binary_to_atom(Binary) ->
-	erlang:list_to_atom(erlang:binary_to_list(Binary)).
+
 
 strip_values(L) ->
 	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
