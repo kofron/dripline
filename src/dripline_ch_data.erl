@@ -8,6 +8,7 @@
 %%%%%%%%%%%%%%%%%%%
 -record(cd,{
 		id :: binary(),
+		instr :: binary(),
 		model :: atom(),
 		module :: atom(),
 		locator :: term()
@@ -30,6 +31,7 @@
 new() ->
 	#cd{
 		id = <<>>,
+		instr = none,
 		model = none,
 		module = none,
 		locator = none
@@ -43,6 +45,8 @@ new() ->
 -spec set_field(atom(),term(),record()) -> record().
 set_field(id, V, R) when is_record(R,cd) ->
 	R#cd{id=V};
+set_field(instr, V, R) when is_record(R,cd) ->
+	R#cd{instr=V};
 set_field(model, V, R) when is_record(R,cd) ->
 	R#cd{model=V};
 set_field(module, V, R) when is_record(R,cd) ->
@@ -63,6 +67,8 @@ get_fields(id,#cd{id=Id}) ->
 	{ok,Id};
 get_fields(model,#cd{model=Md}) ->
 	{ok,Md};
+get_fields(instr,#cd{instr,In}) ->
+	{ok,In};
 get_fields(module,#cd{module=Ml}) ->
 	{ok,Ml};
 get_fields(locator,#cd{locator=Lc}) ->
