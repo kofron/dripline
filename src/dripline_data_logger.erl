@@ -146,4 +146,4 @@ write_couch_spec(Id,Data) ->
 	% OK, get a handle to the database and write it.
 	SConn = dripline_conn_mgr:get(),
 	{ok, Db} = couchbeam:open_or_create_db(SConn,"dripline_logged_data"),
-	couchbeam:save_doc(Db,D0).
+	couchbeam:save_doc(Db,D1).
