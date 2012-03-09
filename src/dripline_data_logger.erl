@@ -17,7 +17,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm API and callbacks %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([start_link/4]).
+-export([start_link/3]).
 -export([init/1, handle_event/3, handle_sync_event/4, handle_info/3, 
 		terminate/3, code_change/4]).
 
@@ -29,17 +29,20 @@
 %%%%%%%%%%%%%%%%%%%%%%
 %%% internal state %%%
 %%%%%%%%%%%%%%%%%%%%%%
--record(state,{call,interval,max_it,cur_it, elapsed, c_res, c_err}).
+-record(state,{id,call,interval,max_it,cur_it, elapsed, c_res, c_err}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm API and callback definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_link(Id,Call,Interval,MaxIterations) ->
-	InitArgs = [Call,Interval,MaxIterations],
+start_link(Id,Interval,MaxIterations) ->
+	InitArgs = [Id,Interval,MaxIterations],
 	gen_fsm:start_link({local,Id},?MODULE,InitArgs,[]).
 
-init([Call,Interval,MaxIterations]) ->
+init([Id,Interval,MaxIterations]) ->
+	{ok, ChData} = dripline_conf_mgr:lookup(Id),
+	Call = dripline_ch_data:synthesize_fun(ChData),
 	InitialState = #state{
+		id = Id,
 		call = Call,
 		interval = Interval,
 		max_it = MaxIterations,
