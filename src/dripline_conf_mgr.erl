@@ -14,7 +14,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([lookup/2]).
+-export([lookup/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server API and callbacks %%%
@@ -27,22 +27,15 @@
 %%% internal state record %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
-			chs, 
-			ins
+			chs
 		}).
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
 %%%%%%%%%%%%%%%%%%%%%%
 -spec lookup(atom(),binary()) -> {ok,term()} | {error,term()}.
-lookup(channel,ChName) ->
-	gen_server:call(?MODULE,{lookup,{ch,ChName}});
-lookup(module,ChName) ->
-	gen_server:call(?MODULE,{lookup,{md,ChName}});
-lookup(instrument_id,ChName) ->
-	gen_server:call(?MODULE,{lookup,{id,ChName}});
-lookup(locator,ChName) ->
-	gen_server:call(?MODULE,{lookup,{lc,ChName}}).
+lookup(ChName) ->
+	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
@@ -55,50 +48,18 @@ init([]) ->
 	{ok, Db} = couchbeam:open_db(SConn,"dripline_conf"),
 	{ok, AllInstr} = couchbeam_view:fetch(Db,{"objects","instruments"}),
 	{ok, AllChannels} = couchbeam_view:fetch(Db,{"objects","channels"}),
-	ChanDict = generate_channel_dict(AllChannels),
-	InstDict = generate_instrument_dict(AllInstr),
+	{ok, ChanDict} = generate_channel_dict(AllChannels,AllInstr),
 	InitialState = #state{
-		chs = ChanDict,
-		ins = InstDict
+		chs = ChanDict
 	},
 	{ok, InitialState}.
 
 handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
-			normalize_instrument_name(Value,In);
+			Value;
 		error ->
 			{error, {bad_channel,Name}}
-	end,
-	{reply, Reply, StateData};
-handle_call({lookup,{md,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
-	Reply = case dict:find(Name,Ch) of
-		{ok, Value} ->
-			D = normalize_instrument_name(Value,In),
-			{ok, Module} = dict:find(module,D),
-			Module;
-		error ->
-			{error, {no_module,Name}}
-	end,
-	{reply, Reply, StateData};
-handle_call({lookup,{id,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
-	Reply = case dict:find(Name,Ch) of
-		{ok, Value} ->
-			D = normalize_instrument_name(Value,In),
-			{ok, Instr} = dict:find(id,D),
-			Instr;
-		error ->
-			{error, {no_name, Name}}
-	end,
-	{reply, Reply, StateData};
-handle_call({lookup,{lc,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
-	Reply = case dict:find(Name,Ch) of
-		{ok, Value} ->
-			D = normalize_instrument_name(Value,In),
-			{ok, Locator} = dict:find(locator,D),
-			Locator;
-		error ->
-			{error, {no_locator, Name}}
 	end,
 	{reply, Reply, StateData}.
 
