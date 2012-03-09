@@ -78,30 +78,6 @@ code_change(_OldVsn, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Internal Functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-%%---------------------------------------------------------------------%%
-%% @doc normalize_instrument_name/2 is a horrible function that right now
-%%		does entirely too much.  what it _should_ do is transform a 
-%%		channel document so that it has a sensible instrument field.  
-%%		instead it makes my code hideous :(.
-%% @todo this needs to be broken up into multiple functions
-%% @end
-%%---------------------------------------------------------------------%%
-normalize_instrument_name(Value,In) ->
-	InstrDoc = couchbeam_doc:get_value(<<"instrument">>,Value),
-	Result = case dict:find(InstrDoc,In) of
-		{ok, Value2} ->
-			ModName = binary_to_atom(couchbeam_doc:get_value(<<"instrument_model">>,Value2)),
-			InstrName = binary_to_atom(couchbeam_doc:get_value(<<"name">>,Value2)),
-			Locator = couchbeam_doc:get_value(<<"locator">>,Value),
-			dict:from_list([
-				{id,InstrName},
-				{module,ModName},
-				{locator,Locator}
-			]);
-		error ->
-			{error, {bad_instrument, InstrDoc}}
-	end,
-	Result.
 
 generate_channel_dict(ChViewRes,InViewRes) ->
 	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
