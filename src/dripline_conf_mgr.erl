@@ -33,7 +33,7 @@
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
 %%%%%%%%%%%%%%%%%%%%%%
--spec lookup(atom(),binary()) -> {ok,term()} | {error,term()}.
+-spec lookup(binary()) -> {ok,term()} | {error,term()}.
 lookup(ChName) ->
 	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
 
@@ -54,7 +54,7 @@ init([]) ->
 	},
 	{ok, InitialState}.
 
-handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch,ins=In}=StateData) ->
+handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
 			Value;
@@ -103,37 +103,31 @@ normalize_instrument_name(Value,In) ->
 	end,
 	Result.
 
-%%---------------------------------------------------------------------%%
-%% @doc generate_channel_dict/1 generates a dictionary from a list of 
-%%		channels.  this dict is used internally by the server to find 
-%%		channel data quickly.
-%% @end
-%%---------------------------------------------------------------------%%
-generate_channel_dict(ChannelViewResults) ->
-	generate_dict_from_kv_list(ChannelViewResults,dict:new()).
-
-%%---------------------------------------------------------------------%%
-%% @doc generate_instrument_dict/1 generates a dictionary from a list of
-%%		instruments.  this dict is used internally by the server to find
-%%		instrument data quickly, and also to generate the functions 
-%%		needed to resolve data requests.
-%% @end
-%%---------------------------------------------------------------------%%
-generate_instrument_dict(InstrumentViewResults) ->
-	generate_dict_from_kv_list(InstrumentViewResults,dict:new()).
-
-%%---------------------------------------------------------------------%%
-%% @doc generate_dict_from_kv_list/2 doesn't _quite_ do what it says -
-%%		really it generates a dict from a couch document.  it is 
-%%		essentially an abstracted version of generate_channel_dict.
-%% @todo change the name of this to be more accurate.
-%%---------------------------------------------------------------------%%
-generate_dict_from_kv_list([],Acc) ->
-	Acc;
-generate_dict_from_kv_list([H|T],Acc) ->
-	K = couchbeam_doc:get_value(<<"key">>,H),
-	V = couchbeam_doc:get_value(<<"value">>,H),
-	generate_dict_from_kv_list(T,dict:store(K,V,Acc)).
+generate_channel_dict(ChViewRes,InViewRes) ->
+%%	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
+%%											strip_values(X) 
+%%										end, 
+%%										[ChViewRes,InViewRes]),
+	StrippedCh = strip_values(ChViewRes),
+	StrippedIn = strip_values(InViewRes),
+	generate_channel_dict(StrippedCh,StrippedIn,dict:new()).
+generate_channel_dict([],_,Acc) ->
+	{ok,Acc};
+generate_channel_dict([H|T],Instr,Acc) ->
+	InstrId = couchbeam_doc:get_value(<<"instrument">>,Instr),
+	case get_call_data(InstrId,Instr) of
+		{ok, [Name,Model]} ->
+			CD0 = dripline_ch_data:new(),
+			CD1 = dripline_ch_data:set(instr,Name,CD0),
+			CD2 = dripline_ch_data:set(model,Model,CD1),
+			ChName = couchbeam_doc:get_value(<<"name">>,H),
+			CD3 = dripline_ch_data:set(id,ChName,CD2),
+			Locator = couchbeam_doc:get_value(<<"locator">>,H),
+			CD4 = dripline_ch_data:set(locator,Locator,CD3),
+			generate_channel_dict(T,Instr,dict:store(ChName,CD4,Acc));
+		{error, _E}=Err ->
+			Err
+	end.
 
 %%---------------------------------------------------------------------%%
 %% @doc binary_to_atom simply converts a binary string into an atom.
@@ -141,3 +135,9 @@ generate_dict_from_kv_list([H|T],Acc) ->
 %%---------------------------------------------------------------------%%
 binary_to_atom(Binary) ->
 	erlang:list_to_atom(erlang:binary_to_list(Binary)).
+
+strip_values(L) ->
+	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
+
+get_call_data(_,_) ->
+	{ok, [a,b]}.

@@ -67,7 +67,7 @@ get_fields(id,#cd{id=Id}) ->
 	{ok,Id};
 get_fields(model,#cd{model=Md}) ->
 	{ok,Md};
-get_fields(instr,#cd{instr,In}) ->
+get_fields(instr,#cd{instr=In}) ->
 	{ok,In};
 get_fields(module,#cd{module=Ml}) ->
 	{ok,Ml};
