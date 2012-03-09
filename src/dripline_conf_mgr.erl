@@ -104,26 +104,24 @@ normalize_instrument_name(Value,In) ->
 	Result.
 
 generate_channel_dict(ChViewRes,InViewRes) ->
-%%	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
-%%											strip_values(X) 
-%%										end, 
-%%										[ChViewRes,InViewRes]),
-	StrippedCh = strip_values(ChViewRes),
-	StrippedIn = strip_values(InViewRes),
+	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
+											strip_values(X) 
+										end, 
+										[ChViewRes,InViewRes]),
 	generate_channel_dict(StrippedCh,StrippedIn,dict:new()).
 generate_channel_dict([],_,Acc) ->
 	{ok,Acc};
 generate_channel_dict([H|T],Instr,Acc) ->
-	InstrId = couchbeam_doc:get_value(<<"instrument">>,Instr),
+	InstrId = couchbeam_doc:get_value(<<"instrument">>,H),
 	case get_call_data(InstrId,Instr) of
 		{ok, [Name,Model]} ->
 			CD0 = dripline_ch_data:new(),
-			CD1 = dripline_ch_data:set(instr,Name,CD0),
-			CD2 = dripline_ch_data:set(model,Model,CD1),
+			CD1 = dripline_ch_data:set_field(instr,Name,CD0),
+			CD2 = dripline_ch_data:set_field(model,Model,CD1),
 			ChName = couchbeam_doc:get_value(<<"name">>,H),
-			CD3 = dripline_ch_data:set(id,ChName,CD2),
+			CD3 = dripline_ch_data:set_field(id,ChName,CD2),
 			Locator = couchbeam_doc:get_value(<<"locator">>,H),
-			CD4 = dripline_ch_data:set(locator,Locator,CD3),
+			CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
 			generate_channel_dict(T,Instr,dict:store(ChName,CD4,Acc));
 		{error, _E}=Err ->
 			Err
