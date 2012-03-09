@@ -136,6 +136,14 @@ binary_to_atom(Binary) ->
 
 strip_values(L) ->
 	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
-
-get_call_data(_,_) ->
-	{ok, [a,b]}.
+get_call_data(_,[]) ->
+	{error,instrument_not_found};
+get_call_data(Id,[In|Ins]) ->
+	case couchbeam_doc:get_id(In) of
+		Id ->
+			Name = couchbeam_doc:get_value(<<"name">>,In),
+			Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
+			{ok, [Name,Model]};
+		_NotId ->
+			get_call_data(Id,Ins)
+	end.
