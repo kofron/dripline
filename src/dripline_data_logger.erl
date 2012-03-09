@@ -36,7 +36,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(Id,Interval,MaxIterations) ->
 	InitArgs = [Id,Interval,MaxIterations],
-	gen_fsm:start_link({local,Id},?MODULE,InitArgs,[]).
+    LoggerID = synthesize_logger_id(Id),
+	gen_fsm:start_link({local,LoggerID},?MODULE,InitArgs,[]).
 
 init([Id,Interval,MaxIterations]) ->
 	{ok, ChData} = dripline_conf_mgr:lookup(Id),
@@ -106,6 +107,17 @@ sleeping(timeout,#state{elapsed=E,cur_it=C,max_it=M,interval=I}=SData) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%---------------------------------------------------------------------%%
+%% @doc synthesize_logger_id/1 generates an atom from a binary that 
+%%      uniquely identifies the logger process - this atom is used for
+%%      registering the logger.
+%%---------------------------------------------------------------------%%
+-spec synthesize_logger_id(binary()) -> atom().
+synthesize_logger_id(B) when is_binary(B) ->
+    NameStr = binary_to_list(B),
+    Appended = NameStr ++ "_logger",
+    list_to_atom(Appended).
 
 %%---------------------------------------------------------------------%%
 %% @doc calc_sleep_time/2 is a utility function that is unfortunately 
