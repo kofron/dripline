@@ -102,6 +102,10 @@ synthesize_fun(#cd{instr=BI,model=BM,locator=L}) ->
 %% @end
 %%---------------------------------------------------------------------%%
 -spec synthesize_fun(record(),binary()) -> fun(() -> binary()).
-synthesize_fun(#cd{instr=I,model=M,locator=L},V) ->
+synthesize_fun(#cd{instr=BI,model=BM,locator=L},V) ->
+	[I,M] = lists:map(fun(X) -> 
+						dripline_util:binary_to_atom(X) 
+					end, 
+					[BI,BM]),
 	fun() -> M:write(I,L,V) end.
 
