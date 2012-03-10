@@ -37,7 +37,7 @@ init([]) ->
 		{
 			dripline_data_logger,
 			start_link,
-			[<<"test1">>,5,infinity]
+			[<<"system_pressure">>,5,infinity]
 		},
 		permanent,
 		5000,
