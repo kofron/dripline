@@ -143,7 +143,7 @@ write_couch_spec(Id,Data) ->
 	NewDoc = {[]},
 	D0 = couchbeam_doc:set_value("uncalibrated_value",Data,NewDoc),
 	D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
-	Now = calendar:localtime(),
+	Now = calendar:local_time(),
 	TStamp = generate_timestamp(Now),
 	D2 = couchbeam_doc:set_value("timestamp_localstring",TStamp,D1),
 	% OK, get a handle to the database and write it.
