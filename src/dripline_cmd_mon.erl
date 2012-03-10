@@ -115,7 +115,7 @@ handle_sync_event({notify,Id,RNo}, _F, SName, #state{revs=R}=SData) ->
 
 handle_info({change, _R, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
-handle_info({change, _R, {ChangeData}}, waiting, #state{revs=R}=SData) ->
+handle_info({change, _R, ChangeData}, waiting, #state{revs=R}=SData) ->
 	NewStateData = case ignore_update(ChangeData,R) of
 		true ->
 			SData;
@@ -144,10 +144,10 @@ code_change(_Vsn, StateName, StateData, _Extra) ->
 %% @end
 %%---------------------------------------------------------------------%%
 ignore_update(ChangeData,RevisionInfo) ->
-	Doc = proplists:get_value(<<"doc">>,ChangeData),
+	Doc = couchbeam_doc:get_value(<<"doc">>,ChangeData),
 	Id = couchbeam_doc:get_value(<<"_id">>,Doc),
 	BinRev = couchbeam_doc:get_value(<<"_rev">>,Doc),
-	Rev = strip_rev_no(BinRev),
+	Rev = dripline_util:strip_rev_no(BinRev),
 	case dict:find(Id,RevisionInfo) of
 		{ok, Rev} ->
 			true;
@@ -161,23 +161,11 @@ ignore_update(ChangeData,RevisionInfo) ->
 %% @end
 %%---------------------------------------------------------------------%%
 update_rev_data(ChangeData,RevisionInfo) ->
-	Doc = proplists:get_value(<<"doc">>,ChangeData),
+	Doc = couchbeam_doc:get_value(<<"doc">>,ChangeData),
 	Id = couchbeam_doc:get_value(<<"_id">>,Doc),
 	BinRev = couchbeam_doc:get_value(<<"_rev">>,Doc),
-	Rev = strip_rev_no(BinRev),
+	Rev = dripline_util:strip_rev_no(BinRev),
 	dict:store(Id,Rev,RevisionInfo).
-
-%%---------------------------------------------------------------------%%
-%% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision
-%% 		sequence number.  this is very useful for notifying the monitor
-%%		that a sequence number is about to be changed by e.g. us.
-%% @end
-%%---------------------------------------------------------------------%%
--spec strip_rev_no(binary()) -> integer().
-strip_rev_no(BinRev) ->
-	[NS,_] = string:tokens(binary_to_list(BinRev),"-"),
-	{N,[]} = string:to_integer(NS),
-	N.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_last_seq/1 gets the last update sequence for a given 
