@@ -124,7 +124,7 @@ resolving_action(timeout,#state{cur_doc=D,cur_ch=C}=StateData) ->
 	Branch.
 
 shipping(timeout,#state{cur_fun=F}=StateData) ->
-	io:format("~p~n",[F]),
+	io:format("~p~n",[F()]),
 	{next_state,finishing,StateData,?NOW}.
 
 report_error(timeout,#state{cur_doc=D,cur_err=E}=StateData) ->
