@@ -123,8 +123,13 @@ resolving_action(timeout,#state{cur_doc=D,cur_ch=C}=StateData) ->
 		end,
 	Branch.
 
-shipping(timeout,#state{cur_fun=F}=StateData) ->
-	io:format("~p~n",[F()]),
+shipping(timeout,#state{cur_fun=F,cur_doc=D}=StateData) ->
+	DocID = couchbeam_doc:get_id(D),
+	Perform = fun() -> 
+					R = F(),
+					dripline_util:update_couch_doc(?DB,DocID,"result",R)
+			end,
+	spawn(Perform),
 	{next_state,finishing,StateData,?NOW}.
 
 report_error(timeout,#state{cur_doc=D,cur_err=E}=StateData) ->
