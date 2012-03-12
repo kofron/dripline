@@ -96,8 +96,7 @@ init([InstrumentID,BusID,InstrumentAddress]) ->
 handle_call({read,Channels}, From, 
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	ReadStr = read_channel_string(Channels),
-	AddrStr = addr_string(A),
-	{ok, R} = eprologix_cmdr:send_query(H,[AddrStr|ReadStr]),
+	{ok, R} = eprologix_cmdr:send_query(H,A,[ReadStr]),
 	OutgoingReq = #req_data{from=From,ref = R},
 	NewStateData = StateData#state{c_req = OutgoingReq},
 	{noreply, NewStateData};
@@ -105,8 +104,7 @@ handle_call({read,Channels}, From,
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	WriteStr = write_channel_string(Channels,NewValue),
-	AddrStr = addr_string(A),
-	{ok, R} = eprologix_cmdr:send_command(H,[AddrStr|WriteStr]),
+	{ok, R} = eprologix_cmdr:send_command(H,A,[WriteStr]),
 	OutgoingReq = #req_data{from=From,ref = R},
 	NewStateData = StateData#state{c_req = OutgoingReq},
 	{reply, ok, NewStateData}.
@@ -128,11 +126,6 @@ code_change(_OldVsn, StateData, _Extras) ->
 %%%%%%%%%%%%%%%%
 %%% internal %%%
 %%%%%%%%%%%%%%%%
--spec addr_string(integer()) -> string().
-addr_string(N) ->
-	NStr = lists:flatten(io_lib:format("~p",[N])),
-	"++addr " ++ NStr ++ "\n".
-
 -spec read_channel_string(string()) -> string().
 read_channel_string(CHString) ->
 	"OP" ++ CHString.

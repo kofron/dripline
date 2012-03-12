@@ -91,12 +91,11 @@ init([InstrumentID,PrologixID,BusAddress]) ->
 	},
 	{ok, InitialState}.
 
-handle_call({read,Channels}, From, #state{epro_handle = H}=StateData) ->
-	ReadStr = read_channel_string(Channels),
-	AddrStr = "++addr 9\n",
-	{ok, R} = eprologix_cmdr:send_query(H,[AddrStr|ReadStr]),
-	OutgoingReq = #req_data{from=From,ref = R},
-	NewStateData = StateData#state{c_req = OutgoingReq},
+handle_call({read,Chs}, F, #state{epro_handle = H,gpib_addr=A}=SData) ->
+	ReadStr = read_channel_string(Chs),
+	{ok, R} = eprologix_cmdr:send_query(H,A,[ReadStr]),
+	OutgoingReq = #req_data{from=F,ref = R},
+	NewStateData = SData#state{c_req = OutgoingReq},
 	{noreply, NewStateData}.
 
 handle_cast(_Msg, State) ->
