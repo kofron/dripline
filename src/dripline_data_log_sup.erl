@@ -31,17 +31,17 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    SuperStrategy = {one_for_one, 5, 10},
-    TestLogger = {
-		tester,
+    SuperStrategy = {simple_one_for_one, 5, 10},
+    LoggerProcess = {
+		dripline_data_logger,
 		{
 			dripline_data_logger,
 			start_link,
-			[<<"system_pressure">>,5,infinity]
+			[]
 		},
-		permanent,
+		transient,
 		5000,
 		worker,
 		[dripline_data_logger]
 	},
-    {ok, { SuperStrategy, [TestLogger] }}.
+    {ok, { SuperStrategy, [LoggerProcess] }}.
