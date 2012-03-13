@@ -82,7 +82,7 @@ handle_sync_event(_Event, _From, StateName, StateData) ->
 
 handle_info({change, _Ref, {done, LastSeq}}, waiting, StateData) ->
 	{next_state, connecting, StateData#state{lastSeqNo = LastSeq},1};
-handle_info({change, _Ref, {_ChangeData}}, waiting, StateData) ->
+handle_info({change, _Ref, ChangeData}, waiting, StateData) ->
 	{next_state, waiting, StateData}.
 
 terminate(_Reason, _StateName, _StateData) ->
