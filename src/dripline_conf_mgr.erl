@@ -14,7 +14,8 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([lookup/1]).
+-export([lookup/1,all_channels/0]).
+-export([get_logger_pid/1,set_logger_pid/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server API and callbacks %%%
@@ -27,7 +28,8 @@
 %%% internal state record %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
-			chs
+			chs, % Channel data
+			lgs  % Logger data
 		}).
 
 %%%%%%%%%%%%%%%%%%%%%%
@@ -36,6 +38,19 @@
 -spec lookup(binary()) -> {ok,term()} | {error,term()}.
 lookup(ChName) ->
 	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
+
+-spec all_channels() -> list().
+all_channels() ->
+	gen_server:call(?MODULE,all_channels).
+
+-spec get_logger_pid(binary()) -> {ok,pid()} | {error,no_logger}.
+get_logger_pid(ChannelName) ->
+	gen_server:call(?MODULE,{get_lg_pid, ChannelName}).
+
+-spec set_logger_pid(binary(),pid()) -> ok.
+set_logger_pid(ChannelName, Pid) ->
+	gen_server:call(?MODULE,{set_lg_pid, ChannelName, Pid}).	
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
@@ -50,7 +65,8 @@ init([]) ->
 	{ok, AllChannels} = couchbeam_view:fetch(Db,{"objects","channels"}),
 	{ok, ChanDict} = generate_channel_dict(AllChannels,AllInstr),
 	InitialState = #state{
-		chs = ChanDict
+		chs = ChanDict,
+		lgs = dict:new()
 	},
 	{ok, InitialState}.
 
@@ -61,7 +77,24 @@ handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 		error ->
 			{error, {bad_channel,Name}}
 	end,
-	{reply, Reply, StateData}.
+	{reply, Reply, StateData};
+handle_call(all_channels, _F, #state{chs=Ch}=StateData) ->
+	Reply = dict:fetch_keys(Ch),
+	{reply, Reply, StateData};
+handle_call({get_lg_pid, Name}, _F, #state{lgs=Lg}=StateData) ->
+	Reply = case dict:find(Name,Lg) of
+		{ok, _Pid}=C ->
+			C;
+		error ->
+			{error, no_logger}
+	end,
+	{reply, Reply, StateData};
+handle_call({set_lg_pid, Name, Pid}, _F, #state{lgs=Lg}=StateData) ->
+	NewState = StateData#state{
+		lgs = dict:store(Name,Pid,Lg)
+	},
+	{reply, ok, NewState}.
+
 
 handle_cast(_Cast, StateData) ->
 	{noreply, StateData}.
