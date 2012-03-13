@@ -60,6 +60,8 @@ handle_event(_Event, _StateName, StateData) ->
 handle_sync_event(_Event,_From,_StateName,StateData) ->
 	{stop, unexpected_sync_event, StateData}.
 
+handle_info({stop, user_request}, _StateName, StateData) ->
+	{stop, shutdown, StateData};
 handle_info(_Info, _StateName, StateData) ->
 	{stop, unexpected_info, StateData}.
 
@@ -93,7 +95,7 @@ writing(timeout,#state{id=Id,c_res=R,elapsed=T}=StateData) ->
 sleeping(timeout,#state{elapsed=E,cur_it=C,max_it=M,interval=I}=SData) ->
 	Branch = case (C + 1) >= M of
 		true -> % we've outstayed our welcome
-			{stop, max_iterations_reached, SData};
+			{stop, normal, SData};
 		false -> % keep going, sleep for the right amount of time.
 			SleepTime = calc_sleep_time(E,I),
 			NewStateData = SData#state{
