@@ -90,6 +90,7 @@ handle_call({get_lg_pid, Name}, _F, #state{lgs=Lg}=StateData) ->
 	end,
 	{reply, Reply, StateData};
 handle_call({set_lg_pid, Name, Pid}, _F, #state{lgs=Lg}=StateData) ->
+	erlang:monitor(process,Pid),
 	NewState = StateData#state{
 		lgs = dict:store(Name,Pid,Lg)
 	},
@@ -99,8 +100,22 @@ handle_call({set_lg_pid, Name, Pid}, _F, #state{lgs=Lg}=StateData) ->
 handle_cast(_Cast, StateData) ->
 	{noreply, StateData}.
 
+handle_info({'DOWN',_Ref, process, Pid, Reason}, #state{lgs=Lg}=SData) ->
+	NewStateData = case Reason of
+		normal -> %% need to drop this pid from dictionary
+			SData#state{
+				lgs = drop_pid(Lg,Pid)
+			};
+		shutdown -> %% need to drop this pid from dictionary
+			SData#state{
+				lgs = drop_pid(Lg,Pid)
+			};
+		_Other -> %% Should we try to track down the new process?
+			SData
+	end,
+	{noreply, NewStateData};
 handle_info(_Info, StateData) ->
-	{noreply, StateData}.
+	{stop, unexpected_info, StateData}.
 
 terminate(_Reason, _StateData) ->
 	ok.
@@ -151,3 +166,12 @@ get_call_data(Id,[In|Ins]) ->
 		_NotId ->
 			get_call_data(Id,Ins)
 	end.
+
+drop_pid(LogDict,Pid) ->
+	Search = fun(_K,_V,{true,_D2}=NoOp) -> 
+							NoOp;
+				 (K,Pid,{false,D1}) ->
+				 			{true, dict:erase(K,D1)}
+	end,
+	{true, D2} = dict:fold(Search,{false,LogDict},LogDict),
+	D2.
