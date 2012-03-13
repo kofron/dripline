@@ -14,7 +14,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([lookup/1,all_channels/0]).
+-export([add_channel/1,lookup/1,all_channels/0]).
 -export([get_logger_pid/1,set_logger_pid/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -35,6 +35,10 @@
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
 %%%%%%%%%%%%%%%%%%%%%%
+-spec add_channel(term()) -> ok | {error,already_exists}.
+add_channel(ChannelData) ->
+	gen_server:call(?MODULE,{add_channel, ChannelData}).
+
 -spec lookup(binary()) -> {ok,term()} | {error,term()}.
 lookup(ChName) ->
 	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
@@ -51,7 +55,6 @@ get_logger_pid(ChannelName) ->
 set_logger_pid(ChannelName, Pid) ->
 	gen_server:call(?MODULE,{set_lg_pid, ChannelName, Pid}).	
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -60,6 +63,7 @@ start_link() ->
 
 init([]) ->
 	SConn = dripline_conn_mgr:get(),
+	ok = dripline_jumpstart:go(),
 	{ok, Db} = couchbeam:open_db(SConn,"dripline_conf"),
 	{ok, AllInstr} = couchbeam_view:fetch(Db,{"objects","instruments"}),
 	{ok, AllChannels} = couchbeam_view:fetch(Db,{"objects","channels"}),
@@ -70,6 +74,18 @@ init([]) ->
 	},
 	{ok, InitialState}.
 
+handle_call({add_channel,Data}, _F, #state{chs=Ch}=StateData) ->
+	ChannelName = dripline_ch_data:get_fields(id,Data),
+	{NewStateData, Reply} = case dict:is_key(ChannelName,Ch) of
+		true ->
+			{StateData, {error, already_exists}};
+		false ->
+			TNewStateData = StateData#state{
+				chs = dict:store(ChannelName,Data)
+			},
+			{TNewStateData, ok}
+	end,
+	{reply, Reply, NewStateData};
 handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
@@ -95,7 +111,6 @@ handle_call({set_lg_pid, Name, Pid}, _F, #state{lgs=Lg}=StateData) ->
 		lgs = dict:store(Name,Pid,Lg)
 	},
 	{reply, ok, NewState}.
-
 
 handle_cast(_Cast, StateData) ->
 	{noreply, StateData}.
@@ -126,7 +141,6 @@ code_change(_OldVsn, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Internal Functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-
 generate_channel_dict(ChViewRes,InViewRes) ->
 	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
 											strip_values(X) 
@@ -150,8 +164,6 @@ generate_channel_dict([H|T],Instr,Acc) ->
 		{error, _E}=Err ->
 			Err
 	end.
-
-
 
 strip_values(L) ->
 	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
