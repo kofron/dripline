@@ -15,6 +15,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([add_channel/1,lookup/1,all_channels/0]).
+-export([add_instr/1]).
 -export([get_logger_pid/1,set_logger_pid/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -29,8 +30,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
 			chs, % Channel data
+			ins, % Instrument data
 			lgs  % Logger data
 		}).
+
+%%%%%%%%%%%%%%
+%%% Macros %%%
+%%%%%%%%%%%%%%
+-define(NOW, 0).
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% API definition %%%
@@ -55,6 +62,10 @@ get_logger_pid(ChannelName) ->
 set_logger_pid(ChannelName, Pid) ->
 	gen_server:call(?MODULE,{set_lg_pid, ChannelName, Pid}).	
 
+-spec add_instr(dripline_instr_data:instr_data()) -> ok.
+add_instr(Data) ->
+	gen_server:call(?MODULE,{add_instr, Data}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,30 +73,31 @@ start_link() ->
 	gen_server:start_link({local,?MODULE},?MODULE,[],[]).
 
 init([]) ->
-	SConn = dripline_conn_mgr:get(),
-	ok = dripline_jumpstart:go(),
-	{ok, Db} = couchbeam:open_db(SConn,"dripline_conf"),
-	{ok, AllInstr} = couchbeam_view:fetch(Db,{"objects","instruments"}),
-	{ok, AllChannels} = couchbeam_view:fetch(Db,{"objects","channels"}),
-	{ok, ChanDict} = generate_channel_dict(AllChannels,AllInstr),
 	InitialState = #state{
-		chs = ChanDict,
-		lgs = dict:new()
+		chs = dict:new(),
+		lgs = dict:new(),
+		ins = dict:new()
 	},
-	{ok, InitialState}.
+	{ok, InitialState, ?NOW}.
 
 handle_call({add_channel,Data}, _F, #state{chs=Ch}=StateData) ->
-	ChannelName = dripline_ch_data:get_fields(id,Data),
+	{ok, ChannelName} = dripline_ch_data:get_fields(id,Data),
 	{NewStateData, Reply} = case dict:is_key(ChannelName,Ch) of
 		true ->
 			{StateData, {error, already_exists}};
 		false ->
 			TNewStateData = StateData#state{
-				chs = dict:store(ChannelName,Data)
+				chs = dict:store(ChannelName,Data,Ch)
 			},
 			{TNewStateData, ok}
 	end,
 	{reply, Reply, NewStateData};
+handle_call({add_instr,Data}, _F, #state{ins=In}=StateData) ->
+	InstrName = dripline_instr_data:get_id(Data),
+	NewStateData = StateData#state{
+		ins = dict:store(InstrName,Data,In)
+	},
+	{reply, ok, NewStateData};
 handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 	Reply = case dict:find(Name,Ch) of
 		{ok, Value} ->
@@ -129,7 +141,10 @@ handle_info({'DOWN',_Ref, process, Pid, Reason}, #state{lgs=Lg}=SData) ->
 			SData
 	end,
 	{noreply, NewStateData};
-handle_info(_Info, StateData) ->
+handle_info(timeout, StateData) ->
+	spawn(dripline_jumpstart,go,[]),
+	{noreply, StateData};
+handle_info(_Info,StateData) ->
 	{stop, unexpected_info, StateData}.
 
 terminate(_Reason, _StateData) ->
@@ -141,49 +156,12 @@ code_change(_OldVsn, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Internal Functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-generate_channel_dict(ChViewRes,InViewRes) ->
-	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
-											strip_values(X) 
-										end, 
-										[ChViewRes,InViewRes]),
-	generate_channel_dict(StrippedCh,StrippedIn,dict:new()).
-generate_channel_dict([],_,Acc) ->
-	{ok,Acc};
-generate_channel_dict([H|T],Instr,Acc) ->
-	InstrId = couchbeam_doc:get_value(<<"instrument">>,H),
-	case get_call_data(InstrId,Instr) of
-		{ok, [Name,Model]} ->
-			CD0 = dripline_ch_data:new(),
-			CD1 = dripline_ch_data:set_field(instr,Name,CD0),
-			CD2 = dripline_ch_data:set_field(model,Model,CD1),
-			ChName = couchbeam_doc:get_value(<<"name">>,H),
-			CD3 = dripline_ch_data:set_field(id,ChName,CD2),
-			Locator = couchbeam_doc:get_value(<<"locator">>,H),
-			CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
-			generate_channel_dict(T,Instr,dict:store(ChName,CD4,Acc));
-		{error, _E}=Err ->
-			Err
-	end.
-
-strip_values(L) ->
-	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
-get_call_data(_,[]) ->
-	{error,instrument_not_found};
-get_call_data(Id,[In|Ins]) ->
-	case couchbeam_doc:get_id(In) of
-		Id ->
-			Name = couchbeam_doc:get_value(<<"name">>,In),
-			Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
-			{ok, [Name,Model]};
-		_NotId ->
-			get_call_data(Id,Ins)
-	end.
-
 drop_pid(LogDict,Pid) ->
-	Search = fun(_K,_V,{true,_D2}=NoOp) -> 
+	Search = fun(X) -> fun(_K,_V,{true,_D2}=NoOp) -> 
 							NoOp;
-				 (K,Pid,{false,D1}) ->
+				 		(K,X,{false,D1}) ->
 				 			{true, dict:erase(K,D1)}
+						end
 	end,
-	{true, D2} = dict:fold(Search,{false,LogDict},LogDict),
+	{true, D2} = dict:fold(Search(Pid),{false,LogDict},LogDict),
 	D2.
