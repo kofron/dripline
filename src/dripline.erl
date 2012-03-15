@@ -8,7 +8,7 @@
 -module(dripline).
 
 
--export([start_logging/3,stop_logging/1]).
+-export([start_logging/2,start_logging/3,stop_logging/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% API implementation %%%
@@ -20,6 +20,9 @@
 %%		before death.
 %% @end
 %%---------------------------------------------------------------------%%
+-spec start_logging(binary(),integer()) -> ok | {error, term()}.
+start_logging(ChannelName, Interval) ->
+	start_logging(ChannelName,Interval,infinity).
 -spec start_logging(binary(),integer(),integer() | infinity) 
 		-> ok | {error,term()}.
 start_logging(ChannelName,Interval,infinity) ->
