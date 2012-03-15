@@ -1,4 +1,4 @@
-all: release
+all: compile
 
 compile: get-deps
 	@(./rebar compile)
