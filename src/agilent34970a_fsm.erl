@@ -39,19 +39,26 @@
 			result :: result_type()
 	}).
 
+-record(scan_list,{
+			raw :: [channel_spec()],
+			parsed :: string()
+	}).
+
 -record(cache_value,{
 			last :: cache_data_type(),
-			ttl :: integer
+			ttl :: integer,
+			slist :: [channel_spec()]
 	}).
 
 -opaque request() :: #request{}.
-
+-opaque scan_list() :: #scan_list{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal fsm state %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
 			c_req :: request(),
+			slist :: scan_list(),
 			cache
 	}).
 
@@ -61,6 +68,7 @@
 -export([waiting/2]).
 -export([validate_cache/2]).
 -export([update_cache/2]).
+-export([update_scan_list/2]).
 -export([refresh_cache/2]).
 -export([fetch_cached_value/2]).
 -export([shipping/2]).
@@ -116,7 +124,11 @@ start_link(InstrumentID,PrologixID,BusAddress) ->
 init([InstrumentID,PrologixID,BusAddress]) ->
 	InitialState = #state{
 		c_req = none,
-		cache = dict:new()
+		cache = dict:new(),
+		slist = #scan_list{
+			raw = [],
+			parsed = ""
+		}
 	},
 	{ok, waiting, InitialState}.
 
@@ -170,11 +182,23 @@ update_cache(timeout, #state{c_req=R,cache=C}=StateData) ->
 	NewStateData = StateData#state{
 		cache = NewCache
 	},
+	{next_state, update_scan_list, NewStateData, ?NOW}.
+
+update_scan_list(timeout, #state{c_req=R,slist=S}=StateData) ->
+	ChannelName = R#request.loc,
+	NewChannelList = [ChannelName|S#scan_list.raw],
+	NewStateData = StateData#state{
+		slist = #scan_list{
+			raw = NewChannelList,
+			parsed = channel_spec_list_to_scan_string(NewChannelList)
+		}
+	},
 	{next_state, refresh_cache, NewStateData, ?NOW}.
 
-refresh_cache(timeout, #state{c_req=_R,cache=C}=StateData) ->
+refresh_cache(timeout, #state{c_req=_R,cache=C,slist=S}=StateData) ->
 	%% go get a new cache... how about we just sleep for now?
 	ok = timer:sleep(1000),
+	io:format("scan list is~p~n",[S#scan_list.parsed]),
 	UpdateTS = fun(K,#cache_value{last={D,_}}=Cached) ->
 						NewTS = calendar:local_time(),
 						Cached#cache_value{last={D,NewTS}}
@@ -244,4 +268,83 @@ should_be_refreshed(#cache_value{last={_LastVal,T0},ttl=Dt},T) ->
 			true
 	end.
 
+%%---------------------------------------------------------------------%%
+%% @doc channel_spec_to_int/1 takes a channel specifier 
+%%		{CardNumber,ChannelNumber} and converts it to the data that the 
+%%		switch unit uses for addressing, which is a single integer.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_tuple_to_int(channel_spec()) -> integer().
+channel_tuple_to_int({CardNumber,ChannelNumber}) ->
+	100*CardNumber + ChannelNumber.
 
+%%---------------------------------------------------------------------%%
+%% @doc channel_spec_list_to_scan_string is a very fun function.  
+%%		it takes a list of 34970a channel specs and produces a
+%%		string that the agilent 34970a is expecting, which is of the form
+%%		"101,105,301...".  the cool part is range detection.  the 
+%%		instrument takes ranges in the form of 101:105, which means all
+%%		channels between 1 and 5 on card 1.  this function will 
+%%		automagically produce the appropriate range queries if ranges
+%%		are found in the list of tuples.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_spec_list_to_scan_string([channel_spec()]) -> string().
+channel_spec_list_to_scan_string([]) ->
+	"";
+channel_spec_list_to_scan_string({_,_}=SingleTuple) ->
+	channel_spec_list_to_scan_string([SingleTuple]);
+channel_spec_list_to_scan_string(Tuples) ->
+	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
+	channel_ints_to_scan_string(lists:sort(IntChannels),false,[]).
+
+%%---------------------------------------------------------------------%%
+%% @doc channel_ints_to_scan_string is where the magic happens in terms
+%%		of generating the scan list for the agilent 34970a.
+%% @see channel_spec_list_to_scan_string
+%% @end
+%%---------------------------------------------------------------------%%
+-spec channel_ints_to_scan_string([channel_spec()],atom(),string()) ->
+		string().
+channel_ints_to_scan_string([], false, Acc) ->
+	lists:flatten(lists:reverse(Acc));
+channel_ints_to_scan_string([], H0, Acc) ->
+	Str = io_lib:format(":~p",[H0]), 
+	lists:reverse([Str|Acc]);
+
+channel_ints_to_scan_string([H1,H2|T],false,Acc) when H2 == (H1 + 1) ->
+	Str = io_lib:format("~p",[H1]),
+	channel_ints_to_scan_string(T,H2,[Str|Acc]);
+
+channel_ints_to_scan_string([H|T],H0,Acc) when H == (H0 + 1) ->
+	channel_ints_to_scan_string(T,H,Acc);
+
+channel_ints_to_scan_string([S],false,Acc) ->
+	Str = io_lib:format("~p",[S]),
+	channel_ints_to_scan_string([],false,[Str|Acc]);
+
+channel_ints_to_scan_string([H|T],false,Acc) ->
+	Str = io_lib:format("~p",[H]),
+	channel_ints_to_scan_string(T,false,[Str ++ ","|Acc]);
+
+channel_ints_to_scan_string([_H|_T]=L,H0,Acc) ->
+	Str = io_lib:format(":~p",[H0]),
+	channel_ints_to_scan_string(L,false,[Str ++ ","|Acc]).
+
+%%%%%%%%%%%%%%%
+%%% Testing %%%
+%%%%%%%%%%%%%%%
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+scan_string_input() ->
+	[{1,1},{1,3},{1,5},{1,6},{1,7},{1,8},{1,19},{2,10},
+	{2,12},{2,13},{2,14},{2,15},{3,1},{3,3},{3,8},{3,20}].
+scan_string_result() ->
+	"101,103,105:108,119,210,212:215,301,303,308,320".
+scan_string_test() ->
+	In = scan_string_input(),
+	Out = scan_string_result(),
+	?assertEqual(Out,channel_spec_list_to_scan_string(In)).
+
+-endif.
