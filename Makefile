@@ -1,4 +1,4 @@
-all: compile
+all: compile test
 
 compile: get-deps
 	@(./rebar compile)
@@ -12,3 +12,6 @@ release: clean compile
 clean:
 	@(./rebar clean)
 	rm -Rf release/dripline
+
+test:
+	@(./rebar skip_deps=true eunit)
