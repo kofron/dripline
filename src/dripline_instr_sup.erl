@@ -68,4 +68,16 @@ init([]) ->
 		worker,
 		[hf_sweeper]
 	},
-    {ok, { SuperStrategy, [SwitchMux,ADCMux,HFSweeper] }}.
+	LOSweeper = {
+		lo_sweeper,
+		{
+			hp8657b,
+			start_link,
+			[lo_sweeper,right_box,6]
+		},
+		permanent,
+		5000,
+		worker,
+		[hp8657b]
+	},
+    {ok, { SuperStrategy, [SwitchMux,ADCMux,HFSweeper,LOSweeper] }}.
