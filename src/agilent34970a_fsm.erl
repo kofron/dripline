@@ -31,6 +31,9 @@
 -type cache_type() :: dict().
 -type cache_data_type() :: {binary(), calendar:datetime()}.
 -type result_type() :: binary().
+-type id_type() :: atom().
+-type bus_type() :: atom().
+-type addr_type() :: integer().
 
 -record(request,{
 			ts :: calendar:datetime(),
@@ -57,18 +60,24 @@
 %%% internal fsm state %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(state,{
+			id :: id_type(),
+			epro_handle :: bus_type(),
+			gpib_addr :: addr_type(),
 			c_req :: request(),
-			slist :: scan_list(),
+			slist :: scan_list(), % channels to be scanned
+			ival :: integer(), % scanning interval in seconds
 			cache
 	}).
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm states %%%
 %%%%%%%%%%%%%%%%%%%%%%
+-export([configuring/2]).
 -export([waiting/2]).
 -export([validate_cache/2]).
 -export([update_cache/2]).
 -export([update_scan_list/2]).
+-export([update_instrument/2]).
 -export([refresh_cache/2]).
 -export([fetch_cached_value/2]).
 -export([shipping/2]).
@@ -90,8 +99,12 @@
 %%---------------------------------------------------------------------%%
 -spec read(atom(),locator()) -> binary() | {error, term()}.
 read(InstrumentID,Locator) ->
-	ChannelSpec = locator_to_ch_spec(Locator),
-	gen_fsm:sync_send_all_state_event(InstrumentID,{read,ChannelSpec}).
+	case locator_to_ch_spec(Locator) of
+		{error, _Reason}=Error ->
+			Error;
+		{_Card,_Channel}=CSpec ->
+			gen_fsm:sync_send_all_state_event(InstrumentID,{read,CSpec})
+	end.
 
 %%---------------------------------------------------------------------%%
 %% @doc locator_to_ch_spec is part of a generic instrument interface.  
@@ -119,18 +132,22 @@ locator_to_ch_spec(LocatorBinary) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(InstrumentID,PrologixID,BusAddress) ->
 	Args = [InstrumentID,PrologixID,BusAddress],
-	gen_fsm:start_link({local,?MODULE},?MODULE,Args,[]).
+	gen_fsm:start_link({local,InstrumentID},?MODULE,Args,[]).
 
 init([InstrumentID,PrologixID,BusAddress]) ->
 	InitialState = #state{
+		id = InstrumentID,
+		gpib_addr = BusAddress,
+		epro_handle = PrologixID,
 		c_req = none,
 		cache = dict:new(),
 		slist = #scan_list{
 			raw = [],
 			parsed = ""
-		}
+		},
+		ival = 5
 	},
-	{ok, waiting, InitialState}.
+	{ok, configuring, InitialState, ?NOW}.
 
 handle_event(_Event, StateName, StateData) ->
 	{next_state, StateName, StateData}.
@@ -158,6 +175,15 @@ code_change(_Vsn, StateName, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm state definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+configuring(timeout,#state{gpib_addr=A,epro_handle=H}=StateData) ->
+	lists:foreach(fun(C) -> 
+					eprologix_cmdr:send(H,A,C,true),
+					timer:sleep(1000)
+					end,
+					startup_config_strings()
+				 ),
+	{next_state,waiting,StateData}.
+
 waiting(timeout,StateData) ->
 	{next_state, validate_cache, StateData, ?NOW}.
 
@@ -184,7 +210,7 @@ update_cache(timeout, #state{c_req=R,cache=C}=StateData) ->
 	},
 	{next_state, update_scan_list, NewStateData, ?NOW}.
 
-update_scan_list(timeout, #state{c_req=R,slist=S}=StateData) ->
+update_scan_list(timeout, #state{epro_handle=H,gpib_addr=A,c_req=R,slist=S}=StateData) ->
 	ChannelName = R#request.loc,
 	NewChannelList = [ChannelName|S#scan_list.raw],
 	NewStateData = StateData#state{
@@ -193,12 +219,20 @@ update_scan_list(timeout, #state{c_req=R,slist=S}=StateData) ->
 			parsed = channel_spec_list_to_scan_string(NewChannelList)
 		}
 	},
-	{next_state, refresh_cache, NewStateData, ?NOW}.
+	Cmd = scan_list_command((NewStateData#state.slist)#scan_list.parsed),
+	eprologix_cmdr:send(H,A,Cmd,true),
+	{next_state, update_instrument, NewStateData, ?NOW}.
+
+update_instrument(timeout, #state{epro_handle=H,gpib_addr=A,ival=I}=StateData) ->
+	lists:foreach(fun(C) ->
+						eprologix_cmdr:send(H,A,C,true),
+						timer:sleep(100)
+					end,
+				instrument_timer_commands(I)),
+	{next_state, refresh_cache, StateData, ?NOW}.
 
 refresh_cache(timeout, #state{c_req=_R,cache=C,slist=S}=StateData) ->
 	%% go get a new cache... how about we just sleep for now?
-	ok = timer:sleep(1000),
-	io:format("scan list is~p~n",[S#scan_list.parsed]),
 	UpdateTS = fun(K,#cache_value{last={D,_}}=Cached) ->
 						NewTS = calendar:local_time(),
 						Cached#cache_value{last={D,NewTS}}
@@ -331,6 +365,26 @@ channel_ints_to_scan_string([_H|_T]=L,H0,Acc) ->
 	Str = io_lib:format(":~p",[H0]),
 	channel_ints_to_scan_string(L,false,[Str ++ ","|Acc]).
 
+startup_config_strings() ->
+	[
+		"*CLS",
+		"*RST",
+		"FORM:READ:CHAN ON",
+		"FORM:READ:TIME ON",
+		"FORM:READ:UNIT ON"
+	].
+
+scan_list_command(ScanList) ->
+	io_lib:format("ROUT:SCAN (@~s)",[ScanList]).
+
+instrument_timer_commands(I) ->
+	[
+		"TRIG:SOURCE TIMER",
+		io_lib:format("TRIG:TIMER ~B",[I]),
+		"TRIG:COUNT INFINITY",
+		"INIT"
+	].
+
 %%%%%%%%%%%%%%%
 %%% Testing %%%
 %%%%%%%%%%%%%%%
@@ -346,5 +400,14 @@ scan_string_test() ->
 	In = scan_string_input(),
 	Out = scan_string_result(),
 	?assertEqual(Out,channel_spec_list_to_scan_string(In)).
+
+instrument_test() ->
+	{ok, _Pid} = agilent34970a_fsm:start_link(adc_mux,left_box,12),
+	?assertEqual({error,bad_locator},
+				agilent34970a_fsm:read(adc_mux,<<"{1,}">>)),
+	?assertEqual(<<>>,
+				agilent34970a_fsm:read(adc_mux,<<"{1,1}">>)),
+	?assertEqual(<<>>,
+				agilent34970a_fsm:read(adc_mux,<<"{1,1}">>)).
 
 -endif.
