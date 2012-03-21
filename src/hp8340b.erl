@@ -96,18 +96,14 @@ init([InstrumentID,BusID,InstrumentAddress]) ->
 handle_call({read,Channels}, From, 
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	ReadStr = read_channel_string(Channels),
-	{ok, R} = eprologix_cmdr:send_query(H,A,[ReadStr]),
-	OutgoingReq = #req_data{from=From,ref = R},
-	NewStateData = StateData#state{c_req = OutgoingReq},
-	{noreply, NewStateData};
+	R = eprologix_cmdr:send(H,A,ReadStr),
+	{reply, R, StateData};
 
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	WriteStr = write_channel_string(Channels,NewValue),
-	{ok, R} = eprologix_cmdr:send_command(H,A,[WriteStr]),
-	OutgoingReq = #req_data{from=From,ref = R},
-	NewStateData = StateData#state{c_req = OutgoingReq},
-	{reply, ok, NewStateData}.
+	ok = eprologix_cmdr:send(H,A,WriteStr,true),
+	{reply, ok, StateData}.
 
 handle_cast(_Cast,StateData) ->
 	{noreply, StateData}.
