@@ -44,6 +44,7 @@
 
 -record(scan_list,{
 			raw :: [channel_spec()],
+			len :: integer(),
 			parsed :: string()
 	}).
 
@@ -216,6 +217,7 @@ update_scan_list(timeout, #state{epro_handle=H,gpib_addr=A,c_req=R,slist=S}=Stat
 	NewStateData = StateData#state{
 		slist = #scan_list{
 			raw = NewChannelList,
+			len = erlang:length(raw),
 			parsed = channel_spec_list_to_scan_string(NewChannelList)
 		}
 	},
@@ -231,8 +233,10 @@ update_instrument(timeout, #state{epro_handle=H,gpib_addr=A,ival=I}=StateData) -
 				instrument_timer_commands(I)),
 	{next_state, refresh_cache, StateData, ?NOW}.
 
-refresh_cache(timeout, #state{c_req=_R,cache=C,slist=S}=StateData) ->
-	%% go get a new cache... how about we just sleep for now?
+refresh_cache(timeout, #state{gpib_addr=A,epro_handle=H,cache=C,slist=#scan_list{len=L}}=StateData) ->
+	Cmd = io_lib:format("DATA:REMOVE? ~B",[L]),
+	RawData = eprologix_cmdr:send(H,A,Cmd),
+	io:format("~p~n",[RawData]),
 	UpdateTS = fun(K,#cache_value{last={D,_}}=Cached) ->
 						NewTS = calendar:local_time(),
 						Cached#cache_value{last={D,NewTS}}
@@ -400,14 +404,4 @@ scan_string_test() ->
 	In = scan_string_input(),
 	Out = scan_string_result(),
 	?assertEqual(Out,channel_spec_list_to_scan_string(In)).
-
-instrument_test() ->
-	{ok, _Pid} = agilent34970a_fsm:start_link(adc_mux,left_box,12),
-	?assertEqual({error,bad_locator},
-				agilent34970a_fsm:read(adc_mux,<<"{1,}">>)),
-	?assertEqual(<<>>,
-				agilent34970a_fsm:read(adc_mux,<<"{1,1}">>)),
-	?assertEqual(<<>>,
-				agilent34970a_fsm:read(adc_mux,<<"{1,1}">>)).
-
 -endif.
