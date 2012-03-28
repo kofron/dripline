@@ -47,7 +47,7 @@ init([]) ->
 	ADCMux = {
 		adc_mux,
 		{
-			agilent34970a_fsm,
+			agilent34970a,
 			start_link,
 			[adc_mux,left_box,9]
 		},
