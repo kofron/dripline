@@ -15,7 +15,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([add_channel/1,lookup/1,all_channels/0]).
--export([add_instr/1]).
+-export([add_instr/1,lookup_instr/1]).
 -export([get_logger_pid/1,set_logger_pid/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,6 +66,12 @@ set_logger_pid(ChannelName, Pid) ->
 add_instr(Data) ->
 	gen_server:call(?MODULE,{add_instr, Data}).
 
+-spec lookup_instr(binary()) -> 
+	{ok,dripline_instr_data:instr_data()} | 
+	{error, {bad_instr,binary()}}.
+lookup_instr(InstrName) ->
+	gen_server:call(?MODULE,{lookup,{in,InstrName}}).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -104,6 +110,14 @@ handle_call({lookup,{ch,Name}}, _From, #state{chs=Ch}=StateData) ->
 			{ok, Value};
 		error ->
 			{error, {bad_channel,Name}}
+	end,
+	{reply, Reply, StateData};
+handle_call({lookup,{in,Name}}, _From, #state{ins=In}=StateData) ->
+	Reply = case dict:find(Name,In) of
+		{ok, Value} ->
+			{ok, Value};
+		error ->
+			{error, {bad_instr,Name}}
 	end,
 	{reply, Reply, StateData};
 handle_call(all_channels, _F, #state{chs=Ch}=StateData) ->

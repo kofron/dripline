@@ -60,7 +60,7 @@ generate_st_channel_conf([H|T],Instr) ->
 get_call_data(_,[]) ->
 	{error,instrument_not_found};
 get_call_data(Id,[In|Ins]) ->
-	case couchbeam_doc:get_id(In) of
+	case couchbeam_doc:get_value(<<"name">>,In) of
 		Id ->
 			Name = couchbeam_doc:get_value(<<"name">>,In),
 			Model = couchbeam_doc:get_value(<<"instrument_model">>,In),

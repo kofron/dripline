@@ -13,10 +13,14 @@
 		locator :: term()
 	}).
 
+-opaque ch_data() :: #cd{}.
+-export_type([ch_data/0]).
+
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([new/0,get_fields/2,get_fields/3,set_field/3]).
+-export([new/0,from_json/1]).
+-export([get_fields/2,get_fields/3,set_field/3]).
 -export([synthesize_fun/1,synthesize_fun/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -35,7 +39,50 @@ new() ->
 		model = none,
 		locator = none
 	}.
+%%---------------------------------------------------------------------%%
+%% @doc from_json/1 returns a new channel data structure that is built 
+%%		from a json object with the appropriate fields.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec from_json(ejson:json_object()) -> 
+	{ok, ch_data()} | {error, term()}.
+from_json(JS) ->
+	N = new(),
+	make_ch_data(N,JS).
 
+-spec make_ch_data(ch_data(),ejson:json_object()) ->
+	{ok, ch_data()} | {error, term()}.
+make_ch_data(N, JS) ->
+	set_id(N,JS).
+set_id(N,JS) ->
+	case couchbeam_doc:get_value(<<"name">>,JS) of
+		undefined ->
+			{error, {required, name}};
+		Val ->
+			set_loc(N#cd{id=Val},JS)
+	end.
+set_loc(N,JS) ->
+	case couchbeam_doc:get_value(<<"locator">>,JS) of
+		undefined ->
+			{error, {required, locator}};
+		Val ->
+			set_instr(N#cd{locator=Val},JS)
+	end.
+set_instr(N,JS) ->
+	case couchbeam_doc:get_value(<<"instrument">>,JS) of
+		undefined ->
+			{error, {required, instrument}};
+		Val ->
+			set_model(N#cd{instr=Val},JS)
+	end.
+set_model(#cd{instr=I}=N,_JS) ->
+	case dripline_conf_mgr:lookup_instr(I) of
+		{ok, InD} ->
+			Mod = dripline_instr_data:get_module(InD),
+			{ok, set_field(model,Mod,N)};
+		_ ->
+			{error, {required, model}}
+	end.
 %%---------------------------------------------------------------------%%
 %% @doc set_field/3 sets the value of a field in an existing record to a
 %%		new value.
@@ -108,4 +155,3 @@ synthesize_fun(#cd{instr=BI,model=BM,locator=L},V) ->
 					end, 
 					[BI,BM]),
 	fun() -> M:write(I,L,V) end.
-

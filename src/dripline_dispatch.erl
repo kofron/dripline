@@ -26,6 +26,7 @@
 %%%%%%%%%%%%%%%%%%%%%%
 -export([waiting/2,shipping/2,finishing/2]).
 -export([resolving_type/2,resolving_channel/2,resolving_action/2]).
+-export([resolving_instr/2]).
 -export([report_error/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,6 +72,8 @@ resolving_type(timeout,#state{cur_doc=D}=StateData) ->
 				{next_state,resolving_channel,StateData,?NOW};
 			<<"system">> ->
 				{next_state,finishing,StateData,?NOW};
+			<<"channel">> ->
+				{next_state,resolving_instr,StateData,?NOW};
 			_Otherwise ->
 				Err = {[{error,bad_command}]},
 				NewStateData = StateData#state{
@@ -120,6 +123,22 @@ resolving_action(timeout,#state{cur_doc=D,cur_ch=C}=StateData) ->
 				cur_err = Error
 			},
 			{next_state, report_error, NewStateData, ?NOW}
+		end,
+	Branch.
+
+resolving_instr(timeout,#state{cur_doc=D}=StateData) ->
+	Instr = couchbeam_doc:get_value(<<"instrument">>,D),
+	Branch = case dripline_conf_mgr:lookup_instr(Instr) of
+			{ok, _In} ->
+				{ok, ChData} = dripline_ch_data:from_json(D),
+				dripline_conf_mgr:add_channel(ChData),
+				{next_state, finishing, StateData, ?NOW};
+			{error, _Err} ->
+				Error = {[{error, {[{unknown_instrument, Instr}]}}]},
+				NewStateData = StateData#state{
+					cur_err = Error
+				},
+				{next_state, report_error, StateData, ?NOW}
 		end,
 	Branch.
 
