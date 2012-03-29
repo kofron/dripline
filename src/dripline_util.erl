@@ -36,7 +36,13 @@ update_couch_doc(DbName,DocID,FieldName,NewData) ->
 	EncodedData = ejson:encode(NewData),
 	NewDoc = couchbeam_doc:set_value(FieldName,EncodedData,Doc),
 	OldRevNo = strip_rev_no(couchbeam_doc:get_rev(NewDoc)),
-	dripline_cmd_mon:notify(DocID, OldRevNo + 1),
+    NotifyMod = case DbName of 
+		    "dripline_cmd" ->
+			dripline_cmd_mon;
+		    "dripline_conf" ->
+			dripline_conf_mon
+		end,
+	NotifyMod:notify(DocID, OldRevNo + 1),
 	{ok,_} = couchbeam:save_doc(Db,NewDoc).
 
 %%---------------------------------------------------------------------%%
