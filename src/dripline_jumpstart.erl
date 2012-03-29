@@ -35,38 +35,38 @@ configure_channels(SConn) ->
 
 generate_channel_conf(ChViewRes,InViewRes) ->
 	[StrippedCh,StrippedIn] = lists:map(fun(X) -> 
-											strip_values(X) 
-										end, 
-										[ChViewRes,InViewRes]),
+						    strip_values(X) 
+					    end, 
+					    [ChViewRes,InViewRes]),
 	generate_st_channel_conf(StrippedCh,StrippedIn).
 generate_st_channel_conf([],_) ->
 	ok;
 generate_st_channel_conf([H|T],Instr) ->
 	InstrId = couchbeam_doc:get_value(<<"instrument">>,H),
-	case get_call_data(InstrId,Instr) of
-		{ok, [Name,Model]} ->
-			CD0 = dripline_ch_data:new(),
-			CD1 = dripline_ch_data:set_field(instr,Name,CD0),
-			CD2 = dripline_ch_data:set_field(model,Model,CD1),
-			ChName = couchbeam_doc:get_value(<<"name">>,H),
-			CD3 = dripline_ch_data:set_field(id,ChName,CD2),
-			Locator = couchbeam_doc:get_value(<<"locator">>,H),
-			CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
-			ok = dripline_conf_mgr:add_channel(CD4),
-			generate_st_channel_conf(T,Instr);
-		{error, _E}=Err ->
-			Err
+    case get_call_data(InstrId,Instr) of
+	    {ok, [Name,Model]} ->
+		CD0 = dripline_ch_data:new(),
+		CD1 = dripline_ch_data:set_field(instr,Name,CD0),
+		CD2 = dripline_ch_data:set_field(model,Model,CD1),
+		ChName = couchbeam_doc:get_value(<<"name">>,H),
+		CD3 = dripline_ch_data:set_field(id,ChName,CD2),
+		Locator = couchbeam_doc:get_value(<<"locator">>,H),
+		CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
+		ok = dripline_conf_mgr:add_channel(CD4),
+		generate_st_channel_conf(T,Instr);
+	    {error, _E}=Err ->
+		Err
 	end.
 get_call_data(_,[]) ->
 	{error,instrument_not_found};
 get_call_data(Id,[In|Ins]) ->
 	case couchbeam_doc:get_value(<<"name">>,In) of
-		Id ->
-			Name = couchbeam_doc:get_value(<<"name">>,In),
-			Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
-			{ok, [Name,Model]};
-		_NotId ->
-			get_call_data(Id,Ins)
+	    Id ->
+		Name = couchbeam_doc:get_value(<<"name">>,In),
+		Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
+		{ok, [Name,Model]};
+	    _NotId ->
+		get_call_data(Id,Ins)
 	end.
 
 %%---------------------------------------------------------------------%%
