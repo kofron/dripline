@@ -150,5 +150,5 @@ parse_bus(BusInfo) ->
 				    erlang:list_to_atom(X) 
 			    end,
 			    [ModStr,BusIDStr]),
-    Addr = io_lib:fread("~d",[AddrStr]),
+    {Addr,[]} = string:to_integer(AddrStr),
     {Mod,BusID,Addr}.
