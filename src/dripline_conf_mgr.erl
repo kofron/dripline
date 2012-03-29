@@ -127,7 +127,7 @@ handle_call({lookup,{in,Name}}, _From, #state{ins=In}=StateData) ->
 handle_call(all_channels, _F, #state{chs=Ch}=StateData) ->
 	Reply = dict:fetch_keys(Ch),
 	{reply, Reply, StateData};
-handle_call(all_channels, _F, #state{ins=In}=StateData) ->
+handle_call(all_instr, _F, #state{ins=In}=StateData) ->
 	Reply = dict:fetch_keys(In),
 	{reply, Reply, StateData};
 handle_call({get_lg_pid, Name}, _F, #state{lgs=Lg}=StateData) ->
