@@ -32,52 +32,10 @@ start_link() ->
 
 init([]) ->
     SuperStrategy = {one_for_one, 5, 10},
-    SwitchMux = {
-		switch_mux,
-		{
-			agilent34970a,
-			start_link,
-			[switch_mux,left_box,8]
-		},
-		permanent,
-		5000,
-		worker,
-		[agilent34790a]
-	},
-	ADCMux = {
-		adc_mux,
-		{
-			agilent34970a,
-			start_link,
-			[adc_mux,left_box,9]
-		},
-		permanent,
-		5000,
-		worker,
-		[agilent34790a]
-	},
-	HFSweeper = {
-		hf_sweeper,
-		{
-			hp8340b,
-			start_link,
-			[hf_sweeper,right_box,19]
-		},
-		permanent,
-		5000,
-		worker,
-		[hf_sweeper]
-	},
-	LOSweeper = {
-		lo_sweeper,
-		{
-			hp8657b,
-			start_link,
-			[lo_sweeper,right_box,6]
-		},
-		permanent,
-		5000,
-		worker,
-		[hp8657b]
-	},
-    {ok, { SuperStrategy, [SwitchMux,ADCMux,HFSweeper,LOSweeper] }}.
+    timer:sleep(1000),
+    InitC = lists:map(fun(X) ->
+			      {ok,D} = dripline_conf_mgr:lookup_instr(X),
+			      dripline_instr_data:to_childspec(D)
+		      end,
+		      dripline_conf_mgr:all_instr()),
+    {ok, { SuperStrategy, InitC }}.
