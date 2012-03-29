@@ -26,7 +26,7 @@
 %%%%%%%%%%%%%%%%%%%%%%
 -export([waiting/2,shipping/2,finishing/2]).
 -export([resolving_type/2,resolving_channel/2,resolving_action/2]).
--export([resolving_instr/2]).
+-export([resolving_instr/2,installing_instr/2]).
 -export([report_error/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -38,7 +38,6 @@
 %%% Macros %%%
 %%%%%%%%%%%%%%
 -define(NOW,0).
--define(DB,"dripline_cmd").
 
 %%%%%%%%%%%%%
 %%% Types %%%
@@ -74,6 +73,8 @@ resolving_type(timeout,#state{cur_doc=D}=StateData) ->
 				{next_state,finishing,StateData,?NOW};
 			<<"channel">> ->
 				{next_state,resolving_instr,StateData,?NOW};
+		     <<"instrument">> ->
+			 {next_state,installing_instr,StateData,?NOW};
 			_Otherwise ->
 				Err = {[{error,bad_command}]},
 				NewStateData = StateData#state{
@@ -142,19 +143,51 @@ resolving_instr(timeout,#state{cur_doc=D}=StateData) ->
 		end,
 	Branch.
 
+installing_instr(timeout,#state{cur_doc=D}=StateData) ->
+    Branch = case dripline_instr_data:from_json(D) of
+		 {ok, I} ->
+		     dripline_conf_mgr:add_instr(I),
+		     C = dripline_instr_data:to_childspec(I),
+		     {ok,_Pid} = supervisor:start_child(dripline_instr_sup,C),
+		     {next_state, finishing, StateData, ?NOW};
+		 _ ->
+		     Error = {[{error, {[{parse_error, D}]}}]},
+		     NewStateData = StateData#state{
+				      cur_err = Error
+				     },
+		     {next_state, report_error, StateData, ?NOW}
+	     end,
+    Branch.
+
 shipping(timeout,#state{cur_fun=F,cur_doc=D}=StateData) ->
-	DocID = couchbeam_doc:get_id(D),
-	Perform = fun() -> 
-					R = F(),
-					dripline_util:update_couch_doc(?DB,DocID,"result",R)
-			end,
-	spawn(Perform),
-	{next_state,finishing,StateData,?NOW}.
+    DocID = couchbeam_doc:get_id(D),
+    DB = case couchbeam_doc:get_value(<<"type">>,D) of
+	     <<"channel">> ->
+		 "dripline_conf";
+	     <<"instrument">> ->
+		 "dripline_conf";
+	     _ ->
+		 "dripline_cmd"
+	 end,
+    Perform = fun() -> 
+		      R = F(),
+		      dripline_util:update_couch_doc(DB,DocID,"result",R)
+	      end,
+    spawn(Perform),
+    {next_state,finishing,StateData,?NOW}.
 
 report_error(timeout,#state{cur_doc=D,cur_err=E}=StateData) ->
-	DocID = couchbeam_doc:get_id(D),
-	{ok, _} = dripline_util:update_couch_doc(?DB,DocID,"result",E),
-	{next_state,finishing,StateData,?NOW}.
+    DocID = couchbeam_doc:get_id(D),
+    DB = case couchbeam_doc:get_value(<<"type">>,D) of
+	     <<"channel">> ->
+		 "dripline_conf";
+	     <<"instrument">> ->
+		 "dripline_conf";
+	     _ ->
+		 "dripline_cmd"
+	 end,
+    {ok, _} = dripline_util:update_couch_doc(DB,DocID,"result",E),
+    {next_state,finishing,StateData,?NOW}.
 
 finishing(timeout,_StateData) ->
 	IdleState = idle_state(),
