@@ -29,7 +29,7 @@
 -export([set_module/2,get_module/1]).
 -export([set_bus/2,get_bus/1]).
 -export([set_supports/2,get_supports/1]).
--export([to_childspec/1]).
+-export([from_json/1,to_childspec/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% types and type exports %%%%%
@@ -122,8 +122,41 @@ get_bus(#instr_d{bus=B}) ->
 	B.
 
 %%---------------------------------------------------------------------%%
+%% @doc from_json/1 generates an instr_data record from a json object.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec from_json(ejson:ejson_object()) -> 
+		       {ok, instr_data()} | {error, term()}.
+from_json(JS) ->
+    N = new(),
+    make_in_data(N,JS).
+make_in_data(N,JS) ->
+    set_data_id(N,JS).
+set_data_id(N,JS) ->
+    case couchbeam_doc:get_value(<<"name">>,JS) of
+	undefined ->
+	    {error, {required, name}};
+	Val ->
+	    set_data_bus(set_id(Val,N),JS)
+    end.
+set_data_bus(N,JS) ->
+    case couchbeam_doc:get_value(<<"bus">>,JS) of
+	undefined ->
+	    {error, {required, bus}};
+	Val ->
+	    set_data_model(set_bus(Val,N),JS)
+    end.
+set_data_model(N,JS) ->
+    case couchbeam_doc:get_value(<<"instrument_model">>,JS) of
+	undefined ->
+	    {error, {required, model}};
+	Val ->
+	    {ok, set_module(Val,N)}
+    end.
+
+%%---------------------------------------------------------------------%%
 %% @doc to_childspec/1 takes an instr_data record and generates a child
-%%		spec that can be used to start a supervised instrument process.
+%%	spec that can be used to start a supervised instrument process.
 %% @end
 %%---------------------------------------------------------------------%%
 -spec to_childspec(instr_data()) -> supervisor:child_spec().
