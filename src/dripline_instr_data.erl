@@ -127,8 +127,10 @@ get_bus(#instr_d{bus=B}) ->
 %% @end
 %%---------------------------------------------------------------------%%
 -spec to_childspec(instr_data()) -> supervisor:child_spec().
-to_childspec(#instr_d{bus=B,module=M,id=N}) ->
+to_childspec(#instr_d{bus=B,module=Mod,id=Name}) ->
     {_BusType,Bus,Addr} = parse_bus(B),
+    N = dripline_util:binary_to_atom(Name),
+    M = dripline_util:binary_to_atom(Mod),
     {
       N, % registered name of the instrument
       {
