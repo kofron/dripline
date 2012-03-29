@@ -15,7 +15,7 @@
 %%% API %%%
 %%%%%%%%%%%
 -export([add_channel/1,lookup/1,all_channels/0]).
--export([add_instr/1,lookup_instr/1]).
+-export([add_instr/1,lookup_instr/1,all_instr/0]).
 -export([get_logger_pid/1,set_logger_pid/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,6 +72,10 @@ add_instr(Data) ->
 lookup_instr(InstrName) ->
 	gen_server:call(?MODULE,{lookup,{in,InstrName}}).
 
+-spec all_instr() -> [dripline_instr_data:instr_data()].
+all_instr() ->		    
+    gen_server:call(?MODULE,all_instr).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server callback defs %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -122,6 +126,9 @@ handle_call({lookup,{in,Name}}, _From, #state{ins=In}=StateData) ->
 	{reply, Reply, StateData};
 handle_call(all_channels, _F, #state{chs=Ch}=StateData) ->
 	Reply = dict:fetch_keys(Ch),
+	{reply, Reply, StateData};
+handle_call(all_channels, _F, #state{ins=In}=StateData) ->
+	Reply = dict:fetch_keys(In),
 	{reply, Reply, StateData};
 handle_call({get_lg_pid, Name}, _F, #state{lgs=Lg}=StateData) ->
 	Reply = case dict:find(Name,Lg) of
