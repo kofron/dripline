@@ -29,6 +29,7 @@
 -export([set_module/2,get_module/1]).
 -export([set_bus/2,get_bus/1]).
 -export([set_supports/2,get_supports/1]).
+-export([to_childspec/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% types and type exports %%%%%
@@ -119,3 +120,35 @@ set_bus(A,D) when is_record(D,instr_d) ->
 -spec get_bus(instr_data()) -> bus_type().
 get_bus(#instr_d{bus=B}) ->
 	B.
+
+%%---------------------------------------------------------------------%%
+%% @doc to_childspec/1 takes an instr_data record and generates a child
+%%		spec that can be used to start a supervised instrument process.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec to_childspec(instr_data()) -> supervisor:child_spec().
+to_childspec(#instr_d{bus=B,module=M,id=N}) ->
+    {_BusType,Bus,Addr} = parse_bus(B),
+    {
+      N, % registered name of the instrument
+      {
+	M, % module
+	start_link,
+	[N,Bus,Addr] % need to have parsed bus info here
+      },
+      permanent,
+      5000,
+      worker,
+      [M]
+    }.
+
+-spec parse_bus(binary()) -> {atom(),atom(),integer()}.
+parse_bus(BusInfo) ->
+    StrInfo = erlang:binary_to_list(BusInfo),
+    [ModStr,BusIDStr,AddrStr] = string:tokens(StrInfo,"/:"),
+    [Mod,BusID] = lists:map(fun(X) -> 
+				    erlang:list_to_atom(X) 
+			    end,
+			    [ModStr,BusIDStr]),
+    Addr = io_lib:fread("~d",[AddrStr]),
+    {Mod,BusID,Addr}.
