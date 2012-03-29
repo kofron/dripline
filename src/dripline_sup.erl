@@ -47,4 +47,4 @@ init([]) ->
     CmdMon  = ?CHILD(dripline_cmd_mon,worker),
     Dispatcher = ?CHILD(dripline_dispatch,worker),
     DLogSup = ?CHILD(dripline_data_log_sup,supervisor),
-    {ok, { SuperStrategy, [InstrSup,ConnMgr,ConfMon,CmdMon,ConfMgr,DLogSup,Dispatcher] }}.
+    {ok, { SuperStrategy, [ConnMgr,ConfMon,CmdMon,ConfMgr,InstrSup,DLogSup,Dispatcher] }}.
