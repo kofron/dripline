@@ -7,41 +7,24 @@
 %% @version 0.1a
 %% @author Jared Kofron <jared.kofron@gmail.com>
 -module(dripline_dispatch).
--behavior(gen_fsm).
+-behavior(gen_server).
 
 %%%%%%%%%%%%%%%%%%%%
 %%% Exported API %%%
 %%%%%%%%%%%%%%%%%%%%
--export([dispatch/1]).
+-export([dispatch/2]).
 
-%%%%%%%%%%%%%%%%%%%
-%%% gen_fsm API %%%
-%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_server api and callbacks %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([start_link/0]).
--export([init/1, handle_event/3, handle_sync_event/4, handle_info/3, 
-		terminate/3, code_change/4]).
-
-%%%%%%%%%%%%%%%%%%%%%%
-%%% gen_fsm states %%%
-%%%%%%%%%%%%%%%%%%%%%%
--export([waiting/2,shipping/2,finishing/2]).
--export([resolving_type/2,resolving_channel/2,resolving_action/2]).
--export([resolving_instr/2,installing_instr/2]).
--export([report_error/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal state records %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--record(state,{cur_doc,cur_ch,cur_err,cur_fun}).
-
-%%%%%%%%%%%%%%
-%%% Macros %%%
-%%%%%%%%%%%%%%
--define(NOW,0).
-
-%%%%%%%%%%%%%
-%%% Types %%%
-%%%%%%%%%%%%%
+-record(state,{}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Exported API Definitions %%%
@@ -54,184 +37,52 @@
 %%		the dispatcher.
 %% @end
 %%---------------------------------------------------------------------%%
--spec dispatch(ejson:json_object()) -> ok.
-dispatch(DocUpdateLine) ->
-	StrippedDoc = couchbeam_doc:get_value(<<"doc">>,DocUpdateLine),
-	gen_fsm:send_all_state_event(?MODULE,{process,StrippedDoc}).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% gen_fsm state definitions %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-waiting(timeout,StateData) ->
-	{next_state, waiting, StateData}.
-
-resolving_type(timeout,#state{cur_doc=D}=StateData) ->
-	Branch = case couchbeam_doc:get_value(<<"type">>,D) of
-			<<"command">> ->
-				{next_state,resolving_channel,StateData,?NOW};
-			<<"system">> ->
-				{next_state,finishing,StateData,?NOW};
-			<<"channel">> ->
-				{next_state,resolving_instr,StateData,?NOW};
-		     <<"instrument">> ->
-			 {next_state,installing_instr,StateData,?NOW};
-			_Otherwise ->
-				Err = {[{error,bad_command}]},
-				NewStateData = StateData#state{
-					cur_err = Err
-				},
-				{next_state,report_error,NewStateData,?NOW}
-		end,
-	Branch.
-
-resolving_channel(timeout,#state{cur_doc=D}=StateData) ->
-	CmdDoc = couchbeam_doc:get_value(<<"command">>,D),
-	ChName = couchbeam_doc:get_value(<<"channel">>,CmdDoc),
-	Branch = case dripline_conf_mgr:lookup(ChName) of
-		{ok, Data} ->
-			NewStateData = StateData#state{
-				cur_ch = Data
-			},
-			{next_state,resolving_action,NewStateData,?NOW};
-		{error, _E} ->
-			Error = {[{error,unknown_channel}]},
-			NewStateData = StateData#state{
-				cur_err = Error
-			},
-			{next_state,report_error,NewStateData,?NOW}
-		end,
-	Branch.
-
-resolving_action(timeout,#state{cur_doc=D,cur_ch=C}=StateData) ->
-	CmdDoc = couchbeam_doc:get_value(<<"command">>,D),
-	Branch = case couchbeam_doc:get_value(<<"do">>,CmdDoc) of
-		<<"set">> ->
-			Payload = couchbeam_doc:get_value(<<"value">>,CmdDoc),
-			F = dripline_ch_data:synthesize_fun(C,Payload),
-			NewStateData = StateData#state{
-				cur_fun = F
-			},
-			{next_state, shipping, NewStateData, ?NOW};
-		<<"get">> ->
-			F = dripline_ch_data:synthesize_fun(C),
-			NewStateData = StateData#state{
-				cur_fun = F
-			},
-			{next_state, shipping, NewStateData, ?NOW};
-		_Otherwise ->
-			Error = {[{error,unknown_do_action}]},
-			NewStateData = StateData#state{
-				cur_err = Error
-			},
-			{next_state, report_error, NewStateData, ?NOW}
-		end,
-	Branch.
-
-resolving_instr(timeout,#state{cur_doc=D}=StateData) ->
-	Instr = couchbeam_doc:get_value(<<"instrument">>,D),
-	Branch = case dripline_conf_mgr:lookup_instr(Instr) of
-			{ok, _In} ->
-				{ok, ChData} = dripline_ch_data:from_json(D),
-				dripline_conf_mgr:add_channel(ChData),
-				{next_state, finishing, StateData, ?NOW};
-			{error, _Err} ->
-				Error = {[{error, {[{unknown_instrument, Instr}]}}]},
-				NewStateData = StateData#state{
-					cur_err = Error
-				},
-				{next_state, report_error, StateData, ?NOW}
-		end,
-	Branch.
-
-installing_instr(timeout,#state{cur_doc=D}=StateData) ->
-    Branch = case dripline_instr_data:from_json(D) of
-		 {ok, I} ->
-		     dripline_conf_mgr:add_instr(I),
-		     C = dripline_instr_data:to_childspec(I),
-		     {ok,_Pid} = supervisor:start_child(dripline_instr_sup,C),
-		     {next_state, finishing, StateData, ?NOW};
-		 _ ->
-		     Error = {[{error, {[{parse_error, D}]}}]},
-		     NewStateData = StateData#state{
-				      cur_err = Error
-				     },
-		     {next_state, report_error, StateData, ?NOW}
-	     end,
-    Branch.
-
-shipping(timeout,#state{cur_fun=F,cur_doc=D}=StateData) ->
-    DocID = couchbeam_doc:get_id(D),
-    DB = case couchbeam_doc:get_value(<<"type">>,D) of
-	     <<"channel">> ->
-		 "dripline_conf";
-	     <<"instrument">> ->
-		 "dripline_conf";
-	     _ ->
-		 "dripline_cmd"
-	 end,
-    Perform = fun() -> 
-		      R = F(),
-		      dripline_util:update_couch_doc(DB,DocID,"result",R)
-	      end,
-    spawn(Perform),
-    {next_state,finishing,StateData,?NOW}.
-
-report_error(timeout,#state{cur_doc=D,cur_err=E}=StateData) ->
-    DocID = couchbeam_doc:get_id(D),
-    DB = case couchbeam_doc:get_value(<<"type">>,D) of
-	     <<"channel">> ->
-		 "dripline_conf";
-	     <<"instrument">> ->
-		 "dripline_conf";
-	     _ ->
-		 "dripline_cmd"
-	 end,
-    {ok, _} = dripline_util:update_couch_doc(DB,DocID,"result",E),
-    {next_state,finishing,StateData,?NOW}.
-
-finishing(timeout,_StateData) ->
-	IdleState = idle_state(),
-	{next_state,waiting,IdleState}.
+-spec dispatch(ejson:json_object(),string()) -> ok.
+dispatch(DocUpdateLine, DBSource) ->
+    StrippedDoc = couchbeam_doc:get_value(<<"doc">>,DocUpdateLine),
+    gen_server:cast(?MODULE,{dispatch,DBSource, StrippedDoc}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm api definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link() ->
-	gen_fsm:start_link({local,?MODULE},?MODULE,[],[]).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-	IdleState = idle_state(),
-	{ok, waiting, IdleState, 0}.
+    InitialState = #state{},
+    {ok, InitialState}.
 
-handle_event({process, Doc}, waiting, StateData) ->
-	NewStateData = StateData#state{cur_doc = Doc},
-	{next_state, resolving_type, NewStateData, ?NOW}.
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
 
-handle_sync_event(_Ev, _F, waiting, SData) ->
-	{reply, ok, waiting, SData}.
+handle_cast({dispatch, DB, ChangeLine}, State) ->
+    DocID = couchbeam_doc:get_id(ChangeLine),
+    Updater = fun(X) ->
+		      dripline_util:update_couch_doc(DB,DocID,"result",X)
+	      end,
+    ToDo = case dripline_compiler:compile(ChangeLine) of
+	       {ok, F} ->
+		   fun() ->
+			   R = F(),
+			   Updater(R)
+		   end;
+	       Error ->
+		   fun() ->
+			   Updater(dripline_error:to_json(Error))
+		   end
+	   end,
+    spawn(ToDo),
+    {noreply, State}.
 
-handle_info(_Info, waiting, StateData) ->
-	{next_state, waiting, StateData}.
+handle_info(_Info, State) ->
+    {noreply, State}.
 
-terminate(_Reason, _StateName, _StateData) ->
-	ok.
+terminate(_Reason, _State) ->
+    ok.
 
-code_change(_Vsn, StateName, StateData, _Extra) ->
-	{ok, StateName, StateData}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal function definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%---------------------------------------------------------------------%%
-%% @doc idle_state/0 is just the default state for the fsm when it has 
-%%		no data to process.
-%% @end
-%%---------------------------------------------------------------------%%
-idle_state() ->
-	#state{
-		cur_doc = none,
-		cur_ch = none,
-		cur_err = none,
-		cur_fun = none
-	}.
