@@ -19,13 +19,13 @@
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {
-							I, 
-							{I, start_link, []}, 
-							permanent, 
-							5000, 
-							Type, 
-							[I]
-						}).
+	       I, 
+	       {I, start_link, []}, 
+	       permanent, 
+	       5000, 
+	       Type, 
+	       [I]
+	      }).
 
 %% ===================================================================
 %% API functions
@@ -48,11 +48,11 @@ init([]) ->
     CmdMon  = ?CHILD(dripline_cmd_mon,worker),
     Dispatcher = ?CHILD(dripline_dispatch,worker),
     DLogSup = ?CHILD(dripline_data_log_sup,supervisor),
-    {ok, { SuperStrategy, [Compiler,
-			   ConnMgr,
+    {ok, { SuperStrategy, [ConnMgr,
 			   ConfMgr,
 			   ConfMon,
 			   CmdMon,
+			   Compiler,
 			   InstrSup,
 			   DLogSup,
 			   Dispatcher] }}.
