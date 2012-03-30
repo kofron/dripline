@@ -30,20 +30,20 @@ binary_to_atom(Binary) ->
 -spec update_couch_doc(string(),binary(),string(),ejson:ejson_object()) 
 		-> ok | {error,term()}.
 update_couch_doc(DbName,DocID,FieldName,NewData) ->
-	S = dripline_conn_mgr:get(),
-	{ok,Db} = couchbeam:open_db(S,DbName),
-	{ok,Doc} = couchbeam:open_doc(Db,DocID),
-	EncodedData = ejson:encode(NewData),
-	NewDoc = couchbeam_doc:set_value(FieldName,EncodedData,Doc),
-	OldRevNo = strip_rev_no(couchbeam_doc:get_rev(NewDoc)),
+    S = dripline_conn_mgr:get(),
+    {ok,Db} = couchbeam:open_db(S,DbName),
+    {ok,Doc} = couchbeam:open_doc(Db,DocID),
+    EncodedData = ejson:encode(NewData),
+    NewDoc = couchbeam_doc:set_value(FieldName,EncodedData,Doc),
+    OldRevNo = strip_rev_no(couchbeam_doc:get_rev(NewDoc)),
     NotifyMod = case DbName of 
 		    "dripline_cmd" ->
 			dripline_cmd_mon;
 		    "dripline_conf" ->
 			dripline_conf_mon
 		end,
-	NotifyMod:notify(DocID, OldRevNo + 1),
-	{ok,_} = couchbeam:save_doc(Db,NewDoc).
+    NotifyMod:notify(DocID, OldRevNo + 1),
+    {ok,_} = couchbeam:save_doc(Db,NewDoc).
 
 %%---------------------------------------------------------------------%%
 %% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision
@@ -53,6 +53,6 @@ update_couch_doc(DbName,DocID,FieldName,NewData) ->
 %%---------------------------------------------------------------------%%
 -spec strip_rev_no(binary()) -> integer().
 strip_rev_no(BinRev) ->
-	[NS,_] = string:tokens(binary_to_list(BinRev),"-"),
-	{N,[]} = string:to_integer(NS),
-	N.
+    [NS,_] = string:tokens(binary_to_list(BinRev),"-"),
+    {N,[]} = string:to_integer(NS),
+    N.
