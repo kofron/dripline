@@ -133,21 +133,21 @@ from_json(JS) ->
 make_in_data(N,JS) ->
     set_data_id(N,JS).
 set_data_id(N,JS) ->
-    case couchbeam_doc:get_value(<<"name">>,JS) of
+    case props:get(name,JS) of
 	undefined ->
 	    {error, {required, name}};
 	Val ->
 	    set_data_bus(set_id(Val,N),JS)
     end.
 set_data_bus(N,JS) ->
-    case couchbeam_doc:get_value(<<"bus">>,JS) of
+    case props:get(bus,JS) of
 	undefined ->
 	    {error, {required, bus}};
 	Val ->
 	    set_data_model(set_bus(Val,N),JS)
     end.
 set_data_model(N,JS) ->
-    case couchbeam_doc:get_value(<<"instrument_model">>,JS) of
+    case props:get('instrument_model',JS) of
 	undefined ->
 	    {error, {required, model}};
 	Val ->

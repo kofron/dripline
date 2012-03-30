@@ -55,21 +55,21 @@ from_json(JS) ->
 make_ch_data(N, JS) ->
 	set_id(N,JS).
 set_id(N,JS) ->
-	case couchbeam_doc:get_value(<<"name">>,JS) of
+	case props:get(name,JS) of
 		undefined ->
 			{error, {required, name}};
 		Val ->
 			set_loc(N#cd{id=Val},JS)
 	end.
 set_loc(N,JS) ->
-	case couchbeam_doc:get_value(<<"locator">>,JS) of
+	case props:get(locator,JS) of
 		undefined ->
 			{error, {required, locator}};
 		Val ->
 			set_instr(N#cd{locator=Val},JS)
 	end.
 set_instr(N,JS) ->
-	case couchbeam_doc:get_value(<<"instrument">>,JS) of
+	case props:get(instrument,JS) of
 		undefined ->
 			{error, {required, instrument}};
 		Val ->

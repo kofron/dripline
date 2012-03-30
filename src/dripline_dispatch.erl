@@ -39,8 +39,7 @@
 %%---------------------------------------------------------------------%%
 -spec dispatch(ejson:json_object(),string()) -> ok.
 dispatch(DocUpdateLine, DBSource) ->
-    StrippedDoc = couchbeam_doc:get_value(<<"doc">>,DocUpdateLine),
-    gen_server:cast(?MODULE,{dispatch,DBSource, StrippedDoc}).
+    gen_server:cast(?MODULE,{dispatch,DBSource, DocUpdateLine}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm api definitions %%%
@@ -56,7 +55,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({dispatch, DB, ChangeLine}, State) ->
-    DocID = couchbeam_doc:get_id(ChangeLine),
+    DocID = props:get('doc._id',ChangeLine),
     Updater = fun(X) ->
 		      dripline_util:update_couch_doc(DB,DocID,"result",X)
 	      end,

@@ -144,9 +144,8 @@ code_change(_Vsn, StateName, StateData, _Extra) ->
 %% @end
 %%---------------------------------------------------------------------%%
 ignore_update(ChangeData,RevisionInfo) ->
-	Doc = couchbeam_doc:get_value(<<"doc">>,ChangeData),
-	Id = couchbeam_doc:get_value(<<"_id">>,Doc),
-	BinRev = couchbeam_doc:get_value(<<"_rev">>,Doc),
+	Id = props:get('doc._id',ChangeData),
+	BinRev = props:get('doc._rev',ChangeData),
 	Rev = dripline_util:strip_rev_no(BinRev),
 	case dict:find(Id,RevisionInfo) of
 		{ok, Rev} ->
@@ -161,9 +160,8 @@ ignore_update(ChangeData,RevisionInfo) ->
 %% @end
 %%---------------------------------------------------------------------%%
 update_rev_data(ChangeData,RevisionInfo) ->
-	Doc = couchbeam_doc:get_value(<<"doc">>,ChangeData),
-	Id = couchbeam_doc:get_value(<<"_id">>,Doc),
-	BinRev = couchbeam_doc:get_value(<<"_rev">>,Doc),
+	Id = props:get('doc._id',ChangeData),
+	BinRev = props:get('doc._rev',ChangeData),
 	Rev = dripline_util:strip_rev_no(BinRev),
 	dict:store(Id,Rev,RevisionInfo).
 

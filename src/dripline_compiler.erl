@@ -88,7 +88,7 @@ compile_to_rec(JS,I) ->
 -spec resolve_type(ejson:ejson_object(), #intermed{}) ->
 			  {ok, binary()} | {error, notype}.
 resolve_type(JS, Inter) ->
-    case couchbeam_doc:get_value(<<"type">>,JS) of
+    case props:get(type,JS,undefined) of
 	undefined ->
 	    dripline_error:compiler_expected(type_field,no_type_field);
 	Type ->
@@ -136,11 +136,11 @@ type_tokens() ->
 -spec resolve_action(ejson:ejson_object(), #intermed{}) ->
 			    {ok, #intermed{}} | dripline_error:error().
 resolve_action(JS,#intermed{type=command}=I) ->
-    case couchbeam_doc:get_value(<<"command">>,JS) of
+    case props:get(command,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,command);
 	Cmd ->
-	    case couchbeam_doc:get_value(<<"do">>,Cmd) of
+	    case props:get(do,Cmd) of
 		undefined ->
 		    dripline_error:field_undefined(compiler,do);
 		Do ->
@@ -165,18 +165,18 @@ action_tokens() ->
 			    {ok, #intermed{}} | dripline_error:error().
 resolve_target(JS,#intermed{type=command,do=get}=I) ->
     io:format("~p~n",[JS]),
-    case couchbeam_doc:get_value(<<"channel">>,JS) of
+    case props:get(channel,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,channel);
 	Ch ->
 	    {ok, I#intermed{channel=Ch}}
     end;
 resolve_target(JS,#intermed{type=command,do=set}=I) ->	
-    case couchbeam_doc:get_value(<<"channel">>,JS) of
+    case props:get(channel,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,channel);
 	Ch ->
-	    case couchbeam_doc:get_value(<<"value">>,JS) of
+	    case props:get(value,JS) of
 		undefined ->
 		    dripline_error:field_undefined(compiler,value);
 		Val ->

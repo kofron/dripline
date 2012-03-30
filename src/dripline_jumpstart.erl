@@ -42,15 +42,15 @@ generate_channel_conf(ChViewRes,InViewRes) ->
 generate_st_channel_conf([],_) ->
 	ok;
 generate_st_channel_conf([H|T],Instr) ->
-	InstrId = couchbeam_doc:get_value(<<"instrument">>,H),
+    InstrId = props:get(instrument,H),
     case get_call_data(InstrId,Instr) of
 	    {ok, [Name,Model]} ->
 		CD0 = dripline_ch_data:new(),
 		CD1 = dripline_ch_data:set_field(instr,Name,CD0),
 		CD2 = dripline_ch_data:set_field(model,Model,CD1),
-		ChName = couchbeam_doc:get_value(<<"name">>,H),
+		ChName = props:get(name,H),
 		CD3 = dripline_ch_data:set_field(id,ChName,CD2),
-		Locator = couchbeam_doc:get_value(<<"locator">>,H),
+		Locator = props:get(locator,H),
 		CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
 		ok = dripline_conf_mgr:add_channel(CD4),
 		generate_st_channel_conf(T,Instr);
@@ -60,11 +60,10 @@ generate_st_channel_conf([H|T],Instr) ->
 get_call_data(_,[]) ->
 	{error,instrument_not_found};
 get_call_data(Id,[In|Ins]) ->
-	case couchbeam_doc:get_value(<<"name">>,In) of
+	case props:get(name,In) of 
 	    Id ->
-		Name = couchbeam_doc:get_value(<<"name">>,In),
-		Model = couchbeam_doc:get_value(<<"instrument_model">>,In),
-		{ok, [Name,Model]};
+		Model = props:get('instrument_model',In),
+		{ok, [Id,Model]};
 	    _NotId ->
 		get_call_data(Id,Ins)
 	end.
@@ -87,8 +86,8 @@ generate_loggers_conf(LgViewRes) ->
 generate_st_loggers_conf([]) ->
 	ok;
 generate_st_loggers_conf([H|T]) ->
-	TgtChan = couchbeam_doc:get_value(<<"channel">>,H),
-	Interval = couchbeam_doc:get_value(<<"interval">>,H),
+	TgtChan = props:get(channel,H),
+	Interval = props:get(interval,H),
 	NumInterval = strip_interval(Interval),
 	case dripline:start_logging(TgtChan,NumInterval) of
 		ok ->
@@ -116,10 +115,10 @@ generate_instr_conf(AllInstr) ->
 generate_st_instr_conf([]) ->
 	ok;
 generate_st_instr_conf([H|T]) ->
-	InstrId = couchbeam_doc:get_value(<<"name">>,H),
-	InstrBus = couchbeam_doc:get_value(<<"bus">>,H),
-	InstrModule = couchbeam_doc:get_value(<<"instrument_model">>,H),
-	InstrMethods = couchbeam_doc:get_value(<<"supports">>,H),
+	InstrId = props:get(name,H),
+	InstrBus = props:get(bus,H),
+	InstrModule = props:get('instrument_model',H),
+	InstrMethods = props:get(supports,H),
 	Data = dripline_instr_data:new(),
 	Data0 = dripline_instr_data:set_id(InstrId,Data),
 	Data1 = dripline_instr_data:set_bus(InstrBus,Data0),
@@ -133,7 +132,7 @@ generate_st_instr_conf([H|T]) ->
 %% @end
 %%---------------------------------------------------------------------%%
 strip_values(L) ->
-	lists:map(fun(X) -> couchbeam_doc:get_value(<<"value">>,X) end, L).
+	lists:map(fun(X) -> props:get(value,X) end, L).
 
 %%---------------------------------------------------------------------%%
 %% @doc strip_interval strips a numeric interval from a binary string.
