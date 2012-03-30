@@ -123,7 +123,7 @@ handle_info({change, _R, ChangeData}, waiting, #state{revs=R}=SData) ->
 			SData;
 		false ->
 			NewRevs = update_rev_data(ChangeData,R),
-			dripline_dispatch:dispatch(ChangeData),		
+			dripline_dispatch:dispatch(ChangeData,"dripline_conf"),		
 			SData#state{revs=NewRevs}
 	end,
 	{next_state, waiting, NewStateData}.
