@@ -68,30 +68,61 @@ code_change(_OldVsn, State, _Extra) ->
 			  {ok, fun()} | {error, dripline_error:error()}.
 drip_compile(JS) ->
     New = #intermed{},
-    case resolve_type(JS,New) of
-	{ok, Typed} ->
-	    resolve_action(JS,Typed);
-	{error, notype} ->
-	    dripline_error:compiler_expected(type_field,no_type_field);
-	{error, {bad_type, T}} ->
-	    dripline_error:compiler_surprised(<<"type">>,T)
+    case compile_to_rec(JS,New) of
+	{ok, Rec} ->
+	    case compile_to_fun(Rec) of
+		{ok, _F}=Success -> 
+		    Success;
+		Error -> 
+		    Error
+	    end;
+	Err ->
+	    Err
     end.
+
+-spec compile_to_rec(ejson:json_object(),#intermed{}) ->
+			    {ok, #intermed{}} | {error, dripline_error:error()}.
+compile_to_rec(JS,I) ->
+    resolve_type(JS,I).
 
 -spec resolve_type(ejson:ejson_object(), #intermed{}) ->
 			  {ok, binary()} | {error, notype}.
 resolve_type(JS, Inter) ->
     case couchbeam_doc:get_value(<<"type">>,JS) of
 	undefined ->
-	    {error, notype};
+	    dripline_error:compiler_expected(type_field,no_type_field);
 	Type ->
 	    case lists:member(Type, type_tokens()) of
 		true ->
 		    AType = dripline_util:binary_to_atom(Type),
-		    {ok, Inter#intermed{type=AType}};
+		    resolve_action(JS,Inter#intermed{type=AType});
 		false ->
-		    {error, {bad_type, Type}}
+		    dripline_error:compiler_surprised(<<"type">>,Type)
 	    end
     end.
+
+-spec compile_to_fun(#intermed{}) -> 
+			    {ok, fun()} | {error, dripline_error:error()}.
+compile_to_fun(#intermed{type=command,do=get,channel=C}) ->
+    F =	fun() ->
+		case dripline_conf_mgr:lookup(C) of
+		    {ok, CD} ->
+			(dripline_ch_data:synthesize_fun(CD))();
+		    {error, _}=E ->
+			fun() -> E end
+		end
+	end,
+    {ok, F};
+compile_to_fun(#intermed{type=command,do=set,channel=C,value=V}) ->
+    F = fun() ->
+		case dripline_conf_mgr:lookup(C) of
+		    {ok, CD} ->
+			(dripline_ch_data:synthesize_fun(CD,V))();
+		    {error, _}=E ->
+			fun() -> E end	       
+		end
+	end,
+    {ok, F}.
 
 -spec type_tokens() -> [binary()].
 type_tokens() ->
@@ -163,18 +194,16 @@ basic_get_test() ->
     Test = {[{<<"type">>,<<"command">>},
 	     {<<"command">>,{[{<<"do">>,<<"get">>},
 			      {<<"channel">>,<<"test">>}]}}]},
-    Res = #intermed{type=command,do=get,channel = <<"test">>},
-    ?assertEqual({ok, Res},drip_compile(Test)).
+    ?assertEqual(ok,fst(drip_compile(Test))).
 
 basic_set_test() ->
     Test = {[{<<"type">>,<<"command">>},
 	     {<<"command">>,{[{<<"do">>,<<"set">>},
 			      {<<"channel">>,<<"test">>},
 			      {<<"value">>,<<"3500">>}]}}]},
-    Res = #intermed{type=command,
-		    do=set,
-		    channel = <<"test">>, 
-		    value = <<"3500">>},
-    ?assertEqual({ok,Res},drip_compile(Test)).
+    ?assertEqual(ok,fst(drip_compile(Test))).
+
+fst({A,_B}) ->
+    A.
 
 -endif.
