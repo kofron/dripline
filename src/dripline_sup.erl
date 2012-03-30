@@ -41,10 +41,18 @@ start_link() ->
 init([]) ->
     SuperStrategy = {one_for_one, 5, 10},
     InstrSup = ?CHILD(dripline_instr_sup,supervisor),
+    Compiler = ?CHILD(dripline_compiler,worker),
     ConnMgr = ?CHILD(dripline_conn_mgr,worker),
     ConfMon = ?CHILD(dripline_conf_mon,worker),
     ConfMgr = ?CHILD(dripline_conf_mgr,worker),
     CmdMon  = ?CHILD(dripline_cmd_mon,worker),
     Dispatcher = ?CHILD(dripline_dispatch,worker),
     DLogSup = ?CHILD(dripline_data_log_sup,supervisor),
-    {ok, { SuperStrategy, [ConnMgr,ConfMgr,ConfMon,CmdMon,InstrSup,DLogSup,Dispatcher] }}.
+    {ok, { SuperStrategy, [Compiler,
+			   ConnMgr,
+			   ConfMgr,
+			   ConfMon,
+			   CmdMon,
+			   InstrSup,
+			   DLogSup,
+			   Dispatcher] }}.
