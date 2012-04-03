@@ -1,134 +1,293 @@
-%% @doc the agilent 34970a is a "data acquisition/switch unit", which 
-%% 		means it carries a number of multifunction modules, such as
-%%		ADC banks, general purpose switches, RF muxers, and so on.  
-%%		They are controlled via either GPIB or RS232 - currently the
-%% 		module only supports the GPIB interface.
-%% @author jared kofron <jared.kofron@gmail.com>
-%% @todo write/configure functions
 -module(agilent34970a).
--behavior(gen_server).
+-behaviour(gen_server).
 
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([read/2]).
--export([locator_to_ch_spec/1]).
+-export([read/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([start_link/3]).
+-export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% internal record definitions %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--record(req_data, {from, ref}).
--record(state, {id, gpib_addr, epro_handle, c_req}).
-
 %%%%%%%%%%%%%%%%%%
-%%% Data Types %%%
+%%% Macros etc %%%
 %%%%%%%%%%%%%%%%%%
--type locator() :: binary().
 -type channel_spec() :: {integer(),integer()}.
+-type id_type() :: atom().
+-type bus_type() :: atom().
+-type addr_type() :: integer().
+-define(DEFAULT_CACHE_EXP,20000).
+-define(READ_ACC_TMO,200).
+-record(cache_value, {last,ttl,ts}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% internal server state %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-record(state, {
+	  q,
+	  cache,
+	  tref,
+	  id :: id_type(),
+	  epro_handle :: bus_type(),
+	  gpib_addr :: addr_type(),
+	  read_cmd :: fun(),
+	  write_cmd :: fun()
+}).
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
+read(Locator) ->
+    gen_server:call(?MODULE,{read, Locator}).
 
-%%---------------------------------------------------------------------%%
-%% @doc read/2 maps a request for data onto the correct instrument and
-%%		synchronously returns either data or a descriptive error.  Error
-%%		codes that are returned are from the instrument itself.
-%% @end
-%%---------------------------------------------------------------------%%
--spec read(atom(),locator()) -> binary() | {error, term()}.
-read(InstrumentID,Locator) ->
-	ChannelSpec = locator_to_ch_spec(Locator),
-	gen_server:call(InstrumentID,{read,ChannelSpec}).
-
-%%---------------------------------------------------------------------%%
-%% @doc locator_to_ch_spec is part of a generic instrument interface.  
-%%		essentially it allows us to take a string that is human readable
-%%		and turn it into something that the instrument understands as 
-%%		referring to a channel.  This is nice because in the database,
-%%		the amount of information that the user needs to know about the
-%%		instrument itself is reduced.
-%% @todo maybe this should get moved into a behavior?
-%% @end
-%%---------------------------------------------------------------------%%
--spec locator_to_ch_spec(binary()) -> 
-		channel_spec() | {error, bad_locator}.
-locator_to_ch_spec(LocatorBinary) ->
-	LocatorString = erlang:binary_to_list(LocatorBinary),
-	case io_lib:fread("{~u,~u}",LocatorString) of
-		{ok, [CardNumber,ChannelNumber], []} ->
-			{CardNumber,ChannelNumber};
-		_Error ->
-			{error, bad_locator}
-	end.
-
-%%====================================================================
-%% gen_server callbacks
-%%====================================================================
-
-%%---------------------------------------------------------------------%%
-%% @doc start_link/3 starts the instrument interface with a specific 
-%%		prologix device and bus address.  note that we are just assuming
-%%		that we can actually talk to the bus - init/1 succeeds no matter
-%%		what.
-%% @todo maybe we shouldn't succeed if the bus isn't available.
-%% @end
-%%---------------------------------------------------------------------%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% gen_server API and callback definitions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(InstrumentID,PrologixID,BusAddress) ->
-	Args = [InstrumentID,PrologixID,BusAddress],
-	gen_server:start_link({local, InstrumentID}, ?MODULE, Args, []).
+    Args = [InstrumentID,PrologixID,BusAddress],
+    gen_server:start_link({local, InstrumentID}, ?MODULE, Args, []).
 
 init([InstrumentID,PrologixID,BusAddress]) ->
-	InitialState = #state{
-		gpib_addr=BusAddress,id=InstrumentID,epro_handle=PrologixID
-	},
-	{ok, InitialState}.
+    Locators = infer_init_scan_list(),
+    InitCmds = setup_cmds(Locators),
+    TRef = init_cache_expiry(),
+    InitialState = #state{
+      id = InstrumentID,
+      gpib_addr = BusAddress,
+      epro_handle = PrologixID,
+      q = [],
+      tref = TRef,
+      cache = dict:new(),
+      read_cmd = fun(X) ->
+			 eprologix_cmdr:send(PrologixID,
+					     BusAddress,
+					     X)
+		 end,
+      write_cmd = fun(X) ->
+			  eprologix_cmdr:send(PrologixID,
+					      BusAddress,
+					      X,
+					      true)
+		  end
+     },
+    instrument_send(InitCmds,InitialState#state.write_cmd),
+    {ok, InitialState}.
 
-handle_call({read,Chs}, F, #state{epro_handle = H,gpib_addr=A}=SData) ->
-	ReadStr = read_channel_string(Chs),
-	{ok, R} = eprologix_cmdr:send_query(H,A,[ReadStr]),
-	OutgoingReq = #req_data{from=F,ref = R},
-	NewStateData = SData#state{c_req = OutgoingReq},
-	{noreply, NewStateData}.
+handle_call({read, Locator}, From, #state{tref=none,q=Q}=State) ->
+    NewQ = append_action({Locator, From},Q),
+    NewState = State#state{
+		 q = NewQ
+		},
+    {noreply, NewState, ?READ_ACC_TMO};
+handle_call({read, Locator}, From, #state{cache=C,tref=TRef,q=Q}=State) ->
+    Branch = case fetch_last_value(Locator,C) of
+		 {cache_good, Value} ->
+		     {reply, Value, State};
+		 new_channel ->
+		     erlang:cancel_timer(TRef), % stop the current timer
+		     NewQ = append_action({read, Locator, From},Q),
+		     NewState = State#state{
+				  tref = none,
+				  q = NewQ
+				 },
+		     {noreply, NewState, ?READ_ACC_TMO}
+	     end,
+    Branch.
 
 handle_cast(_Msg, State) ->
-  {noreply, State}.
-
-handle_info({R,Data}, #state{c_req=#req_data{from=F,ref=R}}=StateData) ->
-	gen_server:reply(F,Data),
-	NewStateData = StateData#state{c_req=none},
-	{noreply, NewStateData}.
+    {noreply, State}.
+handle_info(timeout, #state{q=Q,cache=C,read_cmd=F}=State) ->
+    NewCache = augment_and_update_cache(Q,C,F),
+    respond(Q,NewCache),
+    TRef = init_cache_expiry(),
+    NewState = State#state{
+		 cache = NewCache,
+		 q = [],
+		 tref = TRef
+		},
+    {noreply, NewState};    
+handle_info(update_cache, #state{cache=C,read_cmd=F}=State) ->
+    NewCache = update_cache(C,[{updater,F}]),
+    TRef = init_cache_expiry(),
+    NewState = State#state{
+		 cache = NewCache,
+		 tref = TRef
+		},
+    {noreply, NewState}.
 
 terminate(_Reason, _State) ->
-  ok.
+    ok.
 
 code_change(_OldVsn, State, _Extra) ->
-  {ok, State}.
+    {ok, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Internal functions %%%
+%%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
+infer_init_scan_list() ->
+    [].
+
+init_cache_expiry() ->
+    erlang:send_after(?DEFAULT_CACHE_EXP,self(),update_cache).
+
+append_action(NewAction, OldQueue) ->
+    [NewAction|OldQueue].
+
+respond([], _Cache) ->
+    ok;
+respond([{write, _Loc, _Val, _From}|T], Cache) ->
+    respond(T,Cache);
+respond([{read, Loc, From}|T], Cache) ->
+    #cache_value{last=V} = dict:fetch(Loc,Cache),
+    gen_server:reply(From, V),
+    respond(T,Cache).
+
+augment_and_update_cache([],Cache,F) ->
+    Opt = [{new_ch, true},{updater,F}],
+    update_cache(Cache,Opt);
+augment_and_update_cache([{read, Loc, _From}|T],C,F) ->
+    V = new_cache_value(Loc),
+    NewCache = dict:store(Loc,V,C),
+    augment_and_update_cache(T,NewCache,F);
+augment_and_update_cache([{write, Loc, _Val, _From}|T],C,F) ->
+    V = new_cache_value(Loc),
+    NewCache = dict:store(Loc,V,C),
+    augment_and_update_cache(T,NewCache,F).
+
+update_cache(Cache,Options) ->
+    F = proplists:get_value(updater,Options),
+    Cmd = case proplists:get_value(new_ch,Options) of
+	      true ->
+		  ScanCmd = sl_cmd(sl_from_cache(Cache)),
+		  TimeCmd = timing_cmd(smallest_ttl(Cache)),
+		  ReadCmd = readback_cmd(dict:size(Cache)),
+		  [ScanCmd,";",TimeCmd,";","INIT",";",ReadCmd];
+	      undefined ->
+		  readback_cmd(dict:size(Cache))
+	  end,
+    Result = instrument_send(Cmd,F),
+    ParsedResult = parse_instrument_response(Result),
+    refresh_cache(ParsedResult, Cache).
+
+setup_cmds(Locators) ->
+    SL = channel_spec_list_to_scan_string(Locators),
+    [
+     "*CLS;",
+     "*RST;",
+     "FORM:READ:CHAN ON;",
+     "FORM:READ:TIME ON;", 
+     "FORM:READ:TIME:TYPE ABS;",
+     "FORM:READ:UNIT ON;",
+     sl_cmd(SL),
+     ";",
+     timing_cmd(?DEFAULT_CACHE_EXP),
+     ";",
+     "INIT"
+    ].
+
+instrument_send(Cmd, Fun) ->
+    Fun(Cmd).
+
+parse_instrument_response(Bin) ->
+    parse_instrument_response(Bin, []).
+parse_instrument_response(<<>>, Acc) ->
+    Acc;
+parse_instrument_response(<<V:152/bitstring,
+			    ",",
+			    Y:32/bitstring,
+			    ",",
+			    M:16/bitstring,
+			    ",",
+			    D:16/bitstring,
+			    ",",
+			    HH:16/bitstring,
+			    ",",
+			    MM:16/bitstring,
+			    ",",
+			    SS:16/bitstring,
+			    ".",
+			    _MS:24/bitstring,
+			    ",",
+			    Ch:24/bitstring,
+			    Rest/binary>>, Acc) ->
+    Locator = locator_from_binary(Ch),
+    Ts = <<Y/binary,"-",M/binary,"-",D/binary,
+	   " ", 
+	   HH/binary, MM/binary, SS/binary>>,
+    R = (new_cache_value(Locator))#cache_value{
+	  last = V,
+	  ts = Ts
+	 },
+    parse_instrument_response(Rest,[{Locator,R}|Acc]).
+
+new_cache_value(_Locator) ->
+    #cache_value{
+		 last = <<>>,
+		 ttl = ?DEFAULT_CACHE_EXP
+		}.
+
+refresh_cache([],Cache) ->
+    Cache;
+refresh_cache([{Loc,#cache_value{last=V,ts=Ts}}|T],Cache) ->
+    ValUpdater = fun(#cache_value{}=CV) ->
+			 CV#cache_value{last=V,ts=Ts}
+		 end,
+    dict:update(Loc,ValUpdater,Cache),
+    refresh_cache(T,Cache).    
+
+fetch_last_value(Locator, Cache) ->
+    Result = case dict:find(Locator,Cache) of
+		 {ok, #cache_value{last=Value}} ->
+		     {cache_good, Value};
+		 error ->
+		     new_channel
+	     end,
+    Result.
+
+locator_from_binary(Bin) ->
+    {I,[]} = string:to_integer(binary:bin_to_list(Bin)),
+    {I div 100, I rem 100}.
+
+smallest_ttl(Cache) ->
+    KeepSmallest = fun(_K,#cache_value{ttl=T},A1) when T < A1 -> T;
+		      (_,_,A1) -> A1 end,
+    dict:fold(KeepSmallest, ?DEFAULT_CACHE_EXP, Cache).
+
+sl_from_cache(Cache) ->
+    channel_spec_list_to_scan_string(dict:fetch_keys(Cache)).
+
+sl_cmd(ScanList) ->    
+    io_lib:format("ROUT:SCAN (@~s)",[ScanList]).
+
+timing_cmd(Interval) when is_integer(Interval) ->
+    [
+     "TRIG:SOURCE TIMER",
+     ";",
+     io_lib:format("TRIG:TIMER ~B",[Interval]),
+     ";",
+     "TRIG:COUNT INFINITY"
+    ].
+
+readback_cmd(NumChannels) when is_integer(NumChannels) ->
+    io_lib:format("DATA:REMOVE? ~B",[NumChannels]).
 
 %%---------------------------------------------------------------------%%
-%% @doc channel_tuple_to_int/1 takes a tuple {CardNumber,ChannelNumber}
-%% 		and converts it to the data that the agilent is expecting, which
-%%		is a single integer.
+%% @doc channel_spec_to_int/1 takes a channel specifier 
+%%		{CardNumber,ChannelNumber} and converts it to the data that the 
+%%		switch unit uses for addressing, which is a single integer.
 %% @end
 %%---------------------------------------------------------------------%%
--spec channel_tuple_to_int({integer(),integer()}) -> integer().
+-spec channel_tuple_to_int(channel_spec()) -> integer().
 channel_tuple_to_int({CardNumber,ChannelNumber}) ->
 	100*CardNumber + ChannelNumber.
 
 %%---------------------------------------------------------------------%%
-%% @doc channel_tuple_list_to_channel_spec is a very fun function.  
-%%		it takes a list of tuples [{integer(),integer()}] and produces a
+%% @doc channel_spec_list_to_scan_string is a very fun function.  
+%%		it takes a list of 34970a channel specs and produces a
 %%		string that the agilent 34970a is expecting, which is of the form
 %%		"101,105,301...".  the cool part is range detection.  the 
 %%		instrument takes ranges in the form of 101:105, which means all
@@ -137,54 +296,44 @@ channel_tuple_to_int({CardNumber,ChannelNumber}) ->
 %%		are found in the list of tuples.
 %% @end
 %%---------------------------------------------------------------------%%
--spec channel_tuple_list_to_channel_spec([channel_spec()]) -> string().
-channel_tuple_list_to_channel_spec([]) ->
+-spec channel_spec_list_to_scan_string([channel_spec()]) -> string().
+channel_spec_list_to_scan_string([]) ->
 	"";
-channel_tuple_list_to_channel_spec({_,_}=SingleTuple) ->
-	channel_tuple_list_to_channel_spec([SingleTuple]);
-channel_tuple_list_to_channel_spec(Tuples) ->
+channel_spec_list_to_scan_string({_,_}=SingleTuple) ->
+	channel_spec_list_to_scan_string([SingleTuple]);
+channel_spec_list_to_scan_string(Tuples) ->
 	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
-	channel_ints_to_channel_spec(lists:sort(IntChannels),false,[]).
+	channel_ints_to_scan_string(lists:sort(IntChannels),false,[]).
 
 %%---------------------------------------------------------------------%%
-%% @doc channel_ints_to_channel_spec is where the magic happens in terms
-%%		of generating the actual data to be sent to the instrument.  
-%% @see channel_tuple_list_to_channel_spec
+%% @doc channel_ints_to_scan_string is where the magic happens in terms
+%%		of generating the scan list for the agilent 34970a.
+%% @see channel_spec_list_to_scan_string
 %% @end
 %%---------------------------------------------------------------------%%
--spec channel_ints_to_channel_spec([channel_spec()],atom(),string()) ->
+-spec channel_ints_to_scan_string([channel_spec()],atom(),string()) ->
 		string().
-channel_ints_to_channel_spec([], false, Acc) ->
-	lists:reverse(Acc);
-channel_ints_to_channel_spec([], H0, Acc) ->
+channel_ints_to_scan_string([], false, Acc) ->
+	lists:flatten(lists:reverse(Acc));
+channel_ints_to_scan_string([], H0, Acc) ->
 	Str = io_lib:format(":~p",[H0]), 
 	lists:reverse([Str|Acc]);
 
-channel_ints_to_channel_spec([H1,H2|T],false,Acc) when H2 == (H1 + 1) ->
+channel_ints_to_scan_string([H1,H2|T],false,Acc) when H2 == (H1 + 1) ->
 	Str = io_lib:format("~p",[H1]),
-	channel_ints_to_channel_spec(T,H2,[Str|Acc]);
+	channel_ints_to_scan_string(T,H2,[Str|Acc]);
 
-channel_ints_to_channel_spec([H|T],H0,Acc) when H == (H0 + 1) ->
-	channel_ints_to_channel_spec(T,H,Acc);
+channel_ints_to_scan_string([H|T],H0,Acc) when H == (H0 + 1) ->
+	channel_ints_to_scan_string(T,H,Acc);
 
-channel_ints_to_channel_spec([S],false,Acc) ->
+channel_ints_to_scan_string([S],false,Acc) ->
 	Str = io_lib:format("~p",[S]),
-	channel_ints_to_channel_spec([],false,[Str|Acc]);
+	channel_ints_to_scan_string([],false,[Str|Acc]);
 
-channel_ints_to_channel_spec([H|T],false,Acc) ->
+channel_ints_to_scan_string([H|T],false,Acc) ->
 	Str = io_lib:format("~p",[H]),
-	channel_ints_to_channel_spec(T,false,[Str ++ ","|Acc]);
+	channel_ints_to_scan_string(T,false,[Str ++ ","|Acc]);
 
-channel_ints_to_channel_spec([_H|_T]=L,H0,Acc) ->
+channel_ints_to_scan_string([_H|_T]=L,H0,Acc) ->
 	Str = io_lib:format(":~p",[H0]),
-	channel_ints_to_channel_spec(L,false,[Str ++ ","|Acc]).
-
-%%---------------------------------------------------------------------%%
-%% @doc read_channel_string takes a string and returns the command string
-%%		to be sent over GPIB to read from the instrument.
-%% @end
-%%---------------------------------------------------------------------%%
--spec read_channel_string(string()) -> string().
-read_channel_string(ChannelList) ->
-	ChannelSpec = channel_tuple_list_to_channel_spec(ChannelList),
-	"MEAS:VOLT:DC? 10,0.003, (@" ++ ChannelSpec ++ ")".
+	channel_ints_to_scan_string(L,false,[Str ++ ","|Acc]).
