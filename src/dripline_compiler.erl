@@ -88,7 +88,7 @@ compile_to_rec(JS,I) ->
 -spec resolve_type(ejson:ejson_object(), #intermed{}) ->
 			  {ok, binary()} | {error, notype}.
 resolve_type(JS, Inter) ->
-    case props:get(type,JS,undefined) of
+    case props:get(doc.type,JS,undefined) of
 	undefined ->
 	    dripline_error:compiler_expected(type_field,no_type_field);
 	Type ->
@@ -136,18 +136,18 @@ type_tokens() ->
 -spec resolve_action(ejson:ejson_object(), #intermed{}) ->
 			    {ok, #intermed{}} | dripline_error:error().
 resolve_action(JS,#intermed{type=command}=I) ->
-    case props:get(command,JS) of
+    case props:get(doc.command,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,command);
-	Cmd ->
-	    case props:get(do,Cmd) of
+	_Cmd ->
+	    case props:get(doc.command.do,JS) of
 		undefined ->
 		    dripline_error:field_undefined(compiler,do);
 		Do ->
 		    case lists:member(Do,action_tokens()) of
 			true ->
 			    ADo = dripline_util:binary_to_atom(Do),
-			    resolve_target(Cmd,I#intermed{do=ADo});
+			    resolve_target(JS,I#intermed{do=ADo});
 			false ->
 			    dripline_error:compiler_surprised(do,Do)
 		    end
@@ -165,18 +165,18 @@ action_tokens() ->
 			    {ok, #intermed{}} | dripline_error:error().
 resolve_target(JS,#intermed{type=command,do=get}=I) ->
     io:format("~p~n",[JS]),
-    case props:get(channel,JS) of
+    case props:get(doc.command.channel,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,channel);
 	Ch ->
 	    {ok, I#intermed{channel=Ch}}
     end;
 resolve_target(JS,#intermed{type=command,do=set}=I) ->	
-    case props:get(channel,JS) of
+    case props:get(doc.command.channel,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,channel);
 	Ch ->
-	    case props:get(value,JS) of
+	    case props:get(doc.command.value,JS) of
 		undefined ->
 		    dripline_error:field_undefined(compiler,value);
 		Val ->
