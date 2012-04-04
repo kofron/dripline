@@ -1,5 +1,5 @@
 ## Name of the node
--name dripline@p8portal.phys.washington.edu
+-sname dripline
 
 ## Cookie for distributed erlang
 -setcookie dripline_mgmt
