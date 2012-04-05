@@ -19,6 +19,7 @@
 -type channel_spec() :: {integer(),integer()}.
 -type id_type() :: atom().
 -type bus_type() :: atom().
+-type locator() :: binary().
 -type addr_type() :: integer().
 -define(DEFAULT_CACHE_EXP,20000).
 -define(READ_ACC_TMO,200).
@@ -41,8 +42,42 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
-read(InstrumentID, Locator) ->
-    gen_server:call(InstrumentID ,{read, Locator}).
+
+%%---------------------------------------------------------------------%%
+%% @doc read/2 maps a request for data onto the correct instrument and
+%%		synchronously returns either data or a descriptive error.  Error
+%%		codes that are returned are from the instrument itself.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec read(atom(),locator()) -> binary() | {error, term()}.
+read(InstrumentID,Locator) ->
+	case locator_to_ch_spec(Locator) of
+		{error, _Reason}=Error ->
+			Error;
+		{_Card,_Channel}=CSpec ->
+			gen_server:call(InstrumentID,{read,CSpec})
+	end.
+
+%%---------------------------------------------------------------------%%
+%% @doc locator_to_ch_spec is part of a generic instrument interface.  
+%%		essentially it allows us to take a string that is human readable
+%%		and turn it into something that the instrument understands as 
+%%		referring to a channel.  This is nice because in the database,
+%%		the amount of information that the user needs to know about the
+%%		instrument itself is reduced.
+%% @todo maybe this should get moved into a behavior?
+%% @end
+%%---------------------------------------------------------------------%%
+-spec locator_to_ch_spec(binary()) -> 
+		channel_spec() | {error, bad_locator}.
+locator_to_ch_spec(LocatorBinary) ->
+	LocatorString = erlang:binary_to_list(LocatorBinary),
+	case io_lib:fread("{~u,~u}",LocatorString) of
+		{ok, [CardNumber,ChannelNumber], []} ->
+			{CardNumber,ChannelNumber};
+		_Error ->
+			{error, bad_locator}
+	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server API and callback definitions %%%
@@ -108,7 +143,12 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 handle_info(timeout, #state{q=Q,cache=C,read_cmd=R,write_cmd=W}=State) ->
     Opts = [{reader,R},{writer,W}],
-    NewCache = augment_and_update_cache(Q,C,Opts),
+    NewCache = case augment_and_update_cache(Q,C,Opts) of
+		   {ok, NewC} ->
+		       NewC;
+		   {error, {_Err, OldC}} ->
+		       OldC % Might want to report errors here?
+	       end,
     respond(Q,NewCache),
     TRef = init_cache_expiry(),
     NewState = State#state{
@@ -118,7 +158,12 @@ handle_info(timeout, #state{q=Q,cache=C,read_cmd=R,write_cmd=W}=State) ->
 		},
     {noreply, NewState};    
 handle_info(update_cache, #state{cache=C,read_cmd=F}=State) ->
-    NewCache = update_cache(C,[{reader,F}]),
+    NewCache = case update_cache(C,[{reader,F}]) of
+		   {ok, NewC} ->
+		       NewC;
+		   {error, {_Err, OldC}} ->
+		       OldC
+	       end,
     TRef = init_cache_expiry(),
     NewState = State#state{
 		 cache = NewCache,
@@ -189,11 +234,11 @@ update_cache(Cache,Options) ->
 		     instrument_send(readback_cmd(dict:size(Cache)),Rd)
 	     end,
     case Result of 
-	{error, {E,R}=Err} ->
-	    Cache;
+	{error, {_E,_R}=Err} ->
+	    {error, {Err, Cache}};
 	Else ->
 	    ParsedResult = parse_instrument_response(Else),
-	    refresh_cache(ParsedResult, Cache)
+	    {ok, refresh_cache(ParsedResult, Cache)}
     end.
 
 setup_cmds(Locators) ->
