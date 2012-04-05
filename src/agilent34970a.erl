@@ -4,12 +4,12 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([read/1]).
+-export([read/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([start_link/0]).
+-export([start_link/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -41,8 +41,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
-read(Locator) ->
-    gen_server:call(?MODULE,{read, Locator}).
+read(InstrumentID, Locator) ->
+    gen_server:call(InstrumentID ,{read, Locator}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server API and callback definitions %%%
@@ -54,7 +54,13 @@ start_link(InstrumentID,PrologixID,BusAddress) ->
 init([InstrumentID,PrologixID,BusAddress]) ->
     Locators = infer_init_scan_list(),
     InitCmds = setup_cmds(Locators),
-    TRef = init_cache_expiry(),
+    {InitCmds, TRef} = case Locators of
+			   [] ->
+			       {setup_cmds(Locators), none};
+			   SomeLocators ->
+			       BaseCmds = setup_cmds(Locators),
+			       {[BaseCmds,";:INIT"],init_cache_expiry(100)}
+	   end,
     InitialState = #state{
       id = InstrumentID,
       gpib_addr = BusAddress,
@@ -78,7 +84,7 @@ init([InstrumentID,PrologixID,BusAddress]) ->
     {ok, InitialState}.
 
 handle_call({read, Locator}, From, #state{tref=none,q=Q}=State) ->
-    NewQ = append_action({Locator, From},Q),
+    NewQ = append_action({read, Locator, From},Q),
     NewState = State#state{
 		 q = NewQ
 		},
@@ -100,8 +106,9 @@ handle_call({read, Locator}, From, #state{cache=C,tref=TRef,q=Q}=State) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
-handle_info(timeout, #state{q=Q,cache=C,read_cmd=F}=State) ->
-    NewCache = augment_and_update_cache(Q,C,F),
+handle_info(timeout, #state{q=Q,cache=C,read_cmd=R,write_cmd=W}=State) ->
+    Opts = [{reader,R},{writer,W}],
+    NewCache = augment_and_update_cache(Q,C,Opts),
     respond(Q,NewCache),
     TRef = init_cache_expiry(),
     NewState = State#state{
@@ -111,7 +118,7 @@ handle_info(timeout, #state{q=Q,cache=C,read_cmd=F}=State) ->
 		},
     {noreply, NewState};    
 handle_info(update_cache, #state{cache=C,read_cmd=F}=State) ->
-    NewCache = update_cache(C,[{updater,F}]),
+    NewCache = update_cache(C,[{reader,F}]),
     TRef = init_cache_expiry(),
     NewState = State#state{
 		 cache = NewCache,
@@ -133,6 +140,8 @@ infer_init_scan_list() ->
 
 init_cache_expiry() ->
     erlang:send_after(?DEFAULT_CACHE_EXP,self(),update_cache).
+init_cache_expiry(TMO_MS) ->
+    erlang:send_after(TMO_MS,self(),update_cache).
 
 append_action(NewAction, OldQueue) ->
     [NewAction|OldQueue].
@@ -146,30 +155,34 @@ respond([{read, Loc, From}|T], Cache) ->
     gen_server:reply(From, V),
     respond(T,Cache).
 
-augment_and_update_cache([],Cache,F) ->
-    Opt = [{new_ch, true},{updater,F}],
+augment_and_update_cache([],Cache,Opts) ->
+    Opt = [{new_ch, true}|Opts],
     update_cache(Cache,Opt);
-augment_and_update_cache([{read, Loc, _From}|T],C,F) ->
+augment_and_update_cache([{read, Loc, _From}|T],C,Opts) ->
     V = new_cache_value(Loc),
     NewCache = dict:store(Loc,V,C),
-    augment_and_update_cache(T,NewCache,F);
-augment_and_update_cache([{write, Loc, _Val, _From}|T],C,F) ->
+    augment_and_update_cache(T,NewCache,Opts);
+augment_and_update_cache([{write, Loc, _Val, _From}|T],C,Opts) ->
     V = new_cache_value(Loc),
     NewCache = dict:store(Loc,V,C),
-    augment_and_update_cache(T,NewCache,F).
+    augment_and_update_cache(T,NewCache,Opts).
 
 update_cache(Cache,Options) ->
-    F = proplists:get_value(updater,Options),
-    Cmd = case proplists:get_value(new_ch,Options) of
-	      true ->
-		  ScanCmd = sl_cmd(sl_from_cache(Cache)),
-		  TimeCmd = timing_cmd(smallest_ttl(Cache)),
-		  ReadCmd = readback_cmd(dict:size(Cache)),
-		  [ScanCmd,";",TimeCmd,";","INIT",";",ReadCmd];
-	      undefined ->
-		  readback_cmd(dict:size(Cache))
-	  end,
-    Result = instrument_send(Cmd,F),
+    Rd = proplists:get_value(reader,Options),
+    Wr = proplists:get_value(writer,Options),
+    Result = case proplists:get_value(new_ch,Options) of
+		 true ->
+		     ScanCmd = sl_cmd(sl_from_cache(Cache)),
+		     TrigCmd = trig_cmd(),
+		     TimeCmd = timing_cmd(smallest_ttl(Cache)),
+		     ReadCmd = readback_cmd(dict:size(Cache)),
+		     Cmd = [ScanCmd,";:",TrigCmd,";:",TimeCmd,";:","INIT"],
+		     ok = instrument_send(Cmd,Wr),
+		     timer:sleep(500),
+		     instrument_send(ReadCmd,Rd);
+		 undefined ->
+		     instrument_send(readback_cmd(dict:size(Cache)),Rd)
+	     end,
     ParsedResult = parse_instrument_response(Result),
     refresh_cache(ParsedResult, Cache).
 
@@ -177,16 +190,26 @@ setup_cmds(Locators) ->
     SL = channel_spec_list_to_scan_string(Locators),
     [
      "*CLS;",
-     "*RST;",
-     "FORM:READ:CHAN ON;",
-     "FORM:READ:TIME ON;", 
-     "FORM:READ:TIME:TYPE ABS;",
-     "FORM:READ:UNIT ON;",
+     "*RST;:",
      sl_cmd(SL),
      ";",
-     timing_cmd(?DEFAULT_CACHE_EXP),
-     ";",
-     "INIT"
+     ":FORM:READ:CHAN ON;",
+     ":FORM:READ:TIME ON;", 
+     ":FORM:READ:TIME:TYPE ABS;",
+     ":FORM:READ:UNIT ON"
+    ].
+
+trig_cmd() ->
+    [
+     "ABOR"
+     ";:",
+     "TRIG:SOURCE BUS",
+     ";:",
+     "INIT",
+     ";"
+     "*TRG"
+     ";:",
+     "ABOR"
     ].
 
 instrument_send(Cmd, Fun) ->
@@ -194,7 +217,7 @@ instrument_send(Cmd, Fun) ->
 
 parse_instrument_response(Bin) ->
     parse_instrument_response(Bin, []).
-parse_instrument_response(<<>>, Acc) ->
+parse_instrument_response(<<"\n">>, Acc) ->
     Acc;
 parse_instrument_response(<<V:152/bitstring,
 			    ",",
@@ -236,8 +259,8 @@ refresh_cache([{Loc,#cache_value{last=V,ts=Ts}}|T],Cache) ->
     ValUpdater = fun(#cache_value{}=CV) ->
 			 CV#cache_value{last=V,ts=Ts}
 		 end,
-    dict:update(Loc,ValUpdater,Cache),
-    refresh_cache(T,Cache).    
+    NewCache = dict:update(Loc,ValUpdater,Cache),
+    refresh_cache(T,NewCache).    
 
 fetch_last_value(Locator, Cache) ->
     Result = case dict:find(Locator,Cache) of
@@ -264,11 +287,12 @@ sl_cmd(ScanList) ->
     io_lib:format("ROUT:SCAN (@~s)",[ScanList]).
 
 timing_cmd(Interval) when is_integer(Interval) ->
+    ISec = Interval div 1000,
     [
      "TRIG:SOURCE TIMER",
-     ";",
-     io_lib:format("TRIG:TIMER ~B",[Interval]),
-     ";",
+     ";:",
+     io_lib:format("TRIG:TIMER ~B",[ISec]),
+     ";:",
      "TRIG:COUNT INFINITY"
     ].
 
