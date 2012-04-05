@@ -176,15 +176,25 @@ update_cache(Cache,Options) ->
 		     TrigCmd = trig_cmd(),
 		     TimeCmd = timing_cmd(smallest_ttl(Cache)),
 		     ReadCmd = readback_cmd(dict:size(Cache)),
-		     Cmd = [ScanCmd,";:",TrigCmd,";:",TimeCmd,";:","INIT"],
+		     Cmd = ["ABOR",";:",ScanCmd,";:",TrigCmd,";:",TimeCmd,";:","INIT"],
 		     ok = instrument_send(Cmd,Wr),
 		     timer:sleep(500),
-		     instrument_send(ReadCmd,Rd);
+		     try
+			 instrument_send(ReadCmd,Rd)
+		     catch
+			 Error:Reason ->
+			     {error, {Error,Reason}}
+		     end;
 		 undefined ->
 		     instrument_send(readback_cmd(dict:size(Cache)),Rd)
 	     end,
-    ParsedResult = parse_instrument_response(Result),
-    refresh_cache(ParsedResult, Cache).
+    case Result of 
+	{error, {E,R}=Err} ->
+	    Cache;
+	Else ->
+	    ParsedResult = parse_instrument_response(Else),
+	    refresh_cache(ParsedResult, Cache)
+    end.
 
 setup_cmds(Locators) ->
     SL = channel_spec_list_to_scan_string(Locators),
@@ -201,8 +211,6 @@ setup_cmds(Locators) ->
 
 trig_cmd() ->
     [
-     "ABOR"
-     ";:",
      "TRIG:SOURCE BUS",
      ";:",
      "INIT",
@@ -219,6 +227,8 @@ parse_instrument_response(Bin) ->
     parse_instrument_response(Bin, []).
 parse_instrument_response(<<"\n">>, Acc) ->
     Acc;
+parse_instrument_response(<<",",Rest/binary>>, Acc) ->
+    parse_instrument_response(Rest,Acc);
 parse_instrument_response(<<V:152/bitstring,
 			    ",",
 			    Y:32/bitstring,
