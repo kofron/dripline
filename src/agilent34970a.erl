@@ -87,22 +87,23 @@ start_link(InstrumentID,PrologixID,BusAddress) ->
     gen_server:start_link({local, InstrumentID}, ?MODULE, Args, []).
 
 init([InstrumentID,PrologixID,BusAddress]) ->
-    Locators = infer_init_scan_list(),
-    InitCmds = setup_cmds(Locators),
+    Locators = infer_init_scan_list(InstrumentID),
     {InitCmds, TRef} = case Locators of
 			   [] ->
 			       {setup_cmds(Locators), none};
 			   SomeLocators ->
 			       BaseCmds = setup_cmds(Locators),
-			       {[BaseCmds,";:INIT"],init_cache_expiry(100)}
-	   end,
+			       TrigCmd = trig_cmd(),
+			       TimeCmd = timing_cmd(?DEFAULT_CACHE_EXP),
+			       {[BaseCmds,";:",TrigCmd,";:",TimeCmd,";:INIT"],init_cache_expiry(2000)}
+		       end,
     InitialState = #state{
       id = InstrumentID,
       gpib_addr = BusAddress,
       epro_handle = PrologixID,
       q = [],
       tref = TRef,
-      cache = dict:new(),
+      cache = initial_cache(Locators),
       read_cmd = fun(X) ->
 			 eprologix_cmdr:send(PrologixID,
 					     BusAddress,
@@ -180,9 +181,24 @@ code_change(_OldVsn, State, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-infer_init_scan_list() ->
-    [].
+initial_cache(Locators) ->
+    KVList = [{X, new_cache_value(X)} || X <- Locators],
+    dict:from_list(KVList).
 
+infer_init_scan_list(ID) ->
+    Name = erlang:atom_to_binary(ID,latin1), 
+    Selector = fun(X) ->
+		       {ok, Name} == dripline_ch_data:get_fields(instr,X)
+	       end,
+    L = lists:map(fun(X) -> 
+			  {ok, D} = dripline_conf_mgr:lookup(X),
+			  D
+		  end,
+		  dripline_conf_mgr:all_channels()),
+    C = [dripline_ch_data:get_fields(locator,X) || X <- L, 
+						   Selector(X)],
+    [locator_to_ch_spec(Y) || {ok, Y} <- C].
+    
 init_cache_expiry() ->
     erlang:send_after(?DEFAULT_CACHE_EXP,self(),update_cache).
 init_cache_expiry(TMO_MS) ->
@@ -223,7 +239,7 @@ update_cache(Cache,Options) ->
 		     ReadCmd = readback_cmd(dict:size(Cache)),
 		     Cmd = ["ABOR",";:",ScanCmd,";:",TrigCmd,";:",TimeCmd,";:","INIT"],
 		     ok = instrument_send(Cmd,Wr),
-		     timer:sleep(500),
+		     timer:sleep(1000),
 		     try
 			 instrument_send(ReadCmd,Rd)
 		     catch
@@ -240,7 +256,15 @@ update_cache(Cache,Options) ->
 	    ParsedResult = parse_instrument_response(Else),
 	    {ok, refresh_cache(ParsedResult, Cache)}
     end.
-
+setup_cmds([]) ->
+    [
+     "*CLS;",
+     "*RST;",
+     ":FORM:READ:CHAN ON;",
+     ":FORM:READ:TIME ON;", 
+     ":FORM:READ:TIME:TYPE ABS;",
+     ":FORM:READ:UNIT ON"
+    ];
 setup_cmds(Locators) ->
     SL = channel_spec_list_to_scan_string(Locators),
     [
