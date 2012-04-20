@@ -6,12 +6,15 @@
 %%%%%%%%%%%%%%%%%%%
 %%% Core record %%%
 %%%%%%%%%%%%%%%%%%%
+-type ch_type() :: rtd85 | rtd91 | dmm_dc | dmm_ac.
+
 -record(cd,{
-		id :: binary(),
-		instr :: binary(),
-		model :: atom(),
-		locator :: term()
-	}).
+	  id :: binary(),
+	  instr :: binary(),
+	  model :: atom(),
+	  locator :: term(),
+	  type :: ch_type()
+	 }).
 
 -opaque ch_data() :: #cd{}.
 -export_type([ch_data/0]).
@@ -33,12 +36,13 @@
 %%---------------------------------------------------------------------%%
 -spec new() -> record().
 new() ->
-	#cd{
-		id = <<>>,
-		instr = none,
-		model = none,
-		locator = none
-	}.
+    #cd{
+     id = <<>>,
+     instr = none,
+     model = none,
+     locator = none,
+     ch_type = dmm_dc
+    }.
 %%---------------------------------------------------------------------%%
 %% @doc from_json/1 returns a new channel data structure that is built 
 %%		from a json object with the appropriate fields.
@@ -73,8 +77,16 @@ set_instr(N,JS) ->
 		undefined ->
 			{error, {required, instrument}};
 		Val ->
-			set_model(N#cd{instr=Val},JS)
+			set_type(N#cd{instr=Val},JS)
 	end.
+set_type(N,JS) ->
+    Np = case props:get(sensor_type, JS) of
+	     undefined ->
+		 N;
+	     Val ->
+		 N#cd{ch_type=Val}
+	 end,
+    set_model(Np,JS).
 set_model(#cd{instr=I}=N,_JS) ->
 	case dripline_conf_mgr:lookup_instr(I) of
 		{ok, InD} ->
@@ -83,6 +95,7 @@ set_model(#cd{instr=I}=N,_JS) ->
 		_ ->
 			{error, {required, model}}
 	end.
+
 %%---------------------------------------------------------------------%%
 %% @doc set_field/3 sets the value of a field in an existing record to a
 %%		new value.
@@ -97,6 +110,8 @@ set_field(model, V, R) when is_record(R,cd) ->
 	R#cd{model=V};
 set_field(locator, V, R) when is_record(R,cd) ->
 	R#cd{locator=V};
+set_field(ch_type, V, R) when is_record(R,cd) ->
+    R#cd{ch_type=V};
 set_field(Any, _V, R) when is_record(R,cd) ->
 	{error,{bad_field, Any}}.
 
@@ -115,6 +130,8 @@ get_fields(instr,#cd{instr=In}) ->
 	{ok,In};
 get_fields(locator,#cd{locator=Lc}) ->
 	{ok,Lc};
+get_fields(ch_type,#cd{ch_type=Ch}) ->
+    {ok, Ch};
 get_fields(Any,_Rec) when is_atom(Any) ->
 	{error,{bad_field, Any}};
 get_fields(Fields,Rec) when is_list(Fields) ->
