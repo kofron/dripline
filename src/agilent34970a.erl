@@ -87,12 +87,12 @@ start_link(InstrumentID,PrologixID,BusAddress) ->
     gen_server:start_link({local, InstrumentID}, ?MODULE, Args, []).
 
 init([InstrumentID,PrologixID,BusAddress]) ->
-    Locators = infer_init_scan_list(InstrumentID),
-    {InitCmds, TRef} = case Locators of
+    Channels = infer_init_scan_list(InstrumentID),
+    {InitCmds, TRef} = case Channels of
 			   [] ->
-			       {setup_cmds(Locators), none};
-			   SomeLocators ->
-			       BaseCmds = setup_cmds(Locators),
+			       {setup_cmds([]), none};
+			   SomeChannels ->
+			       BaseCmds = setup_cmds(Channels),
 			       TrigCmd = trig_cmd(),
 			       TimeCmd = timing_cmd(?DEFAULT_CACHE_EXP),
 			       {[BaseCmds,";:",TrigCmd,";:",TimeCmd,";:INIT"],init_cache_expiry(2000)}
@@ -103,7 +103,7 @@ init([InstrumentID,PrologixID,BusAddress]) ->
       epro_handle = PrologixID,
       q = [],
       tref = TRef,
-      cache = initial_cache(Locators),
+      cache = initial_cache([Loc || {Loc,_Type} <- Channels]),
       read_cmd = fun(X) ->
 			 eprologix_cmdr:send(PrologixID,
 					     BusAddress,
@@ -195,9 +195,10 @@ infer_init_scan_list(ID) ->
 			  D
 		  end,
 		  dripline_conf_mgr:all_channels()),
-    C = [dripline_ch_data:get_fields(locator,X) || X <- L, 
-						   Selector(X)],
-    [locator_to_ch_spec(Y) || {ok, Y} <- C].
+    C = [dripline_ch_data:get_fields([type, locator],X) || X <- L, 
+							    Selector(X)],
+    io:format("~p~n",[C]),
+    [{locator_to_ch_spec(Loc),Ct} || {ok, [Ct,Loc]} <- C].
     
 init_cache_expiry() ->
     erlang:send_after(?DEFAULT_CACHE_EXP,self(),update_cache).
@@ -265,11 +266,14 @@ setup_cmds([]) ->
      ":FORM:READ:TIME:TYPE ABS;",
      ":FORM:READ:UNIT ON"
     ];
-setup_cmds(Locators) ->
+setup_cmds(Channels) ->
+    Locators = [Loc || {Loc,_Type} <- Channels],
     SL = channel_spec_list_to_scan_string(Locators),
+    CL = configuration_string(Channels),
     [
      "*CLS;",
      "*RST;:",
+     CL,
      sl_cmd(SL),
      ";",
      ":FORM:READ:CHAN ON;",
@@ -277,6 +281,41 @@ setup_cmds(Locators) ->
      ":FORM:READ:TIME:TYPE ABS;",
      ":FORM:READ:UNIT ON"
     ].
+
+configuration_string(Chs) ->
+    configuration_string(Chs,[]).
+configuration_string([],Acc) ->
+    Acc;
+configuration_string([{Loc,Type}|T],Acc) ->
+    ChString = io_lib:format("~B",[channel_tuple_to_int(Loc)]),
+    ConfStr = [
+	       "CONF:",
+	       chan_type_string(Type),
+	       " ",
+	       chan_opts_string(Type),
+	       ",(@",
+	       ChString,
+	       ");:"
+	      ],
+    configuration_string(T,[ConfStr|Acc]).
+
+chan_type_string(rtd85) ->
+    "TEMP";
+chan_type_string(rtd91) ->
+    "TEMP";
+chan_type_string(dmm_dc) ->
+    "VOLT:DC";
+chan_type_string(dcc_ac) ->
+    "VOLT:AC".
+
+chan_opts_string(rtd85) ->
+    "RTD,85";
+chan_opts_string(rtd91) ->
+    "RTD,91";
+chan_opts_string(dmm_dc) ->
+    "10,0.001";
+chan_opts_string(dmm_ac) ->
+    "10,0.001".
 
 trig_cmd() ->
     [
