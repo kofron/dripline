@@ -41,7 +41,7 @@ new() ->
      instr = none,
      model = none,
      locator = none,
-     ch_type = dmm_dc
+     type = dmm_dc
     }.
 %%---------------------------------------------------------------------%%
 %% @doc from_json/1 returns a new channel data structure that is built 
@@ -84,7 +84,7 @@ set_type(N,JS) ->
 	     undefined ->
 		 N;
 	     Val ->
-		 N#cd{ch_type=Val}
+		 N#cd{type=Val}
 	 end,
     set_model(Np,JS).
 set_model(#cd{instr=I}=N,_JS) ->
@@ -110,8 +110,8 @@ set_field(model, V, R) when is_record(R,cd) ->
 	R#cd{model=V};
 set_field(locator, V, R) when is_record(R,cd) ->
 	R#cd{locator=V};
-set_field(ch_type, V, R) when is_record(R,cd) ->
-    R#cd{ch_type=V};
+set_field(type, V, R) when is_record(R,cd) ->
+    R#cd{type=V};
 set_field(Any, _V, R) when is_record(R,cd) ->
 	{error,{bad_field, Any}}.
 
@@ -130,7 +130,7 @@ get_fields(instr,#cd{instr=In}) ->
 	{ok,In};
 get_fields(locator,#cd{locator=Lc}) ->
 	{ok,Lc};
-get_fields(ch_type,#cd{ch_type=Ch}) ->
+get_fields(type,#cd{type=Ch}) ->
     {ok, Ch};
 get_fields(Any,_Rec) when is_atom(Any) ->
 	{error,{bad_field, Any}};
