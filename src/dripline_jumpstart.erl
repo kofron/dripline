@@ -52,7 +52,9 @@ generate_st_channel_conf([H|T],Instr) ->
 		CD3 = dripline_ch_data:set_field(id,ChName,CD2),
 		Locator = props:get(locator,H),
 		CD4 = dripline_ch_data:set_field(locator,Locator,CD3),
-		ok = dripline_conf_mgr:add_channel(CD4),
+	    ChType = dripline_util:binary_to_atom(props:get(sensor_type,H,<<"dmm_dc">>)),
+	    CD5 = dripline_ch_data:set_field(type,ChType,CD4),
+		ok = dripline_conf_mgr:add_channel(CD5),
 		generate_st_channel_conf(T,Instr);
 	    {error, _E}=Err ->
 		Err
