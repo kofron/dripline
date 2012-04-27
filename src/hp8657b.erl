@@ -95,7 +95,14 @@ handle_call({read,Channels}, From,
 
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
-	WriteStr = write_channel_string(Channels,NewValue),
+	WriteStr = case NewValue of
+		       <<"enable">> ->
+			   <<"R3">>;
+		       <<"disable">> ->
+			   <<"R2">>;
+		       _Other ->
+			   write_channel_string(Channels,NewValue)
+		   end,
 	ok = eprologix_cmdr:send(H,A,WriteStr,true),
 	{reply, ok, StateData}.
 
@@ -128,7 +135,7 @@ write_channel_string(CHString,Value) ->
 unit_string("FR") -> "MZ";
 unit_string("AP") -> "DM".
 
--spec unpack_value(binary()) -> string().
+-spec unpack_value(binary()) -> binary().
 unpack_value(B) ->
-	erlang:binary_to_list(B).
+    B.
 %%%%%%%%%%%%%%%%%%%%%%%%%%

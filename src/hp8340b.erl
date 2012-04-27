@@ -26,7 +26,7 @@
 
 %%%%%%%%%%%%%%%%%%
 %%% Data Types %%%
-%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%
 -type locator() :: binary().
 -type channel_spec() :: string().
 
@@ -101,7 +101,14 @@ handle_call({read,Channels}, From,
 
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
-	WriteStr = write_channel_string(Channels,NewValue),
+	WriteStr = case NewValue of
+		       <<"enable">> ->
+			   <<"RF1">>;
+		       <<"disable">> ->
+			   <<"RF0">>;
+		       _Other ->
+			   write_channel_string(Channels,NewValue)
+		   end,
 	ok = eprologix_cmdr:send(H,A,WriteStr,true),
 	{reply, ok, StateData}.
 
@@ -139,4 +146,4 @@ unit_string("ST") -> "MS".
 
 -spec unpack_value(binary()) -> string().
 unpack_value(B) ->
-	erlang:binary_to_list(B).
+    B.
