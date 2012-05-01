@@ -79,7 +79,8 @@ init([InstrumentID,BusID,InstrumentAddress]) ->
 handle_call({read, Ch}, _From, #state{epro_handle=H, gpib_addr=A}=SD) ->
     ReadStr = ["MEAS:VOLT? ",Ch,";:","MEAS:CURR? ",Ch],
     Result = eprologix_cmdr:send(H,A,ReadStr),
-    {reply, Result, SD};
+    RetVal = pack_data(ok, Result, dripline_util:make_ts()),
+    {reply, RetVal, SD};
 handle_call({write, {Ch, Val}}, _From, #state{epro_handle=H, gpib_addr=A}=SD) ->
     WriteStr = case Val of
 		   <<"ON">> ->
@@ -90,7 +91,8 @@ handle_call({write, {Ch, Val}}, _From, #state{epro_handle=H, gpib_addr=A}=SD) ->
 		       ["APPL ",Ch,",",Val]
 	       end,
     eprologix_cmdr:send(H,A,WriteStr,true),
-    {reply, ok, SD}.
+    RetVal = pack_data(ok, ok, dripline_util:make_ts()),
+    {reply, RetVal, SD}.
 
 handle_cast(_Msg, State) ->
   {noreply, State}.
@@ -109,7 +111,19 @@ code_change(_OldVsn, State, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%---------------------------------------------------------------------%%
+%% @doc pack_data generates an appropriate instrument dripline_data 
+%%      response.
+%%---------------------------------------------------------------------%%
+-spec pack_data(atom(), binary(), binary()) -> dripline_data:dl_data().
+pack_data(ok, Data, Timestamp) ->
+    R0 = dripline_data:new(),
+    R1 = dripline_data:set_ts(R0, Timestamp),
+    R2 = dripline_data:set_code(R1, ok),
+    dripline_data:set_data(R2, Data).
+
+%%---------------------------------------------------------------------%%
 %% @doc unpack_value converts a value passed in from the database 
+%%---------------------------------------------------------------------%%
 -spec unpack_value(locator(), binary()) -> 
 			  {ok, binary()} | {error, term()}.
 unpack_value(_Loc, <<"enable">>) ->
