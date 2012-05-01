@@ -55,10 +55,9 @@ locator_to_ch_spec(_Other) -> {error,bad_locator}.
 %%		of channel specs.
 %% @end
 %%---------------------------------------------------------------------%%
--spec read(atom(),locator()) -> binary() | {error,term()}.
+-spec read(atom(),locator()) -> {error, term()}.
 read(InstrumentID,Locator) ->
-	CHSpec = locator_to_ch_spec(Locator),
-	gen_server:call(InstrumentID,{read,CHSpec}).
+    dripline_error:unsupported_method(?MODULE, read).
 
 %%---------------------------------------------------------------------%%
 %% @doc write/3 maps a write request onto the correct instrument and 
@@ -87,12 +86,6 @@ init([InstrumentID,BusID,InstrumentAddress]) ->
 	},
 	{ok, InitialState}.
 
-handle_call({read,Channels}, From, 
-			#state{epro_handle = H, gpib_addr = A}=StateData) ->
-	ReadStr = read_channel_string(Channels),
-	R = eprologix_cmdr:send(H,A,ReadStr),
-	{reply, R, StateData};
-
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
 	WriteStr = case NewValue of
@@ -104,7 +97,8 @@ handle_call({write,{Channels,NewValue}}, From,
 			   write_channel_string(Channels,NewValue)
 		   end,
 	ok = eprologix_cmdr:send(H,A,WriteStr,true),
-	{reply, ok, StateData}.
+    RetVal = pack_data(ok, ok, dripline_util:make_ts()),
+	{reply, RetVal, StateData}.
 
 handle_cast(_Cast,StateData) ->
 	{noreply, StateData}.
@@ -123,6 +117,18 @@ code_change(_OldVsn, StateData, _Extras) ->
 %%%%%%%%%%%%%%%%
 %%% internal %%%
 %%%%%%%%%%%%%%%%
+
+%%---------------------------------------------------------------------%%
+%% @doc pack_data generates an appropriate instrument dripline_data 
+%%      response.
+%%---------------------------------------------------------------------%%
+-spec pack_data(atom(), binary(), binary()) -> dripline_data:dl_data().
+pack_data(ok, Data, Timestamp) ->
+    R0 = dripline_data:new(),
+    R1 = dripline_data:set_ts(R0, Timestamp),
+    R2 = dripline_data:set_code(R1, ok),
+    dripline_data:set_data(R2, Data).
+
 -spec read_channel_string(string()) -> string().
 read_channel_string(CHString) ->
 	"OP" ++ CHString.
