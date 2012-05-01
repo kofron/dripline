@@ -56,8 +56,11 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({dispatch, DB, ChangeLine}, State) ->
     DocID = props:get('doc._id',ChangeLine),
-    Updater = fun(X) ->
-		      dripline_util:update_couch_doc(DB,DocID,"result",X)
+    Updater = fun(DlData) ->
+		      R = dripline_data:get_data(DlData),
+		      TS = dripline_data:get_ts(DlData),
+		      Props = [{<<"result">>,R}, {<<"timestamp">>, TS}],
+		      dripline_util:update_couch_doc(DB,DocID,Props)
 	      end,
     ToDo = case dripline_compiler:compile(ChangeLine) of
 	       {ok, F} ->
