@@ -213,9 +213,16 @@ respond([], _Cache) ->
 respond([{write, _Loc, _Val, _From}|T], Cache) ->
     respond(T,Cache);
 respond([{read, Loc, From}|T], Cache) ->
-    #cache_value{last=V} = dict:fetch(Loc,Cache),
-    gen_server:reply(From, V),
+    #cache_value{last=V,ts=TS} = dict:fetch(Loc,Cache),
+    RetVal = pack_data(ok,V,TS),
+    gen_server:reply(From, RetVal),
     respond(T,Cache).
+
+pack_data(Code, Value, TS) ->
+    R0 = dripline_data:new(),
+    R1 = dripline_data:set_code(R0, Code),
+    R2 = dripline_data:set_data(R1, Value),
+    dripline_data:set_ts(R2, TS).
 
 augment_and_update_cache([],Cache,Opts) ->
     Opt = [{new_ch, true}|Opts],
@@ -382,8 +389,9 @@ refresh_cache([{Loc,#cache_value{last=V,ts=Ts}}|T],Cache) ->
 
 fetch_last_value(Locator, Cache) ->
     Result = case dict:find(Locator,Cache) of
-		 {ok, #cache_value{last=Value}} ->
-		     {cache_good, Value};
+		 {ok, #cache_value{last=Value, ts=TS}} ->
+		     RetVal = pack_data(ok, Value, TS),
+		     {cache_good, RetVal};
 		 error ->
 		     new_channel
 	     end,
