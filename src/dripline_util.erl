@@ -2,6 +2,10 @@
 %%		the code base as helpers.
 %% @author jared kofron <jared.kofron@gmail.com>
 -module(dripline_util).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Timestamp functions %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-export([make_ts/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Data munging functions %%%
@@ -12,6 +16,22 @@
 %%% CouchDB interface functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([update_couch_doc/3,strip_rev_no/1]).
+
+%%---------------------------------------------------------------------%%
+%% @doc make_ts converts the current time as reported by the erlang VM
+%%      into the external timestamp format (a string).
+%% @end
+%%---------------------------------------------------------------------%%
+-spec make_ts() -> binary().
+make_ts() ->
+    LocalTime = calendar:local_time(),
+    to_binary_ts(LocalTime).
+
+-spec to_binary_ts(calendar:datetime()) -> binary().
+to_binary_ts({{Y,M,D},{H,M,S}}) ->
+    FormStr = "~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",
+    L = lists:flatten(io_lib:format(FormStr,[Y,M,D,H,M,S])),
+    list_to_binary(L).
 
 %%---------------------------------------------------------------------%%
 %% @doc binary_to_atom simply converts a binary string into an atom.
