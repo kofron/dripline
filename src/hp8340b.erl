@@ -94,11 +94,11 @@ init([InstrumentID,BusID,InstrumentAddress]) ->
 	{ok, InitialState}.
 
 handle_call({read,Channels}, From, 
-			#state{epro_handle = H, gpib_addr = A}=StateData) ->
-	ReadStr = read_channel_string(Channels),
-	R = eprologix_cmdr:send(H,A,ReadStr),
+	    #state{epro_handle = H, gpib_addr = A}=StateData) ->
+    ReadStr = read_channel_string(Channels),
+    R = eprologix_cmdr:send(H,A,ReadStr),
     RetVal = pack_data(ok, R, dripline_util:make_ts()),
-	{reply, RetVal, StateData};
+    {reply, RetVal, StateData};
 
 handle_call({write,{Channels,NewValue}}, From,
 			#state{epro_handle = H, gpib_addr = A}=StateData) ->
