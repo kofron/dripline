@@ -11,7 +11,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% CouchDB interface functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([update_couch_doc/4,strip_rev_no/1]).
+-export([update_couch_doc/3,strip_rev_no/1]).
 
 %%---------------------------------------------------------------------%%
 %% @doc binary_to_atom simply converts a binary string into an atom.
@@ -27,14 +27,13 @@ binary_to_atom(Binary) ->
 %%		that field.
 %% @end
 %%---------------------------------------------------------------------%%
--spec update_couch_doc(string(),binary(),string(),ejson:ejson_object()) 
+-spec update_couch_doc(string(),binary(),[{binary(), binary()}]) 
 		-> ok | {error,term()}.
-update_couch_doc(DbName,DocID,FieldName,NewData) ->
+update_couch_doc(DbName,DocID,Props) ->
     S = dripline_conn_mgr:get(),
     {ok,Db} = couchbeam:open_db(S,DbName),
     {ok,Doc} = couchbeam:open_doc(Db,DocID),
-    EncodedData = ejson:encode(NewData),
-    NewDoc = couchbeam_doc:set_value(FieldName,EncodedData,Doc),
+    NewDoc = couchbeam_doc:extend(Props,Doc),
     OldRevNo = strip_rev_no(props:get('_rev',NewDoc)),
     NotifyMod = case DbName of 
 		    "dripline_cmd" ->
