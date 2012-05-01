@@ -3,6 +3,7 @@
 -export([to_json/1]).
 -export([compiler_expected/2,compiler_surprised/2]).
 -export([field_undefined/2]).
+-export([unsupported_method/2]).
 
 -type dripline_error() :: term().
 -export_type([dripline_error/0]).
@@ -27,6 +28,10 @@ field_undefined(Source,Field) ->
 -spec to_json(dripline_error()) -> ejson:ejson_object().
 to_json({E,L}) ->
     ejson:encode({[{E, {L}}]}).
+
+-spec unsupported_method(atom(), atom()) -> dripline_error().
+unsupported_method(Mod,Method) ->
+    {error, [{unsupported_method, [{Mod, Method}]}]}.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
