@@ -31,7 +31,7 @@ start_logging(ChannelName,Interval,infinity) ->
 			{error, already_logging};
 		{error, no_logger} ->
 			StArg = [ChannelName,Interval,infinity],
-			{ok,P} = supervisor:start_child(dripline_data_log_sup,StArg),
+			{ok, P} = Res = supervisor:start_child(dripline_data_log_sup,StArg),
 			dripline_conf_mgr:set_logger_pid(ChannelName,P)
 	end;
 start_logging(ChannelName,Interval,MaxIt) ->
