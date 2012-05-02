@@ -164,7 +164,6 @@ action_tokens() ->
 -spec resolve_target(ejson:json_object(),#intermed{}) -> 
 			    {ok, #intermed{}} | dripline_error:error().
 resolve_target(JS,#intermed{type=command,do=get}=I) ->
-    io:format("~p~n",[JS]),
     case props:get(doc.command.channel,JS) of
 	undefined ->
 	    dripline_error:field_undefined(compiler,channel);
