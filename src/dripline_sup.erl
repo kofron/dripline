@@ -50,9 +50,9 @@ init([]) ->
     DLogSup = ?CHILD(dripline_data_log_sup,supervisor),
     {ok, { SuperStrategy, [ConnMgr,
 			   ConfMgr,
+			   DLogSup,
 			   ConfMon,
 			   CmdMon,
 			   Compiler,
 			   InstrSup,
-			   DLogSup,
 			   Dispatcher] }}.
