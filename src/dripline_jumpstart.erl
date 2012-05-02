@@ -94,8 +94,9 @@ generate_st_loggers_conf([H|T]) ->
 	case dripline:start_logging(TgtChan,NumInterval) of
 		ok ->
 			generate_st_loggers_conf(T);
-		{error, already_logging} ->
+	    Other ->
 			%% error report here
+		error_logger:error_msg("error logging ~p: ~p",[TgtChan,Other]),
 			generate_st_loggers_conf(T)
 	end.
 
