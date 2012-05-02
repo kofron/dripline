@@ -197,7 +197,6 @@ infer_init_scan_list(ID) ->
 		  dripline_conf_mgr:all_channels()),
     C = [dripline_ch_data:get_fields([type, locator],X) || X <- L, 
 							    Selector(X)],
-    io:format("~p~n",[C]),
     [{locator_to_ch_spec(Loc),Ct} || {ok, [Ct,Loc]} <- C].
     
 init_cache_expiry() ->
