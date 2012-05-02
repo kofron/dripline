@@ -52,7 +52,7 @@ init([Id,Interval,MaxIterations]) ->
 		c_res = none,
 		c_err = false
 	},
-	{ok, interrogating, InitialState, 0}.
+	{ok, interrogating, InitialState, 1000}.
 
 handle_event(_Event, _StateName, StateData) ->
 	{stop, unexpected_event, StateData}.
@@ -143,10 +143,11 @@ calc_sleep_time(ElapsedTime, IntervalTime) ->
 write_couch_spec(Id,Data) ->
 	% create the new document
 	NewDoc = {[]},
-	D0 = couchbeam_doc:set_value("uncalibrated_value",Data,NewDoc),
+    Value = dripline_data:get_data(Data),
+	D0 = couchbeam_doc:set_value("uncalibrated_value",Value,NewDoc),
 	D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
 	Now = calendar:local_time(),
-	TStamp = generate_timestamp(Now),
+	TStamp = dripline_data:get_ts(Data),
 	D2 = couchbeam_doc:set_value("timestamp_localstring",TStamp,D1),
 	% OK, get a handle to the database and write it.
 	SConn = dripline_conn_mgr:get(),
