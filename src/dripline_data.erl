@@ -13,6 +13,7 @@
 -record(dl_data,{
 	  code,
 	  data,
+	  final,
 	  ts
 }).
 
@@ -20,7 +21,7 @@
 -export_type([dl_data/0]).
 
 -export([new/0]).
--export([get_data/1,set_data/2]).
+-export([get_data/1,set_data/2,get_final/1,set_final/2]).
 -export([get_code/1,set_code/2]).
 -export([get_ts/1,set_ts/2]).
 
@@ -34,7 +35,7 @@
 %%---------------------------------------------------------------------%%
 -spec new() -> dl_data().
 new() ->
-    #dl_data{code=none,data=none,ts=none}.
+    #dl_data{code=none,data=none,ts=none,final=none}.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_data extracts the data field from a dl_data record.
@@ -51,6 +52,25 @@ get_data(#dl_data{data=D}) ->
 -spec set_data(dl_data(), dl_data_data_type()) -> dl_data().
 set_data(DD, D) when is_record(DD, dl_data) ->
     DD#dl_data{data=D}.
+
+%%---------------------------------------------------------------------%%
+%% @doc get_final extracts the final data field from a dl_data record.
+%% @end
+%%---------------------------------------------------------------------%%
+-spec get_final(dl_data()) -> dl_data_data_type().
+get_final(#dl_data{final=none,data=D}) ->
+    D;
+get_final(#dl_data{final=F,data=D}) ->
+    F.
+
+%%---------------------------------------------------------------------%%
+%% @doc set_final sets the final data (post-hook) field in 
+%%      a dl_data record
+%% @end
+%%---------------------------------------------------------------------%%
+-spec set_final(dl_data(), dl_data_data_type()) -> dl_data().
+set_final(DD, F) when is_record(DD, dl_data) ->
+    DD#dl_data{final=F}.
 
 %%---------------------------------------------------------------------%%
 %% @doc set_code sets the status code field in a dl_data record
