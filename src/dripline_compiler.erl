@@ -122,7 +122,7 @@ compile_to_fun(#intermed{type=command,do=set,channel=C,value=V}) ->
 			fun() -> E end	       
 		end
 	end,
-    {ok, F}.
+    {ok, C, F}.
 
 -spec type_tokens() -> [binary()].
 type_tokens() ->
