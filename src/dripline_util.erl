@@ -10,7 +10,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Data munging functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([binary_to_atom/1]).
+-export([binary_to_atom/1, binary_to_float/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% CouchDB interface functions %%%
@@ -40,6 +40,16 @@ to_binary_ts({{Y,M,D},{HH,MM,SS}}) ->
 -spec binary_to_atom(binary()) -> atom().
 binary_to_atom(Binary) ->
 	erlang:list_to_atom(erlang:binary_to_list(Binary)).
+
+%%---------------------------------------------------------------------%%
+%% @doc binary_to_float converts a binary string with a floating point
+%%      value into that floating point value.
+%%      e.g. <<"1.4E-2">> -> 0.014
+%% @end
+%%---------------------------------------------------------------------%%
+-spec binary_to_float(binary()) -> float().
+binary_to_float(Binary) ->
+	erlang:list_to_float(erlang:binary_to_list(Binary)).
 
 %%---------------------------------------------------------------------%%
 %% @doc update_couch_doc/4 updates a couch document *that already exists*
