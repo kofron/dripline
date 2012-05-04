@@ -42,7 +42,7 @@ init([]) ->
 
 handle_call({compile, JS}, _From, State) ->
     Reply = case drip_compile(JS) of
-		{ok, _F}=Success ->
+		{ok, _Ch, _F}=Success ->
 		    Success;
 		{error, _E}=Err ->
 		    Err
@@ -112,7 +112,7 @@ compile_to_fun(#intermed{type=command,do=get,channel=C}) ->
 			fun() -> E end
 		end
 	end,
-    {ok, F};
+    {ok, C, F};
 compile_to_fun(#intermed{type=command,do=set,channel=C,value=V}) ->
     F = fun() ->
 		case dripline_conf_mgr:lookup(C) of
