@@ -13,7 +13,8 @@
 	  instr :: binary(),
 	  model :: atom(),
 	  locator :: term(),
-	  type :: ch_type()
+	  type :: ch_type(),
+	  post :: [dripline_hook:hook()]
 	 }).
 
 -opaque ch_data() :: #cd{}.
@@ -41,8 +42,10 @@ new() ->
      instr = none,
      model = none,
      locator = none,
-     type = dmm_dc
+     type = dmm_dc,
+     post = none
     }.
+
 %%---------------------------------------------------------------------%%
 %% @doc from_json/1 returns a new channel data structure that is built 
 %%		from a json object with the appropriate fields.
@@ -104,6 +107,8 @@ set_model(#cd{instr=I}=N,_JS) ->
 -spec set_field(atom(),term(),record()) -> record().
 set_field(id, V, R) when is_record(R,cd) ->
 	R#cd{id=V};
+set_field(post_hook, V, R) when is_record(R,cd) ->
+    R#cd{post = V};
 set_field(instr, V, R) when is_record(R,cd) ->
 	R#cd{instr=V};
 set_field(model, V, R) when is_record(R,cd) ->
@@ -124,6 +129,8 @@ set_field(Any, _V, R) when is_record(R,cd) ->
 		{ok,term()} | {ok,[term()]} | {error, term()}.
 get_fields(id,#cd{id=Id}) ->
 	{ok,Id};
+get_fields(post_hooks, #cd{post=P}) ->
+    {ok, P};
 get_fields(model,#cd{model=Md}) ->
 	{ok,Md};
 get_fields(instr,#cd{instr=In}) ->
