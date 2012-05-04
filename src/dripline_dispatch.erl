@@ -56,11 +56,14 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({dispatch, DB, ChangeLine}, State) ->
     DocID = props:get('doc._id',ChangeLine),
-    Updater = fun(Channel, DlData) ->
-		      io:format("updating with channel ~p~n",[Channel]),
+    Updater = fun(Channel, Data) ->
+		      DlData = dripline_hook:apply_hooks(Channel, Data),
 		      R = dripline_data:get_data(DlData),
 		      TS = dripline_data:get_ts(DlData),
-		      Props = [{<<"result">>,R}, {<<"timestamp">>, TS}],
+		      F  = dripline_data:get_final(DlData),
+		      Props = [{<<"result">>,R}, 
+			       {<<"timestamp">>, TS},
+			       {<<"final">>,F}],
 		      dripline_util:update_couch_doc(DB,DocID,Props)
 	      end,
     ToDo = case dripline_compiler:compile(ChangeLine) of
