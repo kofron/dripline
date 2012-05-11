@@ -43,7 +43,7 @@ new() ->
      model = none,
      locator = none,
      type = dmm_dc,
-     post = none
+     post = []
     }.
 
 %%---------------------------------------------------------------------%%
@@ -159,6 +159,14 @@ get_fields([H|T],Rec,Acc) ->
 %% @end
 %%---------------------------------------------------------------------%%
 -spec synthesize_fun(record()) -> fun(() -> binary()).
+synthesize_fun(#cd{id = <<"heartbeat">>}) ->
+    fun() ->
+	    D = dripline_data:new(),
+	    D1 = dripline_data:set_code(D,ok),
+	    D2 = dripline_data:set_data(D1,<<"thump">>),
+	    D3 = dripline_data:set_ts(D2,dripline_util:make_ts()),
+	    D3
+    end;
 synthesize_fun(#cd{instr=BI,model=BM,locator=L}) ->
 	[I,M] = lists:map(fun(X) -> 
 						dripline_util:binary_to_atom(X) 

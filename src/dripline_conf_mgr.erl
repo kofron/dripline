@@ -47,6 +47,8 @@ add_channel(ChannelData) ->
 	gen_server:call(?MODULE,{add_channel, ChannelData}).
 
 -spec lookup(binary()) -> {ok,term()} | {error,term()}.
+lookup(<<"heartbeat">>) ->
+    heartbeat_data();
 lookup(ChName) ->
 	gen_server:call(?MODULE,{lookup,{ch,ChName}}).
 
@@ -177,6 +179,11 @@ code_change(_OldVsn, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Internal Functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
+heartbeat_data() ->
+    D0 = dripline_ch_data:new(),
+    D1 = dripline_ch_data:set_field(id, <<"heartbeat">>, D0),
+    {ok, D1}.
+
 drop_pid(LogDict,Pid) ->
 	Search = fun(X) -> fun(_K,_V,{true,_D2}=NoOp) -> 
 							NoOp;
