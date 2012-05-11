@@ -74,13 +74,14 @@ code_change(_OldVsn, StateName, StateData, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%
 %%% gen_fsm states %%%
 %%%%%%%%%%%%%%%%%%%%%%
-interrogating(timeout,#state{call=C}=StateData) ->
+interrogating(timeout,#state{call=C,id=Id}=StateData) ->
     Result = timer:tc(C),
     NewStateData = case Result of
 		       {_Elapsed,{error,_E}=Err} ->
 			   StateData#state{c_res = Err, c_err = true};
 		       {Elapsed,Data} ->
-			   StateData#state{c_res = Data, elapsed = Elapsed}
+			   ProcData = dripline_hook:apply_hooks(Id,Data),
+			   StateData#state{c_res = ProcData, elapsed = Elapsed}
 		   end,
     {next_state, writing, NewStateData, 0}.
 
@@ -141,18 +142,19 @@ calc_sleep_time(ElapsedTime, IntervalTime) ->
 -spec write_couch_spec(binary(),binary()) 
 		      -> {ok, binary()} | {error, term()}.
 write_couch_spec(Id,Data) ->
-						% create the new document
+    %% create the new document
     NewDoc = {[]},
     Value = dripline_data:get_data(Data),
-    D0 = couchbeam_doc:set_value("uncalibrated_value",Value,NewDoc),
-    D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
-    Now = calendar:local_time(),
+    ProcV = dripline_data:get_final(Data),
     TStamp = dripline_data:get_ts(Data),
-    D2 = couchbeam_doc:set_value("timestamp_localstring",TStamp,D1),
-						% OK, get a handle to the database and write it.
+    D0 = couchbeam_doc:set_value("raw_value",Value,NewDoc),
+    D1 = couchbeam_doc:set_value("sensor_name",Id,D0),
+    D2 = couchbeam_doc:set_value("final_value",ProcV,D1),
+    D3 = couchbeam_doc:set_value("timestamp",TStamp, D2),
+    %% OK, get a handle to the database and write it.
     SConn = dripline_conn_mgr:get(),
     {ok, Db} = couchbeam:open_or_create_db(SConn,"dripline_logged_data"),
-    couchbeam:save_doc(Db,D2).
+    couchbeam:save_doc(Db,D3).
 
 %%---------------------------------------------------------------------%%
 %% @doc generate_timestamp takes an erlang time tuple and returns a
