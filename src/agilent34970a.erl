@@ -171,7 +171,8 @@ handle_info(update_cache, #state{cache=C,read_cmd=F,write_cmd=W}=State) ->
 		},
     {noreply, NewState}.
 
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{write_cmd=W}) ->
+    ok = instrument_send("*RST",W),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
