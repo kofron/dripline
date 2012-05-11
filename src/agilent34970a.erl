@@ -94,8 +94,7 @@ init([InstrumentID,PrologixID,BusAddress]) ->
 			   SomeChannels ->
 			       BaseCmds = setup_cmds(Channels),
 			       TrigCmd = trig_cmd(),
-			       TimeCmd = timing_cmd(?DEFAULT_CACHE_EXP),
-			       {[BaseCmds,";:",TrigCmd,";:",TimeCmd,";:INIT"],init_cache_expiry(2000)}
+			       {[BaseCmds,";:",TrigCmd],init_cache_expiry(2000)}
 		       end,
     InitialState = #state{
       id = InstrumentID,
@@ -158,8 +157,8 @@ handle_info(timeout, #state{q=Q,cache=C,read_cmd=R,write_cmd=W}=State) ->
 		 tref = TRef
 		},
     {noreply, NewState};    
-handle_info(update_cache, #state{cache=C,read_cmd=F}=State) ->
-    NewCache = case update_cache(C,[{reader,F}]) of
+handle_info(update_cache, #state{cache=C,read_cmd=F,write_cmd=W}=State) ->
+    NewCache = case update_cache(C,[{reader,F},{writer,W}]) of
 		   {ok, NewC} ->
 		       NewC;
 		   {error, {_Err, OldC}} ->
@@ -242,9 +241,8 @@ update_cache(Cache,Options) ->
 		 true ->
 		     ScanCmd = sl_cmd(sl_from_cache(Cache)),
 		     TrigCmd = trig_cmd(),
-		     TimeCmd = timing_cmd(smallest_ttl(Cache)),
 		     ReadCmd = readback_cmd(dict:size(Cache)),
-		     Cmd = ["ABOR",";:",ScanCmd,";:",TrigCmd,";:",TimeCmd,";:","INIT"],
+		     Cmd = ["ABOR",";:",ScanCmd,";:",TrigCmd],
 		     ok = instrument_send(Cmd,Wr),
 		     timer:sleep(1000),
 		     try
@@ -254,6 +252,8 @@ update_cache(Cache,Options) ->
 			     {error, {Error,Reason}}
 		     end;
 		 undefined ->
+		     instrument_send("*TRG",Wr),
+		     timer:sleep(1000),
 		     instrument_send(readback_cmd(dict:size(Cache)),Rd)
 	     end,
     case Result of 
@@ -327,11 +327,11 @@ trig_cmd() ->
     [
      "TRIG:SOURCE BUS",
      ";:",
+     "TRIG:COUNT INFINITY",
+     ";:",
      "INIT",
      ";"
      "*TRG"
-     ";:",
-     "ABOR"
     ].
 
 instrument_send(Cmd, Fun) ->
