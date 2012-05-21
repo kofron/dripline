@@ -365,7 +365,7 @@ parse_instrument_response(<<V:152/bitstring,
     Locator = locator_from_binary(Ch),
     Ts = <<Y/binary,"-",M/binary,"-",D/binary,
 	   " ", 
-	   HH/binary, MM/binary, SS/binary>>,
+	   HH/binary,":",MM/binary,":",SS/binary>>,
     R = (new_cache_value(Locator))#cache_value{
 	  last = V,
 	  ts = Ts
