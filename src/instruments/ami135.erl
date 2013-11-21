@@ -30,7 +30,7 @@ init(_Args) ->
 
 do_read('level', StateData) ->
     {send, <<"LEVEL">>, StateData}.
-do_write(_AnyChannel, StateData) ->
+do_write(_AnyChannel, _AnyValue, StateData) ->
     {error, {unsupported_method, write}, StateData}.
 
 
