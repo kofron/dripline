@@ -88,7 +88,7 @@ compile_to_rec(JS,I) ->
 -spec resolve_type(ejson:ejson_object(), #intermed{}) ->
 			  {ok, binary()} | {error, notype}.
 resolve_type(JS, Inter) ->
-    case props:get(doc.type,JS,undefined) of
+    case props:get('doc.type',JS,undefined) of
 	undefined ->
 	    dl_error:compiler_expected(type_field,no_type_field);
 	Type ->
@@ -113,11 +113,11 @@ type_tokens() ->
 -spec resolve_action(ejson:ejson_object(), #intermed{}) ->
 			    {ok, #intermed{}} | dl_error:error().
 resolve_action(JS,#intermed{type=command}=I) ->
-    case props:get(doc.command,JS) of
+    case props:get('doc.command',JS) of
 	undefined ->
 	    dl_error:field_undefined(compiler,command);
 	_Cmd ->
-	    case props:get(doc.command.do,JS) of
+	    case props:get('doc.command.do',JS) of
 		undefined ->
 		    dl_error:field_undefined(compiler,do);
 		Do ->
@@ -164,18 +164,18 @@ resolve_target(JS,#intermed{type=command,do=run}=I) ->
     Data = props:to_proplist(Cmd2),
     {ok, I#intermed{channel=Tgt,value=Data}};
 resolve_target(JS,#intermed{type=command,do=get}=I) ->
-    case props:get(doc.command.channel,JS) of
+    case props:get('doc.command.channel',JS) of
 	undefined ->
 	    dl_error:field_undefined(compiler,channel);
 	Ch ->
 	    {ok, I#intermed{channel=erlang:binary_to_atom(Ch,latin1)}}
     end;
 resolve_target(JS,#intermed{type=command,do=set}=I) ->	
-    case props:get(doc.command.channel,JS) of
+    case props:get('doc.command.channel',JS) of
 	undefined ->
 	    dl_error:field_undefined(compiler,channel);
 	Ch ->
-	    case props:get(doc.command.value,JS) of
+	    case props:get('doc.command.value',JS) of
 		undefined ->
 		    dl_error:field_undefined(compiler,value);
 		Val ->
