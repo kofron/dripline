@@ -1,9 +1,9 @@
 *~
 *#
 #*
+apps/*/ebin
 ebin/*
 rebar
 lib/
 priv/*.so
-release/dripline
-release/files
+rel/dripline

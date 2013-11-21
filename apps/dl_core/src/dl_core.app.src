@@ -1,0 +1,13 @@
+{application, dl_core,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  gproc
+                 ]},
+  {mod, { dl_core_app, []}},
+  {env, []}
+ ]}.
