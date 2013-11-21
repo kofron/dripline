@@ -39,7 +39,7 @@
 	 celsius_to_kelvin/1,
 	 precision_shunt/1,
 	 lakeshore_hall_cal_80K/1,
-	 nmr_hall_cal_77K/1
+	 nmr_hall_cal_77K/1,
 	 power_meter_cal/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
