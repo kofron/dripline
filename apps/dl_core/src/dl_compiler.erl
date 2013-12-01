@@ -1,10 +1,14 @@
 -module(dl_compiler).
 -behaviour(gen_server).
 
+-include_lib("ej/include/ej.hrl").
+
+-record(key_error, {msg, key}).
+
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([compile/1]).
+-export([compile/1, compiler_error_msg/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -30,6 +34,12 @@
 		     {ok, fun()} | {error, dl_error:error()}.
 compile(JSON) ->
     gen_server:call(?MODULE,{compile, JSON}).
+
+-spec compiler_error_msg(term()) -> binary().
+compiler_error_msg(#ej_invalid{msg=M}) ->
+    M;
+compiler_error_msg(#key_error{msg=M}) ->
+    M.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server API and callback definitions %%%
@@ -167,14 +177,8 @@ get_json_value(JS) ->
 
 -spec key_undef_error(binary()) -> term().
 key_undef_error(<<"value">>=Key) ->
-    [
-     {key_error, 
-      {undefined_key, Key}
-     },
-     {msg,
-      "set commands must have the key \"value\" defined with a legal value."
-     }
-    ].
+    #key_error{msg="set commands must have the key \"value\" defined with a legal value.",
+	       key=Key}.
 
 -spec drop_json_keys([binary()],ejson:json_object()) -> ejson:json_object().
 drop_json_keys(KeyList, {JSON}) ->
