@@ -44,7 +44,7 @@ handle_call({compile, JS}, _From, State) ->
     Reply = case drip_compile(JS) of
 		{ok, _F}=Success ->
 		    Success;
-		{error, _E}=Err ->
+		{error, _E, _Req}=Err ->
 		    Err
 	    end,
     {reply, Reply, State}.
@@ -74,8 +74,8 @@ drip_compile(JS) ->
     case json_to_request(Command,Req) of
 	{ok, _Request}=Success ->
 	    Success;
-	{error, _Reason}=Err ->
-	    Err
+	{error, Reason} ->
+	    {error, Reason, Req}
     end.
 
 -spec json_to_request(ejson:json_object(), dl_request:dl_request()) ->
