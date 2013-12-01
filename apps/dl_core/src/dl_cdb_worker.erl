@@ -77,11 +77,12 @@ do_error_response(RequestData, Error, #state{cdb_handle=H}=StateData) ->
 update_cmd_doc(DocID, DBHandle, JSON) ->
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
     NewDoc = ej:set({<<"result">>}, Doc, JSON),
-    case couchbeam:save_doc(DBHandle, NewDoc) of
+    StampedDoc = ej:set({<<"timestamp">>}, NewDoc, dl_util:make_ts()),
+    case couchbeam:save_doc(DBHandle, StampedDoc) of
 	{ok, _} ->
 	    ok;
 	{error, conflict} ->
-	    update_cmd_doc_loop(DBHandle, NewDoc);
+	    update_cmd_doc_loop(DBHandle, StampedDoc);
 	{error, _Other}=Err ->
 	    Err
     end.
