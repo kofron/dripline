@@ -64,12 +64,13 @@ do_request(RequestData, #state{cdb_handle=H}=StateData) ->
 		 <<"data">>),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
-do_error_response(RequestData, _Error, #state{cdb_handle=H}=StateData) ->
+do_error_response(RequestData, Error, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
+    Err = dl_compiler:compiler_error_msg(Error),
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
-		   <<"generic">>),
+		   erlang:iolist_to_binary(Err)),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
