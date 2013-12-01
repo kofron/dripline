@@ -107,7 +107,7 @@ handle_info({change, R, ChangeData}, #state{cmd_ch_ref=R, revs=Revs, db_cmd_hndl
 		   true ->
 		       State;
 		   false ->
-		       spawn_command_worker(ChangeData),
+		       spawn_cmd_worker(ChangeData),
 		       State#state{revs=update_rev_data(ChangeData,Revs)}
 	       end,    
     %% case dl_compiler:compile(ChangeData) of
@@ -225,6 +225,18 @@ ignore_update_rev(ChangeLine, RevsDict) ->
 	_ ->
 	    false
     end.
+
+%%---------------------------------------------------------------------%%
+%% @doc spawn_cmd_worker/1 fires off a process to deal with a new command.
+%% this includes compiling, resolving the host, etc etc.  
+%% @end
+%%---------------------------------------------------------------------%%
+-spec spawn_cmd_worker(ejson:json_object()) -> pid().
+spawn_cmd_worker(Command) ->
+    ok = poolboy:transaction(couchdb_command_pool,
+			     fun(Worker) ->
+				     gen_server:cast(Worker, {process, Command})
+			     end).
 
 %%---------------------------------------------------------------------%%
 %% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision
