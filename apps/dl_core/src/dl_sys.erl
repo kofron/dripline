@@ -11,6 +11,7 @@
 -export([current_loggers/0]).
 -export([start_loggers/1]).
 -export([stop_loggers/1]).
+-export([heartbeat/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -30,6 +31,14 @@
 -spec current_loggers() -> [atom()].
 current_loggers() ->
     dl_conf_mgr:running_loggers().
+
+-spec heartbeat() -> binary().
+heartbeat() ->
+    Dt = dl_data:new(),
+    DtT = dl_data:set_ts(Dt, dl_util:make_ts()),
+    DtD = dl_data:set_data(DtT, <<"thump">>),
+    DtC = dl_data:set_code(DtD, ok),
+    DtC.
 
 -spec start_loggers([atom()]) -> [{atom(), atom() | {atom(), atom()}}].
 start_loggers(Loggers) ->
