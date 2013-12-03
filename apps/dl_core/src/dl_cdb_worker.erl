@@ -59,10 +59,12 @@ code_change(_OldVsn, State, _Extra) ->
 do_request(RequestData, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
-    Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"ok">>}, 
-		 NewJS, 
-		 <<"data">>),
-    ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
+    case dl_conf_mgr:mfa_from_request(RequestData) of
+	{error, Reason} ->
+	    do_error_response(RequestData, Reason, StateData);
+	MFA ->
+	    do_collect_data(MFA, RequestData, StateData)
+    end,
     StateData.
 do_error_response(RequestData, Error, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
@@ -74,16 +76,33 @@ do_error_response(RequestData, Error, #state{cdb_handle=H}=StateData) ->
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
+do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}) ->
+    Dt = erlang:apply(M,F,A),
+    case dl_data:get_code(Dt) of
+	ok ->
+	    NodeName = erlang:atom_to_binary(dl_util:node_name(), utf8),
+	    NewJS = dl_util:new_json_obj(),
+	    ResD = ej:set_p({NodeName, <<"result">>}, 
+			   NewJS, 
+			   dl_data:get_data(Dt)),
+	    ResT = ej:set_p({NodeName, <<"timestamp">>},
+			    ResD,
+			    dl_util:make_ts()),
+	    % TODO: final!
+	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
+	error ->
+	    io:format("fuck~n")
+    end.
+
 update_cmd_doc(DocID, DBHandle, JSON) ->
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
     NewDoc = ej:set({<<"result">>}, Doc, JSON),
     % TODO: this is probably wrong.
-    StampedDoc = ej:set({<<"timestamp">>}, NewDoc, dl_util:make_ts()), 
-    case couchbeam:save_doc(DBHandle, StampedDoc) of
+    case couchbeam:save_doc(DBHandle, NewDoc) of
 	{ok, _} ->
 	    ok;
 	{error, conflict} ->
-	    update_cmd_doc_loop(DBHandle, StampedDoc);
+	    update_cmd_doc_loop(DBHandle, NewDoc);
 	{error, _Other}=Err ->
 	    Err
     end.
