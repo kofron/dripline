@@ -23,7 +23,7 @@
 -type id() :: binary().
 
 -opaque dl_request() :: #dl_request{}.
--export_type([dl_request/0, id/0]).
+-export_type([dl_request/0, id/0, method/0]).
 
 -spec new() -> dl_request().
 new() ->
