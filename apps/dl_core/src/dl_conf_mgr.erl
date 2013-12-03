@@ -66,7 +66,8 @@ mfa_from_request(ParsedRequest) ->
 	    {error, {bad_request, ParsedRequest}};
 	Method ->
 	    Resp = gen_dl_agent:call(?MODULE, {mfa, Method, ParsedRequest}),
-	    mfa_from_request(Method, ParsedRequest)
+	    Resp
+	    %mfa_from_request(Method, ParsedRequest)
     end.
 
 get_read_mfa(ChannelName) ->
@@ -153,7 +154,11 @@ handle_call({info, lg, Ch}, _From, StateData) ->
 handle_call({mfa, Method, Request}, _From, StateData) ->
     Channel = dl_request:get_target(Request),
     Reply = case get_ch_mfa(Channel, Method) of
-		{ok, MFA} ->
+		{ok, {{unix, _, _}, get, A}} ->
+		    {gen_os_cmd, execute, A};
+		{ok, {{prologix, _, _}, F, A}} ->
+		    {gen_prologix, F, A};
+		{ok, {dl_sys, heartbeat, []}=MFA} ->
 		    MFA;
 		{error, _Reason}=E ->
 		    E
@@ -360,6 +365,8 @@ get_bus_data(BsName) ->
     end.
 
 -spec get_ch_mfa(atom(), atom()) -> {ok, term()} | {error, term()}.
+get_ch_mfa(heartbeat, get) ->
+    {ok, {dl_sys, heartbeat, []}};
 get_ch_mfa(ChannelName, Action) ->
     Qc = qlc:q([
 		Ch || Ch <- mnesia:table(dl_ch_data)
@@ -412,7 +419,7 @@ maybe_update_tables(Msg) ->
 	    update_bus_table(Msg);
 	<<"logger">> ->
 	    update_logger_table(Msg);
-	Other ->
+	_AnyOther ->
 	    declare_nonsense(Msg)
     end.
 	
