@@ -43,7 +43,8 @@ handle_cast({process, Command}, State) ->
 	{ok, Request} ->
 	    do_request(Request, State);
 	{error, Reason, BadRequest} ->
-	    do_error_response(BadRequest, Reason, State)
+	    Err = dl_compiler:compiler_error_msg(Reason),
+	    do_error_response(BadRequest, Err, State)
     end,
     {noreply, State}.
 
@@ -56,9 +57,7 @@ terminate(_Reason, _StateData) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-do_request(RequestData, #state{cdb_handle=H}=StateData) ->
-    NewJS = dl_util:new_json_obj(),
-    NodeName = dl_util:node_name(),
+do_request(RequestData, StateData) ->
     case dl_conf_mgr:mfa_from_request(RequestData) of
 	{error, Reason} ->
 	    do_error_response(RequestData, Reason, StateData);
@@ -66,13 +65,13 @@ do_request(RequestData, #state{cdb_handle=H}=StateData) ->
 	    do_collect_data(MFA, RequestData, StateData)
     end,
     StateData.
-do_error_response(RequestData, Error, #state{cdb_handle=H}=StateData) ->
+do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
-    Err = dl_compiler:compiler_error_msg(Error),
+
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
-		   erlang:iolist_to_binary(Err)),
+		   erlang:iolist_to_binary(ErrorMsg)),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
