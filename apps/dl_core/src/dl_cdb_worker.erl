@@ -69,7 +69,6 @@ do_request(RequestData, StateData) ->
 do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
-
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
 		   erlang:iolist_to_binary(ErrorMsg)),
@@ -91,7 +90,8 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}) ->
 	    % TODO: final!
 	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
 	error ->
-	    io:format("fuck~n")
+	    do_error_response(dl_request:get_id(RequestData), H, 
+			      dl_data:get_data(Dt))
     end.
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
