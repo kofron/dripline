@@ -59,8 +59,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 do_request(RequestData, StateData) ->
     case dl_conf_mgr:mfa_from_request(RequestData) of
-	{error, Reason} ->
-	    do_error_response(RequestData, Reason, StateData);
+	{error, no_channel} ->
+	    ErrorMsg = "no such channel", 
+	    do_error_response(RequestData, ErrorMsg, StateData);
 	MFA ->
 	    do_collect_data(MFA, RequestData, StateData)
     end,
