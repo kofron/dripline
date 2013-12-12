@@ -31,7 +31,7 @@ new() ->
 
 -spec set_id(dl_request(), id()) -> dl_request().
 set_id(DLR, ID) ->
-    #dl_request{id=ID}.
+    DLR#dl_request{id=ID}.
 
 -spec get_id(dl_request()) -> id().
 get_id(#dl_request{id=ID}) ->
