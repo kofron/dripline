@@ -210,8 +210,10 @@ channel_is_known(Channel, Cache) ->
     end.
 
 -spec is_valid_channel({integer(), integer()}) -> boolean().
-is_valid_channel(Term) ->
-    true.
+is_valid_channel({M, N}) when is_integer(N) andalso is_integer(M) ->
+    true;
+is_valid_channel(_AnyOther) ->
+    false.
 
 fetch_cached_value(Channel, Cache) ->
     dict:fetch(Channel, Cache).
