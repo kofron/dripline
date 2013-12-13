@@ -554,6 +554,8 @@ update_logger(DtData) ->
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
 -spec is_local_channel(atom()) -> boolean().
+is_local_channel(heartbeat) ->
+    true;
 is_local_channel(ChName) ->
     {ok, Dt} = get_ch_data(ChName),
     is_local_instr(dl_ch_data:get_instr(Dt)).
