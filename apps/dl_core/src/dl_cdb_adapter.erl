@@ -217,50 +217,6 @@ strip_rev_no(BinRev) ->
     N.
 
 %%----------------------------------------------------------------------%%
-%% @doc The worker for this module is responsible for going off and 
-%%      actually fetching a result without blocking the main adapter.  
-%%      When it gets a response, it will update couch with the appropriate
-%%      answer.  
-%%----------------------------------------------------------------------%%
--spec worker(term(),binary(),couchbeam:db()) -> ok.
-worker({system, get, heartbeat}, DocID, DbHandle) ->
-    Result = [{<<"result">>,<<"thump">>},{<<"final">>,<<"thump">>}],
-    update_couch_doc(DbHandle, DocID, Result);
-worker({dl_sys=M, F, A}, DocID, DbHandle) ->
-    Res = dl_data_to_couch(do_dl_sys(M,F,A)),
-    update_couch_doc(DbHandle,DocID,Res);
-worker({M, F, [InstrName,ChLoc|_Rest]=A}, DocID, DbHandle) ->
-    Result = case M of
-		 gen_prologix ->
-		     Res = erlang:apply(M,F,A),
-		     DlDt = dl_data:from_prologix(Res),
-		     ChInfo = dl_conf_mgr:channel_info(InstrName, ChLoc),
-		     ChName = dl_ch_data:get_id(ChInfo),
-		     HookedData = try
-				      dl_hooks:apply_hooks(ChName,DlDt)
-				  catch
-				      C:E ->
-					  lager:info("failed to apply hooks for channel ~p (~p:~p)",
-						     [ChName,C,E]),
-					  DlDt
-				  end,
-		     dl_data_to_couch(HookedData);
-		 gen_os_cmd ->
-		     Res = erlang:apply(M,F,A),
-		     ChInfo = dl_conf_mgr:channel_info(InstrName, ChLoc),
-		     HookedData = try
-				      ChName = dl_ch_data:get_id(ChInfo),
-				      dl_hooks:apply_hooks(ChName,Res)
-				  catch
-				      _C:_E ->
-					  Res
-				  end,
-		     dl_data_to_couch(HookedData)
-	     end,
-    lager:debug("worker will update doc ~p with result ~p",[DocID,Result]),
-    update_couch_doc(DbHandle, DocID, Result).
-
-%%----------------------------------------------------------------------%%
 %% @doc This is a specialized worker for responding to data takers.  It
 %%      takes data *already read* and pushes it up to the data log on 
 %%      the couch database.
