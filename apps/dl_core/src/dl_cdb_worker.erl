@@ -41,7 +41,7 @@ handle_call(_Call, _From, State) ->
 handle_cast({process, Command}, State) ->
     case dl_compiler:compile(Command) of
 	{ok, Request} ->
-	    do_request(Request, State);
+	    do_request_if_local(Request, State);
 	{error, Reason, BadRequest} ->
 	    Err = dl_compiler:compiler_error_msg(Reason),
 	    do_error_response(BadRequest, Err, State)
@@ -56,6 +56,14 @@ terminate(_Reason, _StateData) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+do_request_if_local(RequestData, StateData) ->
+    case dl_conf_mgr:is_local_channel(dl_request:get_target(RequestData)) of
+	true ->
+	    do_request(RequestData, StateData);
+	false ->
+	    ok
+    end.
 
 do_request(RequestData, StateData) ->
     case dl_conf_mgr:mfa_from_request(RequestData) of
