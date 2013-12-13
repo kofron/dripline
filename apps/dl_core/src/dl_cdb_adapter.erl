@@ -238,17 +238,6 @@ worker_dt(Instr,Ch,RawData) ->
     post_dt_couch_doc(CouchDoc).
 
 %%----------------------------------------------------------------------%%
-%% @doc Respond to an erroneous command by posting a response on couchdb.
-%%----------------------------------------------------------------------%%
--spec worker_err({atom(),atom()}, atom(), binary()) -> ok.
-worker_err({error, no_channel}, DocID, Hndl) ->
-    {ok, Doc} = couchbeam:open_doc(Hndl, DocID),
-    Res = [{<<"result">>,<<"error">>},
-	   {<<"final">>,{[{<<"error">>,<<"no_channel">>}]}}],
-    NewDoc = couchbeam_doc:extend(Res,Doc),
-    {ok, _} = couchbeam:save_doc(Hndl, NewDoc).
-
-%%----------------------------------------------------------------------%%
 %% @doc Post a data point to couchdb by creating a new document.
 %%----------------------------------------------------------------------%%
 -spec post_dt_couch_doc(term()) -> ok.
