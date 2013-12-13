@@ -110,40 +110,6 @@ handle_info({change, R, ChangeData}, #state{cmd_ch_ref=R, revs=Revs, db_cmd_hndl
 		       spawn_cmd_worker(ChangeData),
 		       State#state{revs=update_rev_data(ChangeData,Revs)}
 	       end,    
-    %% case dl_compiler:compile(ChangeData) of
-    %% 	   {ok, Request} ->
-    %% 	       % spawn worker to update document with trite string
-    
-    %% 	       {error, _Reason}=Err ->
-						% spawn worker to update document with error
-    
-    %% 	       {ok, BFA} = dl_compiler:compile(ChangeData),
-    %% 	       MFA = case BFA of
-    %% 			 {{prologix, _, _}, F, A} ->
-    %% 			     {gen_prologix, F, A};
-    %% 			 {{unix, _, _}, read, A} ->
-    %% 			     {gen_os_cmd, execute, A};
-    %% 			 {system, get, heartbeat} ->
-    %% 			     BFA;
-    %% 			 Other ->
-    %% 			     Other
-    %% 		     end,
-    %% 	       case node_is_endpoint(BFA) of
-    %% 		   true ->
-    %% 		       ID = props:get('doc._id',ChangeData),
-    %% 		       spawn(fun() -> 
-    %% 				     worker(MFA,ID,H) 
-    %% 			     end);
-    %% 		   false ->
-    %% 		       lager:debug("recvd cmd for another node.");
-    %% 		   {error, _Reason}=Err ->
-    %% 		       spawn(fun() ->
-    %% 				     ID = props:get('doc._id',ChangeData),
-    %% 				     worker_err(Err,ID,H)
-    %% 			     end)
-    %% 	       end,
-    %% 	       State#state{revs=update_rev_data(ChangeData,Revs)}
-    %% end,
     {noreply, NewState}.
 
 handle_call(_Call, _From, StateData) ->
