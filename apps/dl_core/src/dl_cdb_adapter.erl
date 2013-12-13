@@ -102,7 +102,7 @@ handle_info({change, R, ChangeData}, #state{conf_ch_ref=R, revs=_Revs}=State) ->
     dl_softbus:bcast(agents, ?MODULE, ChangeData),
     {noreply, State};
 %% The second kind of changes come from the command stream.
-handle_info({change, R, ChangeData}, #state{cmd_ch_ref=R, revs=Revs, db_cmd_hndl=H}=State) ->
+handle_info({change, R, ChangeData}, #state{cmd_ch_ref=R, revs=Revs}=State) ->
     NewState = case ignore_update_rev(ChangeData, Revs) of
 		   true ->
 		       State;
