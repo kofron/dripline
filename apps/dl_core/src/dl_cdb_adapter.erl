@@ -88,11 +88,11 @@ handle_sb_msg({_Ref, _AnyID, _Msg}, #state{}=State) ->
     {noreply, State}.
 
 %% When our streams go down, recuisitate them
-handle_info({change, R, {done, _LastSeq}}, 
+handle_info({R, {done, _LastSeq}}, 
 	    #state{cmd_ch_ref=R,db_cmd_hndl=H}=State) ->
     {ok, CmdRef} = setup_cmd_streaming(H),
     {noreply, State#state{cmd_ch_ref=CmdRef}};
-handle_info({change, R, {done, _LastSeq}}, 
+handle_info({R, {done, _LastSeq}}, 
 	    #state{conf_ch_ref=R,db_cnf_hndl=H}=State) ->
     {ok, ConfRef} = setup_conf_streaming(H),
     {noreply, State#state{conf_ch_ref=ConfRef}};
