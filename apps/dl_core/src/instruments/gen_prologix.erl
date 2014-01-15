@@ -86,7 +86,7 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
 						      E#ep_st.gpib_addr,
 						      ToSend),
-			 {PR, NewNewSD} = case M:do_parse(R, NewSD) of
+			 {PR, NewNewSD} = case M:handle_parse(R, NewSD) of
 					      {ok, Parsed, StateData} ->
 						  {Parsed, StateData};
 					      {error, Reason, StateData} ->
