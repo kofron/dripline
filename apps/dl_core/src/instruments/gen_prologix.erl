@@ -10,7 +10,7 @@
 -export([init/1,start_link/4]).
 -export([handle_call/3,handle_cast/2,terminate/2,code_change/3,handle_info/2]).
 
--export([read/2,write/3]).
+-export([get/2,set/3]).
 
 -record(ep_st,{ep_id, gpib_addr}).
 -record(pro_st,{mod, mod_sd, ep_d}).
@@ -31,10 +31,10 @@ behaviour_info(_) ->
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
-read(Instrument, Channel) ->
+get(Instrument, Channel) ->
     gen_server:call(Instrument, {r, Instrument, Channel}).
 
-write(Instrument, Channel, NewValue) ->
+set(Instrument, Channel, NewValue) ->
     gen_server:call(Instrument, {w, Instrument, Channel, NewValue}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
