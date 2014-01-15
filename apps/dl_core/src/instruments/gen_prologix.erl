@@ -22,8 +22,8 @@ behaviour_info(callbacks) ->
     [
      {init,1},
      {start_link,3},
-     {do_read,2},
-     {do_write,3}
+     {handle_get,2},
+     {handle_set,3}
     ];
 behaviour_info(_) ->
     undefined.
@@ -74,7 +74,7 @@ init([CallbackMod,_ID,EProID,GPIBAddr]=Args) ->
     end.
 
 handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
-    {Rp,NMSDt} = case M:do_read(Ch,MS) of
+    {Rp,NMSDt} = case M:handle_get(Ch,MS) of
 		     {data, D, NewSD} ->
 			 {D, NewSD};
 		     {send, ToSend, NewSD} ->
@@ -101,7 +101,7 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 			 R = evaluate_action_list(ActList, E#ep_st.ep_id,
 						  E#ep_st.gpib_addr),
 			 {ok, NewNewSD} = M:parse_instrument_reply(R, NewSDP),
-			 case M:do_read(Ch, NewNewSD) of
+			 case M:handle_get(Ch, NewNewSD) of
 			     {data, D, SDPPP} ->
 				 {D, SDPPP};
 			     _Other ->
@@ -113,7 +113,7 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     NewState = St#pro_st{mod_sd = NMSDt},
     {reply, Rp, NewState};
 handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
-    {Rp, NMSDt} = case M:do_write(Ch,V,MS) of
+    {Rp, NMSDt} = case M:handle_set(Ch,V,MS) of
 		    {data, D, NewSD} ->
 			{D, NewSD};
 		    {send, ToSend, NewSD} ->
