@@ -76,7 +76,8 @@ init([CallbackMod,_ID,EProID,GPIBAddr]=Args) ->
 handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     {Rp,NMSDt} = case M:handle_get(Ch,MS) of
 		     {data, D, NewSD} ->
-			 {D, NewSD};
+			 Reply = make_success_response(D),
+			 {Reply, NewSD};
 		     {send, ToSend, NewSD} ->
 			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
 						     E#ep_st.gpib_addr,
@@ -94,7 +95,8 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 					  end,
 			 {{PR, dl_util:make_ts()}, NewNewSD};
 		     {error, Reason, NewSD} ->
-			{{error, Reason}, NewSD};
+			 Reply = make_error_response(Reason),
+			 {Reply, NewSD};
 		     {update_cache, NewSD} ->
 			 {ok, ToSend, NewSDP} = M:do_update_cache(NewSD),
 			 ActList = generate_action_list(ToSend),
@@ -144,6 +146,21 @@ code_change(_OldVsn, State, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TODO: term() is extremely unsatisfying here.
+-spec make_success_response(term()) -> dl_data:dl_data().
+make_success_response({Data, Timestamp}) ->
+    Dt = dl_data:new(),
+    Dt1 = dl_data:set_data(Dt, Data),
+    Dt2 = dl_data:set_ts(Dt, Timestamp),
+    dl_data:set_code(Dt2, ok).
+-spec make_error_response(term()) -> dl_data:dl_data().
+make_error_response(Error) ->
+    Dt = dl_data:new(),
+    Dt1 = dl_data:set_data(Dt, Error),
+    Dt2 = dl_data:set_ts(Dt, dl_util:make_ts()),
+    dl_data:set_code(Dt2, error).
+
 -spec generate_action_list([term()]) -> [fun()].
 generate_action_list([]) ->
     [];
