@@ -13,7 +13,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 -export([parse_instrument_reply/2, do_update_cache/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -42,7 +42,7 @@ init(_Args) ->
 			 new_ch=false},
     {ok, setup_cmds([]), InitialState}.
 
-do_read(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
+handle_get(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
     Dt = timer:now_diff(erlang:now(), L)/1000000, % Dt in seconds
     DecodedCh = raw_ch_to_spec(Ch),
     Branch = case channel_is_known(DecodedCh, C) of
@@ -71,7 +71,7 @@ do_read(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
 	     end,
     Branch.
 
-do_write(_Ch, _Value, _StateData) ->
+handle_set(_Ch, _Value, _StateData) ->
     {error, unimplemented}.
 
 do_update_cache(#state{cache=C,new_ch=true}=StateData) ->

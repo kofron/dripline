@@ -8,7 +8,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -30,32 +30,32 @@ init(_Args) ->
 	InitialState = #state{},
 	{ok, InitialState}.
 
-do_read(cw_freq, StateData) ->
+handle_get(cw_freq, StateData) ->
     {send, <<"OPCW">>, StateData};
-do_read(power_level, StateData) ->
+handle_get(power_level, StateData) ->
     {send, <<"OPPL">>, StateData};
-do_read(sweep_start_freq, StateData) ->
+handle_get(sweep_start_freq, StateData) ->
     {send, <<"OPFA">>, StateData};
-do_read(sweep_stop_freq, StateData) ->
+handle_get(sweep_stop_freq, StateData) ->
     {send, <<"OPFB">>, StateData};
-do_read(sweep_time, StateData) ->
+handle_get(sweep_time, StateData) ->
     {send, <<"OPST">>, StateData};
-do_read(AnyOther, StateData) ->
+handle_get(AnyOther, StateData) ->
     {error, {unknown_channel, AnyOther}, StateData}.
 
-do_write(cw_freq, <<"disable">>, StateData) ->
+handle_set(cw_freq, <<"disable">>, StateData) ->
     {send, [<<"RF0">>], StateData};
-do_write(cw_freq, <<"enable">>, StateData) ->
+handle_set(cw_freq, <<"enable">>, StateData) ->
     {send, [<<"RF1">>], StateData};
-do_write(cw_freq, NewValue, StateData) ->
+handle_set(cw_freq, NewValue, StateData) ->
     {send, [<<"CW">>, NewValue, <<"MZ">>], StateData};
-do_write(power_level, NewValue, StateData) ->
+handle_set(power_level, NewValue, StateData) ->
     {send, [<<"PL">>, NewValue, <<"DB">>], StateData};
-do_write(sweep_start_freq, NewValue, StateData) ->
+handle_set(sweep_start_freq, NewValue, StateData) ->
     {send, [<<"FA">>, NewValue, <<"MZ">>], StateData};
-do_write(sweep_stop_freq, NewValue, StateData) ->
+handle_set(sweep_stop_freq, NewValue, StateData) ->
     {send, [<<"FB">>, NewValue, <<"MZ">>], StateData};
-do_write(sweep_time, NewValue, StateData) ->
+handle_set(sweep_time, NewValue, StateData) ->
     {send, [<<"ST">>, NewValue, <<"MS">>], StateData};
-do_write(AnyOther, _NewValue, StateData) ->
+handle_set(AnyOther, _NewValue, StateData) ->
     {error, {unknown_channel, AnyOther}, StateData}.

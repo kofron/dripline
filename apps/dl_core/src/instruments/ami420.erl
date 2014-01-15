@@ -9,7 +9,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -31,18 +31,18 @@ init(_Args) ->
 	InitialState = #state{},
 	{ok, InitialState}.
 
-do_read(supply_current, StateData) ->
+handle_get(supply_current, StateData) ->
     {send, <<"CURR:MAG?">>, StateData};
-do_read(supply_voltage, StateData) ->
+handle_get(supply_voltage, StateData) ->
     {send, <<"VOLT:SUPP?">>, StateData};
-do_read(coil_constant, StateData) ->
+handle_get(coil_constant, StateData) ->
     {send, <<"COIL?">>, StateData};
-do_read(magnetic_field, StateData) ->
+handle_get(magnetic_field, StateData) ->
     {send, <<"FIELD:MAG?">>, StateData};
-do_read(ramp_state, StateData) ->
+handle_get(ramp_state, StateData) ->
     {send, <<"STATE?">>, StateData};
-do_read(persistent_switch, StateData) ->
+handle_get(persistent_switch, StateData) ->
     {send, <<"PSwitch?">>, StateData}.
 
-do_write(_AnyChannel, _NewValue, StateData) ->
+handle_set(_AnyChannel, _NewValue, StateData) ->
     {error, {unsupported_method, write}, StateData}.

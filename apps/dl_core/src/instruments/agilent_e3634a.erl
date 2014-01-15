@@ -7,7 +7,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -29,12 +29,12 @@ init(_Args) ->
     InitialState = #state{},
     {ok, InitialState}.
 
-do_read('25V', StateData) ->
+handle_get('25V', StateData) ->
     {send, <<"APPL?">>, StateData};
-do_read('50V', StateData) ->
+handle_get('50V', StateData) ->
     {send, <<"APPL?">>, StateData}.
 
-do_write('25V', NewValue, StateData) ->
+handle_set('25V', NewValue, StateData) ->
     Branch = case unpack_value(NewValue) of
 		 {ok, <<"ON">>} ->
 		     ToSend = ["VOLT:RANG P25V;:","OUTP:STAT ON"],
@@ -49,7 +49,7 @@ do_write('25V', NewValue, StateData) ->
 		     {error, Reason, StateData}
 	     end,
     Branch;
-do_write('50V', NewValue, StateData) ->
+handle_set('50V', NewValue, StateData) ->
     Branch = case unpack_value(NewValue) of
 		 {ok, <<"ON">>} ->
 		     ToSend = ["VOLT:RANG P50V;:","OUTP:STAT ON"],
