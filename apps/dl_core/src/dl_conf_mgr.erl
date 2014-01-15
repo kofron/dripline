@@ -67,7 +67,6 @@ mfa_from_request(ParsedRequest) ->
 	Method ->
 	    Resp = gen_dl_agent:call(?MODULE, {mfa, Method, ParsedRequest}),
 	    Resp
-	    %mfa_from_request(Method, ParsedRequest)
     end.
 
 get_read_mfa(ChannelName) ->
@@ -153,11 +152,16 @@ handle_call({info, lg, Ch}, _From, StateData) ->
     {reply, Reply, StateData};
 handle_call({mfa, Method, Request}, _From, StateData) ->
     Channel = dl_request:get_target(Request),
+    Value = dl_request:get_value(Request),
     Reply = case get_ch_mfa(Channel, Method) of
 		{ok, {{unix, _, _}, get, A}} ->
 		    {gen_os_cmd, execute, A};
-		{ok, {{prologix, _, _}, F, A}} ->
-		    {gen_prologix, F, A};
+		{ok, {{prologix, _, _}, get, A}} ->
+		    {gen_prologix, get, A};
+		{ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
+		    {gen_prologix, set, A ++ Value};
+		{ok, {{prologix, _, _}, set, A}} ->
+		    {gen_prologix, set, A ++ [Value]};
 		{ok, {dl_sys, heartbeat, []}=MFA} ->
 		    MFA;
 		{error, _Reason}=E ->
