@@ -88,21 +88,21 @@ handle_sb_msg({_Ref, _AnyID, _Msg}, #state{}=State) ->
     {noreply, State}.
 
 %% When our streams go down, recuisitate them
-handle_info({change, R, {done, _LastSeq}}, 
+handle_info({R, {done, _LastSeq}}, 
 	    #state{cmd_ch_ref=R,db_cmd_hndl=H}=State) ->
     {ok, CmdRef} = setup_cmd_streaming(H),
     {noreply, State#state{cmd_ch_ref=CmdRef}};
-handle_info({change, R, {done, _LastSeq}}, 
+handle_info({R, {done, _LastSeq}}, 
 	    #state{conf_ch_ref=R,db_cnf_hndl=H}=State) ->
     {ok, ConfRef} = setup_conf_streaming(H),
     {noreply, State#state{conf_ch_ref=ConfRef}};
 %% We get two kinds of changes.  The first kind comes from the 
 %% configuration stream:
-handle_info({change, R, ChangeData}, #state{conf_ch_ref=R, revs=_Revs}=State) ->
+handle_info({R, {change, ChangeData}}, #state{conf_ch_ref=R, revs=_Revs}=State) ->
     dl_softbus:bcast(agents, ?MODULE, ChangeData),
     {noreply, State};
 %% The second kind of changes come from the command stream.
-handle_info({change, R, ChangeData}, #state{cmd_ch_ref=R, revs=Revs}=State) ->
+handle_info({R, {change, ChangeData}}, #state{cmd_ch_ref=R, revs=Revs}=State) ->
     NewState = case ignore_update_rev(ChangeData, Revs) of
 		   true ->
 		       State;
@@ -139,8 +139,8 @@ terminate(_Reason, _StateData) ->
 -spec setup_conf_streaming(couchbeam:db()) -> ok | {error, term()}.
 setup_conf_streaming(DbHandle) ->
     StreamOpts = [continuous, include_docs, {since, 0}],
-    case couchbeam_changes:stream(DbHandle, self(), StreamOpts) of
-	{ok, StartRef, _ChPid} ->
+    case couchbeam_changes:follow(DbHandle, StreamOpts) of
+	{ok, StartRef} ->
 	    {ok, StartRef};
 	{error, _Error}=E ->
 	    E
@@ -158,8 +158,8 @@ setup_cmd_streaming(DbHandle) ->
     {ok,Info} = couchbeam:db_info(DbHandle),
     LastSeq = props:get('update_seq',Info),
     StreamOpts = [continuous, include_docs, {since, LastSeq}],
-    case couchbeam_changes:stream(DbHandle, self(), StreamOpts) of
-	{ok, StartRef, _ChPid} ->
+    case couchbeam_changes:follow(DbHandle, StreamOpts) of
+	{ok, StartRef} ->
 	    {ok, StartRef};
 	{error, _Error}=E ->
 	    E
