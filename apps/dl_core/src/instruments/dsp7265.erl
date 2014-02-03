@@ -59,7 +59,10 @@ handle_set(data_curves, Value, State) ->
     CurveStr = erlang:integer_to_list(data_output(Value)),
     {send, [<<"CBD ">>, CurveStr], State};
 handle_set(take_data_register, _, State) ->
-    {send, [<<"TD">>], State}.
+    {send, [<<"TD">>], State};
+handle_set(raw_write, Value, State) ->
+    {send, Value, State}.
+
 
 handle_parse(Data, State) ->
     {ok, parse_twos_complement(Data), State}.
