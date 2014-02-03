@@ -117,14 +117,17 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     {Rp, NMSDt} = case M:handle_set(Ch,V,MS) of
 		    {data, D, NewSD} ->
-			{D, NewSD};
+			  Reply = make_success_response(D),
+			  {Reply, NewSD};
 		    {send, ToSend, NewSD} ->
 			R = eprologix_cmdr:send(E#ep_st.ep_id,
 						E#ep_st.gpib_addr,
 						ToSend),
-			 {{R, dl_util:make_ts()}, NewSD};
+			  Reply = make_success_response(R),
+			  {Reply, NewSD};
 		    {error, Reason, NewSD} ->
-			{{error, Reason}, NewSD};
+			  Reply = make_error_response(D),
+			  {Reply, NewSD};
 		    {stop, _NewSD}=Die ->
 			Die
 		  end,
