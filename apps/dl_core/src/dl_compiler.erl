@@ -129,7 +129,7 @@ verb0(JS, [{Verb, Value}|R]) ->
     
 -spec regex_for(atom()) -> {string(), string()}.
 regex_for(channel) ->
-    {"^[a-z_]+$","channel names consist of a-z & _."};
+    {"^[a-z_0-9]+$","channel names consist of a-z & _."};
 regex_for(verb) ->
     {"set|get|run|syscmd","valid verbs are set, get, run, and syscmd."};
 regex_for(value) ->
