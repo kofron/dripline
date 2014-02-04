@@ -125,10 +125,10 @@ handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 			R = eprologix_cmdr:send(E#ep_st.ep_id,
 						E#ep_st.gpib_addr,
 						ToSend),
-
-			  {make_success_response(Reply), NewSD};
+			  
+			  {make_success_response(R), NewSD};
 		      {error, Reason, NewSD} ->
-			  {make_error_response(R), NewSD};
+			  {make_error_response(Reason), NewSD};
 		      {error, Reason, NewSD} ->
 			  {make_error_response(Reason), NewSD};
 		      {stop, _NewSD}=Die ->
