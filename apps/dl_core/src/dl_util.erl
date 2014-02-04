@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Timestamp functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
--export([make_ts/0, node_name/0]).
+-export([make_ts/0, node_name/0, new_json_obj/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Data munging functions %%%
@@ -63,3 +63,10 @@ binary_to_integer(Binary) ->
 node_name() ->
     [_, N] = binary:split(erlang:atom_to_binary(node(),latin1),<<"@">>),
     binary_to_atom(N, latin1).
+
+%%---------------------------------------------------------------------%%
+%% @doc new_json_obj returns a new empty json object.
+%%---------------------------------------------------------------------%%
+-spec new_json_obj() -> ejson:json_object().
+new_json_obj() ->
+    {[]}.

@@ -8,7 +8,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -30,10 +30,10 @@ init(_Args) ->
     InitialState = #state{},
     {ok, InitialState}.
 
-do_read(_AnyChannel, StateData) ->
+handle_get(_AnyChannel, StateData) ->
     {error, {unsupported_method, read}, StateData}.
 
-do_write(power_level, NewValue, StateData) ->
+handle_set(power_level, NewValue, StateData) ->
     {send, [<<"AP">>,NewValue,<<"DM">>], StateData};
-do_write(cw_freq, NewValue, StateData) ->
+handle_set(cw_freq, NewValue, StateData) ->
     {send, [<<"FR">>,NewValue,<<"MZ">>], StateData}.

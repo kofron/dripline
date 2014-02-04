@@ -10,7 +10,7 @@
 -export([init/1,start_link/4]).
 -export([handle_call/3,handle_cast/2,terminate/2,code_change/3,handle_info/2]).
 
--export([read/2,write/3]).
+-export([get/2,set/3]).
 
 -record(ep_st,{ep_id, gpib_addr}).
 -record(pro_st,{mod, mod_sd, ep_d}).
@@ -22,8 +22,8 @@ behaviour_info(callbacks) ->
     [
      {init,1},
      {start_link,3},
-     {do_read,2},
-     {do_write,3}
+     {handle_get,2},
+     {handle_set,3}
     ];
 behaviour_info(_) ->
     undefined.
@@ -31,10 +31,10 @@ behaviour_info(_) ->
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
-read(Instrument, Channel) ->
+get(Instrument, Channel) ->
     gen_server:call(Instrument, {r, Instrument, Channel}).
 
-write(Instrument, Channel, NewValue) ->
+set(Instrument, Channel, NewValue) ->
     gen_server:call(Instrument, {w, Instrument, Channel, NewValue}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,36 +74,45 @@ init([CallbackMod,_ID,EProID,GPIBAddr]=Args) ->
     end.
 
 handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
-    {Rp,NMSDt} = case M:do_read(Ch,MS) of
+    {Rp,NMSDt} = case M:handle_get(Ch,MS) of
 		     {data, D, NewSD} ->
-			 {D, NewSD};
+			 Reply = make_success_response(D),
+			 {Reply, NewSD};
 		     {send, ToSend, NewSD} ->
 			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
 						     E#ep_st.gpib_addr,
 						     ToSend),
-			 {{R, dl_util:make_ts()}, NewSD};
+			 Reply = make_success_response(R),
+			 {Reply, NewSD};
 		     {send_then_parse, ToSend, NewSD} ->
 			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
 						      E#ep_st.gpib_addr,
 						      ToSend),
-			 {PR, NewNewSD} = case M:do_parse(R, NewSD) of
-					      {ok, Parsed, StateData} ->
-						  {Parsed, StateData};
-					      {error, Reason, StateData} ->
-						  {{error, Reason}, StateData}
-					  end,
-			 {{PR, dl_util:make_ts()}, NewNewSD};
+			 case R of
+			     {error, Reason} ->
+				 {make_error_response(Reason), NewSD};
+			     _AnyOther ->
+				 {PR, NewNewSD} = case M:handle_parse(R, NewSD) of
+						      {ok, Parsed, StateData} ->
+							  {Parsed, StateData};
+						      {error, Reason, StateData} ->
+							  {{error, Reason}, StateData}
+						  end,
+				 {make_success_response(PR), NewNewSD}
+			 end;
 		     {error, Reason, NewSD} ->
-			{{error, Reason}, NewSD};
+			 Reply = make_error_response(Reason),
+			 {Reply, NewSD};
 		     {update_cache, NewSD} ->
 			 {ok, ToSend, NewSDP} = M:do_update_cache(NewSD),
 			 ActList = generate_action_list(ToSend),
 			 R = evaluate_action_list(ActList, E#ep_st.ep_id,
 						  E#ep_st.gpib_addr),
 			 {ok, NewNewSD} = M:parse_instrument_reply(R, NewSDP),
-			 case M:do_read(Ch, NewNewSD) of
+			 case M:handle_get(Ch, NewNewSD) of
 			     {data, D, SDPPP} ->
-				 {D, SDPPP};
+				 Reply = make_success_response(D),
+				 {Reply, SDPPP};
 			     _Other ->
 				 {{error, max_cmd_depth_exceeded}, NewNewSD}
 			 end;
@@ -113,18 +122,22 @@ handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     NewState = St#pro_st{mod_sd = NMSDt},
     {reply, Rp, NewState};
 handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
-    {Rp, NMSDt} = case M:do_write(Ch,V,MS) of
+    {Rp, NMSDt} = case M:handle_set(Ch,V,MS) of
 		    {data, D, NewSD} ->
-			{D, NewSD};
+			  Reply = make_success_response(D),
+      {Reply, NewSD};
 		    {send, ToSend, NewSD} ->
 			R = eprologix_cmdr:send(E#ep_st.ep_id,
 						E#ep_st.gpib_addr,
 						ToSend),
-			 {{R, dl_util:make_ts()}, NewSD};
-		    {error, Reason, NewSD} ->
-			{{error, Reason}, NewSD};
-		    {stop, _NewSD}=Die ->
-			Die
+			  
+			  {make_success_response(R), NewSD};
+		      {error, Reason, NewSD} ->
+			  {make_error_response(Reason), NewSD};
+		      {error, Reason, NewSD} ->
+			  {make_error_response(Reason), NewSD};
+		      {stop, _NewSD}=Die ->
+			  Die
 		  end,
     NewState = St#pro_st{mod_sd = NMSDt},
     {reply, Rp, NewState}.
@@ -144,6 +157,22 @@ code_change(_OldVsn, State, _Extra) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TODO: term() is extremely unsatisfying here.  In addition, we should make
+% provisions for instruments which provide their own timestamp...
+-spec make_success_response(term()) -> dl_data:dl_data().
+make_success_response(Data) ->
+    Dt = dl_data:new(),
+    Dt1 = dl_data:set_data(Dt, Data),
+    Dt2 = dl_data:set_ts(Dt1, dl_util:make_ts()),
+    dl_data:set_code(Dt2, ok).
+-spec make_error_response(term()) -> dl_data:dl_data().
+make_error_response(Error) ->
+    Dt = dl_data:new(),
+    Dt1 = dl_data:set_data(Dt, Error),
+    Dt2 = dl_data:set_ts(Dt1, dl_util:make_ts()),
+    dl_data:set_code(Dt2, error).
+
 -spec generate_action_list([term()]) -> [fun()].
 generate_action_list([]) ->
     [];

@@ -69,9 +69,22 @@ init([]) ->
       [dl_cdb_adapter]
      },
 
+    CdbWorkerSup = {
+      dl_cdb_worker_sup,
+      {
+	dl_cdb_worker_sup,
+	start_link,
+	[]
+      },
+      permanent,
+      5000,
+      supervisor,
+      [dl_cdb_worker_sup]
+     },
+
     Children = [EproSup, DlInstrSup, 
 		Compiler, ConfMgr,
-		CdbAdapter, SysMgr, 
+		CdbAdapter, CdbWorkerSup, SysMgr, 
 		DTSup],
 
     {ok, { {one_for_one, 5, 10}, Children} }.

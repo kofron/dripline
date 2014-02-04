@@ -28,6 +28,7 @@
 -export([local_buses/0,bus_info/1]).
 -export([logger_info/1,local_loggers/0,running_loggers/0]).
 
+-export([mfa_from_request/1]).
 -export([get_read_mfa/1]).
 -export([get_write_mfa/1]).
 
@@ -57,6 +58,16 @@ instrument_info(In) ->
 
 bus_info(Bs) ->
     gen_dl_agent:call(?MODULE, {info, bs, Bs}).
+
+-spec mfa_from_request(dl_request:dl_request()) -> mfa() | {error, term()}.
+mfa_from_request(ParsedRequest) ->
+    case dl_request:get_method(ParsedRequest) of
+	none ->
+	    {error, {bad_request, ParsedRequest}};
+	Method ->
+	    Resp = gen_dl_agent:call(?MODULE, {mfa, Method, ParsedRequest}),
+	    Resp
+    end.
 
 get_read_mfa(ChannelName) ->
     gen_dl_agent:call(?MODULE, {mfa, read, ch, ChannelName}).
@@ -139,23 +150,24 @@ handle_call({info, lg, Ch}, _From, StateData) ->
 		    E
 	    end,
     {reply, Reply, StateData};
-handle_call({mfa, read, ch, ChName}, _From, StateData) ->
-    Reply = case get_ch_mfa(ChName, read) of
-		{ok, MFA} ->
-		    MFA;
-		{error, _Reason}=E ->
-		    E
-	    end,
-    {reply, Reply, StateData};
-handle_call({mfa, write, ch, ChName}, _From, StateData) ->
-    Reply = case get_ch_mfa(ChName, write) of
-		{ok, MFA} ->
+handle_call({mfa, Method, Request}, _From, StateData) ->
+    Channel = dl_request:get_target(Request),
+    Value = dl_request:get_value(Request),
+    Reply = case get_ch_mfa(Channel, Method) of
+		{ok, {{unix, _, _}, get, A}} ->
+		    {gen_os_cmd, execute, A};
+		{ok, {{prologix, _, _}, get, A}} ->
+		    {gen_prologix, get, A};
+		{ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
+		    {gen_prologix, set, A ++ Value};
+		{ok, {{prologix, _, _}, set, A}} ->
+		    {gen_prologix, set, A ++ [Value]};
+		{ok, {dl_sys, heartbeat, []}=MFA} ->
 		    MFA;
 		{error, _Reason}=E ->
 		    E
 	    end,
     {reply, Reply, StateData}.
-
 
 handle_cast(_Cast, StateData) ->
     {noreply, StateData}.
@@ -357,6 +369,8 @@ get_bus_data(BsName) ->
     end.
 
 -spec get_ch_mfa(atom(), atom()) -> {ok, term()} | {error, term()}.
+get_ch_mfa(heartbeat, get) ->
+    {ok, {dl_sys, heartbeat, []}};
 get_ch_mfa(ChannelName, Action) ->
     Qc = qlc:q([
 		Ch || Ch <- mnesia:table(dl_ch_data)
@@ -409,7 +423,7 @@ maybe_update_tables(Msg) ->
 	    update_bus_table(Msg);
 	<<"logger">> ->
 	    update_logger_table(Msg);
-	Other ->
+	_AnyOther ->
 	    declare_nonsense(Msg)
     end.
 	
@@ -544,6 +558,8 @@ update_logger(DtData) ->
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
 -spec is_local_channel(atom()) -> boolean().
+is_local_channel(heartbeat) ->
+    true;
 is_local_channel(ChName) ->
     {ok, Dt} = get_ch_data(ChName),
     is_local_instr(dl_ch_data:get_instr(Dt)).

@@ -1,7 +1,7 @@
 -module(dsp7265).
 -behavior(gen_prologix).
 
--export([do_read/2,do_write/3, do_parse/2]).
+-export([handle_get/2,handle_set/3, handle_parse/2]).
 -export([init/1, start_link/3]).
 -ifdef(TEST).
 -export([data_output/1]).
@@ -16,59 +16,62 @@ init(_Args) ->
     InitialState = #state{},
     {ok, InitialState}.
 
-do_read(x, State) ->
+handle_get(x, State) ->
     {send, <<"X.">>, State};
-do_read(y, State) ->
+handle_get(y, State) ->
     {send, <<"Y.">>, State};
-do_read(mag, State) ->
+handle_get(mag, State) ->
     {send, <<"MAG.">>, State};
-do_read(phase, State) ->
+handle_get(phase, State) ->
     {send, <<"PHA.">>, State};
-do_read(xy, State) ->
+handle_get(xy, State) ->
     {send, <<"XY.">>, State};
-do_read(magphase, State) ->
+handle_get(magphase, State) ->
     {send, <<"MP.">>, State};
-do_read(data_status, State) ->
+handle_get(data_status, State) ->
     {send, <<"M">>, State};
-do_read('curve.x', State) ->
+handle_get('curve.x', State) ->
     DataBit = data_output(x_out),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
-do_read('curve.y', State) ->
+handle_get('curve.y', State) ->
     DataBit = data_output(y_out),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
-do_read('curve.adc1', State) ->
+handle_get('curve.adc1', State) ->
     DataBit = data_output(adc1),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
-do_read('curve.adc2', State) ->
+handle_get('curve.adc2', State) ->
     DataBit = data_output(adc2),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
-do_read('curve.adc3', State) ->
+handle_get('curve.adc3', State) ->
     DataBit = data_output(adc3),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State}.
 
 
-do_write(sensitivity, Value, State) ->
+handle_set(sensitivity, Value, State) ->
     {send, [<<"SEN ">>, Value], State};
-do_write(gain, Value, State) ->
+handle_set(gain, Value, State) ->
     {send, [<<"ACGAIN ">>, Value], State};
-do_write(osc_amplitude, Value, State) ->
+handle_set(osc_amplitude, Value, State) ->
     {send, [<<"OA. ">>, Value], State};
-do_write(osc_freq, Value, State) ->
+handle_set(osc_freq, Value, State) ->
     {send, [<<"OF. ">>, Value], State};
-do_write(data_curves, Value, State) ->
+handle_set(data_curves, Value, State) ->
     CurveStr = erlang:integer_to_list(data_output(Value)),
     {send, [<<"CBD ">>, CurveStr], State};
-do_write(take_data_register, _, State) ->
-    {send, [<<"TD">>], State}.
+handle_set(take_data_register, _, State) ->
+    {send, [<<"TD">>], State};
+handle_set(raw_write, Value, State) ->
+    {send, Value, State}.
 
-do_parse(Data, State) ->
+
+handle_parse(Data, State) ->
     {ok, parse_twos_complement(Data), State}.
 
 parse_twos_complement(Bin) ->
     parse_twos_complement_acc(Bin, []).
 parse_twos_complement_acc(<<>>, Acc) ->
     lists:reverse(Acc);
-parse_twos_complement_acc(<<Value:2/binary,Rest/binary>>=Bin,Acc) ->
+parse_twos_complement_acc(<<Value:2/binary,Rest/binary>>,Acc) ->
     DecodedInt = case is_positive(Value) of 
         true ->
             binary_to_16bit(Value);

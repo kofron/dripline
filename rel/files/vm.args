@@ -1,5 +1,5 @@
 ## Name of the node
--name dripline@127.0.0.1
+-name dripline@hilbert.local
 
 ## Cookie for distributed erlang
 -setcookie dripline

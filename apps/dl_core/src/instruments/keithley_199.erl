@@ -7,7 +7,7 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([do_read/2, do_write/3]).
+-export([handle_get/2, handle_set/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% gen_server api and callbacks %%%
@@ -29,8 +29,8 @@ init(_Args) ->
 	InitialState = #state{},
 	{ok, InitialState}.
 
-do_read(dmm_input, StateData) ->
+handle_get(dmm_input, StateData) ->
     {send, <<"R3T5X">>, StateData}.
 
-do_write(_AnyChannel, _NewValue, StateData) ->
+handle_set(_AnyChannel, _NewValue, StateData) ->
     {error, {unsupported_method, write}, StateData}.

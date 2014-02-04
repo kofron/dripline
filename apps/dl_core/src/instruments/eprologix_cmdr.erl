@@ -85,7 +85,7 @@ handle_call(#req{}=R, F, #state{q=Q,waiting=true}=SD) ->
 
 handle_cast(_Msg, State) ->
   {noreply, State}.
-handle_info(tcp_timeout, #state{c=#req{sndr=F},sock=S,q=[]}=SD) ->
+handle_info(tcp_timeout, #state{c=#req{sndr=F},sock=_S,q=[]}=SD) ->
     gen_server:reply(F,{error, tcp_timeout}),
     {noreply, SD#state{waiting=false}};
 handle_info({tcp,S,D}, #state{c=#req{sndr=F},sock=S,q=[]}=SD) ->
