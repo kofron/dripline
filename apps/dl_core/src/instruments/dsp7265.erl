@@ -36,6 +36,9 @@ handle_get('curve.x', State) ->
 handle_get('curve.y', State) ->
     DataBit = data_output_table(y_out),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
+handle_get('curve.mag', State) ->
+    DataBit = data_output_table(mag_out),
+    {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
 handle_get('curve.adc1', State) ->
     DataBit = data_output_table(adc1),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
