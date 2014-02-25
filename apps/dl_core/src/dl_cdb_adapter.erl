@@ -96,6 +96,9 @@ handle_info({R, {done, _LastSeq}},
 	    #state{conf_ch_ref=R,db_cnf_hndl=H}=State) ->
     {ok, ConfRef} = setup_conf_streaming(H),
     {noreply, State#state{conf_ch_ref=ConfRef}};
+%% When we receive {last_seq, N} messages, ignore them.
+handle_info({R, {change, {[{<<"last_seq">>, _}]}}}, StateData) ->
+    {noreply, StateData};
 %% We get two kinds of changes.  The first kind comes from the 
 %% configuration stream:
 handle_info({R, {change, ChangeData}}, #state{conf_ch_ref=R, revs=_Revs}=State) ->
