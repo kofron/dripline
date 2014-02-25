@@ -31,19 +31,22 @@ handle_get(magphase, State) ->
 handle_get(data_status, State) ->
     {send, <<"M">>, State};
 handle_get('curve.x', State) ->
-    DataBit = data_output(x_out),
+    DataBit = data_output_table(x_out),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
 handle_get('curve.y', State) ->
-    DataBit = data_output(y_out),
+    DataBit = data_output_table(y_out),
+    {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
+handle_get('curve.mag', State) ->
+    DataBit = data_output_table(mag_out),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
 handle_get('curve.adc1', State) ->
-    DataBit = data_output(adc1),
+    DataBit = data_output_table(adc1),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
 handle_get('curve.adc2', State) ->
-    DataBit = data_output(adc2),
+    DataBit = data_output_table(adc2),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State};
 handle_get('curve.adc3', State) ->
-    DataBit = data_output(adc3),
+    DataBit = data_output_table(adc3),
     {send_then_parse, [<<"DCB ">>,erlang:integer_to_list(DataBit)], State}.
 
 
@@ -71,13 +74,7 @@ parse_twos_complement(Bin) ->
     parse_twos_complement_acc(Bin, []).
 parse_twos_complement_acc(<<>>, Acc) ->
     lists:reverse(Acc);
-parse_twos_complement_acc(<<Value:2/binary,Rest/binary>>,Acc) ->
-    DecodedInt = case is_positive(Value) of 
-        true ->
-            binary_to_16bit(Value);
-        false ->
-            decode_negative_value(Value)
-        end,
+parse_twos_complement_acc(<<DecodedInt:16/integer,Rest/binary>>,Acc) ->
     parse_twos_complement_acc(Rest,[DecodedInt|Acc]).
 
 is_positive(<<0:1,_Rest/binary>>) ->
@@ -144,21 +141,21 @@ data_output_table(ref_bits_16t32) ->
 
 data_output_test() ->
     BitsDef = [{x_out, 1}, 
-	      {y_out, 2},
-	      {mag_out, 4},
-	      {phase, 8},
-	      {sensitivity, 16},
-	      {adc1, 32},
-	      {adc2, 64},
-	      {adc3, 128},
-	      {dac1, 256},
-	      {dac2, 512},
-	      {noise, 1024},
-	      {ratio, 2048},
-	      {log_ratio, 4096},
-	      {event, 8192},
-	      {ref_bits_0t15,16384},
-	      {ref_bits_16t32,32768}],
+	       {y_out, 2},
+	       {mag_out, 4},
+	       {phase, 8},
+	       {sensitivity, 16},
+	       {adc1, 32},
+	       {adc2, 64},
+	       {adc3, 128},
+	       {dac1, 256},
+	       {dac2, 512},
+	       {noise, 1024},
+	       {ratio, 2048},
+	       {log_ratio, 4096},
+	       {event, 8192},
+	       {ref_bits_0t15,16384},
+	       {ref_bits_16t32,32768}],
     BitsMap = lists:map(fun({B,D}) ->
 				{data_output(B),D}
 			end,
