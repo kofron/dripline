@@ -167,6 +167,8 @@ make_success_response(Data) ->
     Dt2 = dl_data:set_ts(Dt1, dl_util:make_ts()),
     dl_data:set_code(Dt2, ok).
 -spec make_error_response(term()) -> dl_data:dl_data().
+make_error_response(Error) when is_atom(Error) ->
+    make_error_response(erlang:atom_to_binary(Error, utf8));
 make_error_response(Error) ->
     Dt = dl_data:new(),
     Dt1 = dl_data:set_data(Dt, Error),

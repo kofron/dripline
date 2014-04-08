@@ -83,7 +83,7 @@ do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
-do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}) ->
+do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     Dt = erlang:apply(M,F,A),
     case dl_data:get_code(Dt) of
 	ok ->
@@ -98,8 +98,9 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}) ->
 	    % TODO: final!
 	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
 	error ->
-	    do_error_response(dl_request:get_id(RequestData), H, 
-			      dl_data:get_data(Dt))
+	    do_error_response(RequestData, 
+			      dl_data:get_data(Dt),
+			     StateData)
     end.
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
