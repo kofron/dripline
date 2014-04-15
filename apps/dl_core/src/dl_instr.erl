@@ -15,7 +15,7 @@ start_bus(BsData) ->
 		   prologix ->
 		       generate_prologix_cspec(BsData);
 		   prologix_gpib2ethernet ->
-		       generate_prologix_cspec2(BSData);
+		       generate_prologix_cspec2(BsData);
 		   unix ->
 		       generate_unix_os_cspec(BsData)
 	       end,
@@ -50,6 +50,8 @@ generate_instr_cspec(InData) ->
     Name = dl_instr_data:get_id(InData),
     Mod  = dl_instr_data:get_model(InData),
     Args = case dl_instr_data:get_bus(InData) of
+	       {prologix_gpib2ethernet, BusProc, BusAddr} ->
+		   [Name, BusAddr, prologix_gpib2ethernet, BusProc];
 	       {prologix, BusProc, BusAddr} ->
 		   [Name, BusProc, BusAddr];
 	       {unix, _BusProc, _BusAddr} ->
@@ -116,7 +118,8 @@ generate_unix_os_cspec(_BsData) ->
     {none,{none,none,none},none,none,none,[unix]}.
 
 -spec start_bus_from_spec(supervisor:child_spec()) -> ok | {error, term()}.
-start_bus_from_spec({_N,{_,_,_},_Tm,_Tmo,_Role,[eprologix_cmdr]}=Ch) ->
+start_bus_from_spec({_N,{_,_,_},_Tm,_Tmo,_Role,[M]}=Ch) 
+  when M =:= eprologix_cmdr; M =:= prologix_gpib2ethernet ->
     case supervisor:start_child(eprologix_sup, Ch) of
 	{ok, _} ->
 	    ok;
