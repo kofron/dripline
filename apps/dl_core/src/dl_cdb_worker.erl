@@ -118,10 +118,12 @@ update_cmd_doc(DocID, DBHandle, JSON) ->
     % TODO: this is probably wrong.
     case couchbeam:save_doc(DBHandle, NewDoc) of
 	{ok, _} ->
+        lager:warning("cmd updated"),
 	    ok;
 	{error, conflict} ->
 	    update_cmd_doc_loop(DBHandle, NewDoc);
 	{error, _Other}=Err ->
+        lager:error("Doc update error"),
 	    Err
     end.
 
