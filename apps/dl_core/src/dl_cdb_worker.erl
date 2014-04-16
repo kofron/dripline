@@ -60,10 +60,9 @@ code_change(_OldVsn, State, _Extra) ->
 do_request_if_exists(RequestData, StateData) ->
     case dl_conf_mgr:is_real_channel(dl_request:get_target(RequestData)) of
     true ->
-        lager:info("channel is real"),
         do_request_if_local(RequestData, StateData);
     false ->
-        lager:info("channel unknown"),
+        lager:warning("channel unknown"),
 	    do_error_response(RequestData, "unrecognized_channel", StateData),
         ok
     end.
