@@ -561,8 +561,15 @@ update_logger(DtData) ->
 is_local_channel(heartbeat) ->
     true;
 is_local_channel(ChName) ->
-    {ok, Dt} = get_ch_data(ChName),
-    is_local_instr(dl_ch_data:get_instr(Dt)).
+    {Exists, Dt} = get_ch_data(ChName),
+    case Exists of
+        ok ->
+            is_local_instr(dl_ch_data:get_instr(Dt));
+        _ ->
+            lager:warning("Channel '~p' unrecognized",[ChName]),
+            lager:error("This should have been tested earlier"),
+            false
+    end.
 
 -spec is_local_instr(atom()) -> boolean().
 is_local_instr(InstrName) ->
