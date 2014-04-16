@@ -557,6 +557,17 @@ update_logger(DtData) ->
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
+-spec is_real_channel(atom()) -> boolean().
+is_real_channel(heartbeat) ->
+    true;
+is_real_channel(ChName) ->
+    case get_ch_data(ChName) of
+        {ok, _} ->
+            true;
+        {_, _} ->
+            false
+    end.
+
 -spec is_local_channel(atom()) -> boolean().
 is_local_channel(heartbeat) ->
     true;
