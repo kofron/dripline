@@ -112,13 +112,11 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     end.
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
-    lager:info("just so you know, i got here"),
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
     NewDoc = ej:set({<<"result">>}, Doc, JSON),
     % TODO: this is probably wrong.
     case couchbeam:save_doc(DBHandle, NewDoc) of
 	{ok, _} ->
-        lager:info("cmd updated"),
 	    ok;
 	{error, conflict} ->
 	    update_cmd_doc_loop(DBHandle, NewDoc);
