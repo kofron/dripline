@@ -123,11 +123,13 @@ init([InstrMod, _InstrName, _InstrAddr, _BusMod, _BusName]=Args) ->
     case InstrMod:init([]) of
 	{ok, InstrState} ->
 	    normal_init(Args, InstrState);
+	{ok, ToSend, InitialState} ->
+	    normal_send_init(Args, ToSend, InitialState);
 	AnyOther ->
 	    AnyOther
     end.
 normal_init([InstrMod, InstrName, InstrAddr, BusMod, BusName], InstrState) ->
-    ok = setup_sre_registers(BusMod, BusName, InstrMod, InstrAddr),
+    ok = setup_status_registers(BusMod, BusName, InstrMod, InstrAddr),
     {ok, 
      polling, 
      #state{
@@ -141,12 +143,23 @@ normal_init([InstrMod, InstrName, InstrAddr, BusMod, BusName], InstrState) ->
 	instr_addr=InstrAddr
        },
      0}.
-setup_sre_registers(BusMod, BusName, InstrMod, InstrAddr) ->
+normal_send_init([_InstrMod, _InstrName, InstrAddr, BusMod, BusName]=Args,
+		 ToSend,
+		 InitialState) ->
+    ok = BusMod:send(BusName, InstrAddr, ToSend),
+    normal_init(Args, InitialState).
+    
+setup_status_registers(BusMod, BusName, InstrMod, InstrAddr) ->
     SREMask = InstrMod:sre_register_bitmask(none),    
     ok = BusMod:send(BusName, 
 		     InstrAddr,
 		     [<<"*sre ">>, erlang:integer_to_binary(SREMask)]),
+    ESEMask = InstrMod:ese_register_bitmask(none),
+    ok = BusMod:send(BusName,
+		     InstrAddr,
+		     [<<"*ese ">>, erlang:integer_to_binary(ESEMask)]),
     ok.
+
 
 %%--------------------------------------------------------------------
 %% @private
