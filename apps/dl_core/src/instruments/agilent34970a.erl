@@ -19,7 +19,9 @@
 %%%%%%%%%%%
 %%% API %%%
 %%%%%%%%%%%
--export([handle_get/2, handle_set/3]).
+-export([handle_get/2, handle_set/3,
+	 handle_esr/2, handle_stb/2,
+	 sre_register_bitmask/1, ese_register_bitmask/1]).
 -export([parse_instrument_reply/2, do_update_cache/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
