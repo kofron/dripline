@@ -87,7 +87,7 @@ do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
 		   erlang:iolist_to_binary(Err)),
-    lager:debug("Response is now: ~p", [Res]),
+    lager:warning("Response is now: ~p", [Res]),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
