@@ -8,7 +8,13 @@
 %%      we utilize the scanning feature of the instrument in order
 %%      to keep errors to a minimum.
 -module(agilent34970a).
--behavior(gen_prologix).
+-behavior(gen_gpib_spoller).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% defs for status byte system %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-define(srq_asserted(X), ((X bsr 6) band 1) == 1).
+-define(mav_asserted(X), ((X bsr 4) band 1) == 1).
 
 %%%%%%%%%%%
 %%% API %%%
@@ -33,7 +39,7 @@
 %%% gen_server api and callbacks definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(InstrumentID,EProID,GPIBAddress) ->
-    gen_prologix:start_link(?MODULE, InstrumentID, EProID, GPIBAddress).
+    gen_gpib_spoller:start_link(?MODULE, InstrumentID, EProID, GPIBAddress).
 
 init(_Args) ->
     InitialState = #state{ttl=3,
@@ -41,6 +47,39 @@ init(_Args) ->
 			 cache=dict:new(),
 			 new_ch=false},
     {ok, setup_cmds([]), InitialState}.
+
+sre_register_bitmask(_) ->
+    176.
+ese_register_bitmask(_) ->
+    61.
+
+%% 
+%% If there is a message available, that is the highest priority. 
+%% Otherwise, we retrieve errors or clear the status byte as necessary.
+%%
+handle_stb(StatusByte, StateData) when ?srq_asserted(StatusByte) ->
+    case StatusByte of
+	_MsgAvail when ?mav_asserted(StatusByte) ->
+	    {retrieve_data, StateData};
+	Err when Err =:= 224; Err =:= 144; Err =:= 192; Err =:= 208 ->
+	    {retrieve_error, <<"err?">>, StateData};
+	ESR when ESR =:= 96; ESR =:= 112 ->
+	    {fetch_esr, <<"*esr?">>, StateData}
+    end;
+handle_stb(StatusByte, StateData) ->
+    case StatusByte of
+	Err when Err =:= 160; Err =:= 80; Err =:= 128; Err =:= 144 ->
+	    {retrieve_error, <<"err?">>, StateData};
+	ESR when ESR =:= 32; ESR =:= 48 ->
+	    {fetch_esr, <<"*esr?">>, StateData};
+	_MsgAvail when ?mav_asserted(StatusByte) ->
+	    {retrieve_data, StateData}
+    end.
+
+handle_esr(1, StateData) ->
+    {op_complete, StateData};
+handle_esr(Err, StateData) when Err =:= 8; Err =:= 33; Err =:= 9; Err =:= 32 ->
+    {retrieve_error, <<"syst:err?">>, StateData}.
 
 handle_get(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
     Dt = timer:now_diff(erlang:now(), L)/1000000, % Dt in seconds
