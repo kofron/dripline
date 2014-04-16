@@ -105,6 +105,7 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
 	    % TODO: final!
 	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
 	error ->
+        lager:debug("Data Collection Error"),
 	    do_error_response(RequestData, 
 			      dl_data:get_data(Dt),
 			     StateData)
