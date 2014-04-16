@@ -77,9 +77,14 @@ do_request(RequestData, StateData) ->
 do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
+    dbg:p(self(), m),
+    Err = case is_tuple(ErrorMsg) of
+      true -> io_lib:format("~p", [ErrorMsg]);
+      false -> ErrorMsg
+    end,
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
-		   erlang:iolist_to_binary(ErrorMsg)),
+		   erlang:iolist_to_binary(Err)),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
