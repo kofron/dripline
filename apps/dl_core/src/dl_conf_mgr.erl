@@ -23,7 +23,7 @@
 %%%%%%%%%%%%%%%%%%%%%
 %%% API Functions %%%
 %%%%%%%%%%%%%%%%%%%%%
--export([channel_info/1,channel_info/2,is_local_channel/1]).
+-export([channel_info/1,channel_info/2,is_real_channel/1,is_local_channel/1]).
 -export([instrument_info/1]).
 -export([local_buses/0,bus_info/1]).
 -export([logger_info/1,local_loggers/0,running_loggers/0]).
