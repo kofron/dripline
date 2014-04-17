@@ -23,7 +23,7 @@
 %%%%%%%%%%%%%%%%%%%%%
 %%% API Functions %%%
 %%%%%%%%%%%%%%%%%%%%%
--export([channel_info/1,channel_info/2,is_local_channel/1]).
+-export([channel_info/1,channel_info/2,is_real_channel/1,is_local_channel/1]).
 -export([instrument_info/1]).
 -export([local_buses/0,bus_info/1]).
 -export([logger_info/1,local_loggers/0,running_loggers/0]).
@@ -557,12 +557,30 @@ update_logger(DtData) ->
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
+-spec is_real_channel(atom()) -> boolean().
+is_real_channel(heartbeat) ->
+    true;
+is_real_channel(ChName) ->
+    case get_ch_data(ChName) of
+        {ok, _} ->
+            true;
+        {_, _} ->
+            false
+    end.
+
 -spec is_local_channel(atom()) -> boolean().
 is_local_channel(heartbeat) ->
     true;
 is_local_channel(ChName) ->
-    {ok, Dt} = get_ch_data(ChName),
-    is_local_instr(dl_ch_data:get_instr(Dt)).
+    {Exists, Dt} = get_ch_data(ChName),
+    case Exists of
+        ok ->
+            is_local_instr(dl_ch_data:get_instr(Dt));
+        _ ->
+            lager:warning("Channel '~p' unrecognized",[ChName]),
+            lager:error("This should have been tested earlier"),
+            false
+    end.
 
 -spec is_local_instr(atom()) -> boolean().
 is_local_instr(InstrName) ->
