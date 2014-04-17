@@ -161,7 +161,12 @@ handle_call({mfa, Method, Request}, _From, StateData) ->
 		{ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
 		    {gen_prologix, set, A ++ Value};
 		{ok, {{prologix, _, _}, set, A}} ->
-		    {gen_prologix, set, A ++ [Value]};
+		    {gen_prologix, set, A ++ [Value]}
+;		{ok, {{prologix_gpib2ethernet, _, _}, get, A}} ->
+		    %% this is a hack.  how to handle this...
+		    {gen_gpib_spoller, get, A};
+		{ok, {{prologix_gpib2ethernet, _, _}, set, A}} ->
+		    {gen_gpib_spoller, set, A ++ [Value]};
 		{ok, {dl_sys, heartbeat, []}=MFA} ->
 		    MFA;
 		{error, _Reason}=E ->
