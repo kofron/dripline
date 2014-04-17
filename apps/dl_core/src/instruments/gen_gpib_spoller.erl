@@ -20,6 +20,8 @@
 
 %% API
 -export([start_link/5,
+	 get/2,
+	 set/3,
 	 send_sync/2]).
 
 %% gen_fsm callbacks
@@ -60,7 +62,8 @@ behaviour_info(callbacks) ->
      {sre_register_bitmask,1},
      {ese_register_bitmask,1},
      {handle_stb, 2},
-     {handle_esr, 2}];
+     {handle_esr, 2},
+     {handle_get, 2}];
 behaviour_info(_) ->
     undefined.
 
@@ -101,6 +104,32 @@ start_link(InstrMod, InstrName, InstrAddr, BusMod, BusName) ->
 send_sync(InstrName, Data) ->
     gen_fsm:sync_send_all_state_event(InstrName,
 				      {send, Data}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% get is called when data is to be retrieved from an instrument.
+%% 
+%% @spec get(atom(), atom()) -> {ok, dl_data:dl_data()} | {error, term()}.
+%% @end
+%%--------------------------------------------------------------------
+-spec get(atom(), atom()) -> dl_data:dl_data().
+get(InstrumentName, ChannelName) ->
+    gen_fsm:sync_send_all_state_event(InstrumentName,
+				      {get, ChannelName}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% set is called when data is to be sent to an instrument and asserted
+%% on some channel.
+%% 
+%% @spec set(atom(), atom(), term()) -> 
+%%   {ok, dl_data:dl_data()} | {error, term()}.
+%% @end
+%%--------------------------------------------------------------------
+-spec set(atom(), atom(), term()) -> dl_data:dl_data().
+set(InstrumentName, ChannelName, Value) ->
+    gen_fsm:sync_send_all_state_event(InstrumentName,
+				      {set, ChannelName, Value}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -271,15 +300,50 @@ handle_sync_event({send, Dt}, Fr,
 		    end,
     NewQueue = Q ++ [Req],
     ok = M:send(S,Addr,ToSend),
-    {next_state, State, SD#state{req_queue=NewQueue}, ?IMMEDIATE}.
+    {next_state, State, SD#state{req_queue=NewQueue}, ?IMMEDIATE};
+handle_sync_event({get, Ch}, Fr, StateName, 
+		  #state{
+		     instr_mod=I,
+		     instr_state=St
+		    }=SD) ->
+    case I:handle_get(Ch, St) of
+	{send, ToSend, NewStateData} ->
+	    handle_sync_event({send, ToSend}, 
+			      Fr, 
+			      StateName, 
+			      SD#state{instr_state=NewStateData});
+	{error, Reason, NewStateData} ->
+	    Reply = make_error_response(Reason),
+	    gen_fsm:reply(Fr, Reply),
+	    {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
+    end;
+handle_sync_event({set, Ch, Val}, Fr, StateName,
+		  #state{
+		     instr_mod=I,
+		     instr_state=St
+		    }=SD) ->
+    case I:handle_set(Ch, Val, St) of
+	{send, ToSend, NewStateData} ->
+	    handle_sync_event({send, ToSend},
+			      Fr,
+			      StateName,
+			      SD#state{instr_state=NewStateData});
+	{error, Reason, NewStateData} ->
+	    Reply = make_error_response(Reason),
+	    gen_fsm:reply(Fr, Reply),
+	    {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
+    end.
 
-is_query(Bin) ->
+is_query(Bin) when is_binary(Bin) ->
     case binary:match(Bin, <<$?>>) of
 	nomatch ->
 	    false;
 	_AnyOther ->
 	    true
-    end.
+    end;
+is_query(BinList) when is_list(BinList) ->
+    is_query(lists:last(BinList)).
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -358,11 +422,11 @@ handle_info({gpib, B, Data},
 		   req_status=Status}=SD) ->
     Reply = case Type of
 		stmt when Status =:= error ->
-		    {Status, Data};
+		    make_error_response(Data);
 		stmt when Status =:= ok ->
-		    Status;
+		    make_success_response(ok);
 		qry ->
-		    {Status, Data}
+		    make_response(Status,Data)
 	    end,
     gen_fsm:reply(From, Reply),
     {next_state, 
@@ -442,3 +506,17 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+make_response(error, Data) ->
+    make_error_response(Data);
+make_response(ok, Data) ->
+    make_success_response(Data).
+make_error_response(Data) ->
+    D = dl_data:new(),
+    D1 = dl_data:set_data(D, Data),
+    D2 = dl_data:set_ts(D1, dl_util:make_ts()),
+    dl_data:set_code(D2,error).
+make_success_response(Data) ->
+    D = dl_data:new(),
+    D1 = dl_data:set_data(D, Data),
+    D2 = dl_data:set_ts(D1, dl_util:make_ts()),
+    dl_data:set_code(D2, ok).

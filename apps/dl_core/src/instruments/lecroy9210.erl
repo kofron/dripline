@@ -13,6 +13,8 @@
 	 init/1,
 	 handle_stb/2,
 	 handle_esr/2,
+	 handle_get/2,
+	 handle_set/3,
 	 sre_register_bitmask/1,
 	 ese_register_bitmask/1]).
 
@@ -31,6 +33,11 @@ init([]) ->
 
 start_link(InstrName, GPIBAddress, BusMod, BusName) ->
     gen_gpib_spoller:start_link(?MODULE, InstrName, GPIBAddress, BusMod, BusName).
+
+handle_get(ch_a_amplitude, StateData) ->
+    {send, <<"a:amp?">>, StateData}.
+handle_set(ch_a_amplitude, Value, StateData) ->
+    {send, [<<"a:amp ">>, Value], StateData}.
 
 %% 
 %% If there is a message available, that is the highest priority. 
