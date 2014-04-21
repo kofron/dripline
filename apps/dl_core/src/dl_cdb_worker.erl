@@ -126,8 +126,16 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     end.
 
 try_finalize_data(Data, Request) ->
-    ChannelName = dl_request:get_target(Request),
-    dl_hooks:apply_hooks(ChannelName, Data).
+    ChName = dl_request:get_target(Request),
+    try
+	dl_hooks:apply_hooks(ChName,Data)
+    catch
+	C:E ->
+	    lager:info("failed to apply hooks for channel ~p (~p:~p)",
+		       [ChName,C,E]),
+	    Data
+    end.
+
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
