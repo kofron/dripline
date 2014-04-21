@@ -102,24 +102,32 @@ do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
 
 do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     Dt = erlang:apply(M,F,A),
-    case dl_data:get_code(Dt) of
+    Final = try_finalize_data(Dt, RequestData),
+    case dl_data:get_code(Final) of
 	ok ->
 	    NodeName = erlang:atom_to_binary(dl_util:node_name(), utf8),
 	    NewJS = dl_util:new_json_obj(),
 	    ResD = ej:set_p({NodeName, <<"result">>}, 
 			   NewJS, 
-			   dl_data:get_data(Dt)),
+			   dl_data:get_data(Final)),
 	    ResT = ej:set_p({NodeName, <<"timestamp">>},
 			    ResD,
 			    dl_util:make_ts()),
-	    % TODO: final!
-	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
+	    ResF = ej:set_p({NodeName, <<"final">>},
+			    ResT,
+			    dl_data:get_final(Final)),
+	    
+	    update_cmd_doc(dl_request:get_id(RequestData), H, ResF);
 	error ->
         lager:debug("Data Collection Error"),
 	    do_error_response(RequestData, 
-			      dl_data:get_data(Dt),
+			      dl_data:get_data(Final),
 			     StateData)
     end.
+
+try_finalize_data(Data, Request) ->
+    ChannelName = dl_request:get_target(Request),
+    dl_hooks:apply_hooks(ChannelName, Data).
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
