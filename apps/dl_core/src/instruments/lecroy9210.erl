@@ -35,9 +35,32 @@ start_link(InstrName, GPIBAddress, BusMod, BusName) ->
     gen_gpib_spoller:start_link(?MODULE, InstrName, GPIBAddress, BusMod, BusName).
 
 handle_get(ch_a_amplitude, StateData) ->
-    {send, <<"a:amp?">>, StateData}.
+    {send, <<"a:amp?">>, StateData};
+handle_get(pulse_width, StateData) ->
+    {send, <<"a:wid?">>, StateData};
+handle_get(trigger_mode, StateData) ->
+    {send, <<"trmd?">>, StateData};
+handle_get(ch_a_output_enabled, StateData) ->
+    {send, <<"a:out?">>, StateData};
+handle_get(ch_a_output_bar_enabled, StateData) ->
+    {send, <<"a:outbar?">>, StateData};
+handle_get(ch_a_period, StateData) ->
+    {send, <<"a:per?">>, StateData}.
+
 handle_set(ch_a_amplitude, Value, StateData) ->
-    {send, [<<"a:amp ">>, Value], StateData}.
+    {send, [<<"a:amp ">>, Value], StateData};
+handle_set(pulse_width, Value, StateData) ->
+    {send, [<<"a:wid ">>, Value], StateData};
+%%% Valid settings: NORMAL, SINGLE, GATE, BURST, E_WID
+handle_set(trigger_mode, Value, StateData) ->
+    {send, [<<"trmd ">>, Value], StateData};
+handle_set(ch_a_output_enabled, Value, StateData) ->
+    {send, [<<"a:out ">>, Value], StateData};
+handle_set(ch_a_output_bar_enabled, Value, StateData) ->
+    {send, [<<"a:outbar ">>, Value], StateData};
+handle_set(ch_a_period, Value, StateData) ->
+    {send, [<<"a:per ">>, Value], StateData}.
+
 
 %% 
 %% If there is a message available, that is the highest priority. 
