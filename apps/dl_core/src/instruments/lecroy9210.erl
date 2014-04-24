@@ -45,7 +45,9 @@ handle_get(ch_a_output_enabled, StateData) ->
 handle_get(ch_a_output_bar_enabled, StateData) ->
     {send, <<"a:outbar?">>, StateData};
 handle_get(ch_a_period, StateData) ->
-    {send, <<"a:per?">>, StateData}.
+    {send, <<"a:per?">>, StateData};
+handle_get(ch_a_trigger, StateData) ->
+    {error, {unsupported_method, {ch_a_trigger, read}}, StateData}.
 
 handle_set(ch_a_amplitude, Value, StateData) ->
     {send, [<<"a:amp ">>, Value], StateData};
@@ -59,8 +61,9 @@ handle_set(ch_a_output_enabled, Value, StateData) ->
 handle_set(ch_a_output_bar_enabled, Value, StateData) ->
     {send, [<<"a:outbar ">>, Value], StateData};
 handle_set(ch_a_period, Value, StateData) ->
-    {send, [<<"a:per ">>, Value], StateData}.
-
+    {send, [<<"a:per ">>, Value], StateData};
+handle_set(ch_a_trigger, _Value, StateData) ->
+    {send, <<"*TRG">>, StateData}.
 
 %% 
 %% If there is a message available, that is the highest priority. 
