@@ -31,6 +31,7 @@ init(_Args) ->
     {ok, InitialState}.
 
 handle_get(_AnyChannel, StateData) ->
+    lager:warning("The hp8657b does not support get",[]),
     {error, {unsupported_method, read}, StateData}.
 
 handle_set(power_level, NewValue, StateData) ->

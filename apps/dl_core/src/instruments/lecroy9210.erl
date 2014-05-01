@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 10 Feb 2014 by Jared Kofron <jared.kofron@gmail.com>
 %%%-------------------------------------------------------------------
--module(agilent_e3631a).
+-module(lecroy9210).
 -behavior(gen_gpib_spoller).
 
 -export([start_link/4,
@@ -16,8 +16,7 @@
 	 handle_get/2,
 	 handle_set/3,
 	 sre_register_bitmask/1,
-	 ese_register_bitmask/1
-	]).
+	 ese_register_bitmask/1]).
 
 -record(state, {}).
 
@@ -27,7 +26,7 @@
 sre_register_bitmask(_) ->
     176.
 ese_register_bitmask(_) ->
-    61.
+    1.
 
 init([]) ->
     {ok, #state{}}.
@@ -35,11 +34,36 @@ init([]) ->
 start_link(InstrName, GPIBAddress, BusMod, BusName) ->
     gen_gpib_spoller:start_link(?MODULE, InstrName, GPIBAddress, BusMod, BusName).
 
-handle_get(Any, StateData) ->
-    {stop, unimplemented, StateData}.
+handle_get(ch_a_amplitude, StateData) ->
+    {send, <<"a:amp?">>, StateData};
+handle_get(pulse_width, StateData) ->
+    {send, <<"a:wid?">>, StateData};
+handle_get(trigger_mode, StateData) ->
+    {send, <<"trmd?">>, StateData};
+handle_get(ch_a_output_enabled, StateData) ->
+    {send, <<"a:out?">>, StateData};
+handle_get(ch_a_output_bar_enabled, StateData) ->
+    {send, <<"a:outbar?">>, StateData};
+handle_get(ch_a_period, StateData) ->
+    {send, <<"a:per?">>, StateData};
+handle_get(ch_a_trigger, StateData) ->
+    {error, {unsupported_method, {ch_a_trigger, read}}, StateData}.
 
-handle_set(Any, Value, StateData) ->
-    {stop, unimplemented, StateData}.
+handle_set(ch_a_amplitude, Value, StateData) ->
+    {send, [<<"a:amp ">>, Value], StateData};
+handle_set(pulse_width, Value, StateData) ->
+    {send, [<<"a:wid ">>, Value], StateData};
+%%% Valid settings: NORMAL, SINGLE, GATE, BURST, E_WID
+handle_set(trigger_mode, Value, StateData) ->
+    {send, [<<"trmd ">>, Value], StateData};
+handle_set(ch_a_output_enabled, Value, StateData) ->
+    {send, [<<"a:out ">>, Value], StateData};
+handle_set(ch_a_output_bar_enabled, Value, StateData) ->
+    {send, [<<"a:outbar ">>, Value], StateData};
+handle_set(ch_a_period, Value, StateData) ->
+    {send, [<<"a:per ">>, Value], StateData};
+handle_set(ch_a_trigger, _Value, StateData) ->
+    {send, <<"*TRG">>, StateData}.
 
 %% 
 %% If there is a message available, that is the highest priority. 
@@ -52,19 +76,20 @@ handle_stb(StatusByte, StateData) when ?srq_asserted(StatusByte) ->
 	Err when Err =:= 224; Err =:= 144; Err =:= 192; Err =:= 208 ->
 	    {retrieve_error, <<"err?">>, StateData};
 	ESR when ESR =:= 96; ESR =:= 112 ->
-	    {fetch_esr, <<"*esr?">>, StateData}
+	    {clear_esr, <<"*esr?">>, StateData}
     end;
 handle_stb(StatusByte, StateData) ->
     case StatusByte of
 	Err when Err =:= 160; Err =:= 80; Err =:= 128; Err =:= 144 ->
 	    {retrieve_error, <<"err?">>, StateData};
 	ESR when ESR =:= 32; ESR =:= 48 ->
-	    {fetch_esr, <<"*esr?">>, StateData};
+	    {clear_esr, <<"*esr?">>, StateData};
 	_MsgAvail when ?mav_asserted(StatusByte) ->
 	    {retrieve_data, StateData}
     end.
 
 handle_esr(1, StateData) ->
-    {op_complete, StateData};
-handle_esr(Err, StateData) when Err =:= 8; Err =:= 33; Err =:= 9; Err =:= 32 ->
-    {retrieve_error, <<"syst:err?">>, StateData}.
+    {op_complete, StateData}.
+	
+	
+

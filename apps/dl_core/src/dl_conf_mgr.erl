@@ -4,7 +4,7 @@
 -module(dl_conf_mgr).
 -behavior(gen_dl_agent).
 
--record(state,{id}).
+-record(state,{id,conf}).
 
 -export([start_link/2,
 	 init/1,
@@ -23,7 +23,8 @@
 %%%%%%%%%%%%%%%%%%%%%
 %%% API Functions %%%
 %%%%%%%%%%%%%%%%%%%%%
--export([channel_info/1,channel_info/2,is_local_channel/1]).
+-export([couch_info/0]).
+-export([channel_info/1,channel_info/2,is_real_channel/1,is_local_channel/1]).
 -export([instrument_info/1]).
 -export([local_buses/0,bus_info/1]).
 -export([logger_info/1,local_loggers/0,running_loggers/0]).
@@ -35,6 +36,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API Definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
+couch_info() ->
+    gen_dl_agent:call(?MODULE, couch_info).
+
 local_loggers() ->
     gen_dl_agent:call(?MODULE, local_lgs).
 
@@ -80,7 +84,8 @@ start_link(?MODULE, _Args) ->
 
 init([ID|_T]) ->
     ok = create_mnesia_tables(),
-    {ok, #state{id=ID}}.
+    ConfDict = init_node_config(),
+    {ok, #state{id=ID, conf=ConfDict}}.
 
 %% Handle messages coming from the couchdb adapter.  These are going
 %% to be mostly configuration changes, as that's what the adapter likes
@@ -103,6 +108,10 @@ handle_info({'DOWN', _MRef, process, Obj, _Info}, #state{}=SD) when is_pid(Obj) 
     LgInfo = get_lg_by_pid(Obj),
     record_logger_pid(dl_dt_data:get_channel(LgInfo),undefined),
     {noreply, SD}.
+
+handle_call(couch_info, _From, #state{conf=C}=StateData) ->
+    Reply = {_Host, _Port} = {dict:fetch(couch_host, C), dict:fetch(couch_port, C)},
+    {reply, Reply, StateData};
 
 handle_call(local_lgs, _From, StateData) ->
     {reply, local_lgs(), StateData};
@@ -162,6 +171,11 @@ handle_call({mfa, Method, Request}, _From, StateData) ->
 		    {gen_prologix, set, A ++ Value};
 		{ok, {{prologix, _, _}, set, A}} ->
 		    {gen_prologix, set, A ++ [Value]};
+		{ok, {{prologix_gpib2ethernet, _, _}, get, A}} ->
+		    %% this is a hack.  how to handle this...
+		    {gen_gpib_spoller, get, A};
+		{ok, {{prologix_gpib2ethernet, _, _}, set, A}} ->
+		    {gen_gpib_spoller, set, A ++ [Value]};
 		{ok, {dl_sys, heartbeat, []}=MFA} ->
 		    MFA;
 		{error, _Reason}=E ->
@@ -187,6 +201,45 @@ create_mnesia_tables() ->
     ok = create_instr_data_table(),
     ok = create_bus_data_table(),
     ok = create_dt_data_table().
+
+-spec init_node_config() -> dict().
+init_node_config() ->
+    %% new configuration
+    Conf0 = dict:new(),
+
+    %% first we use the environment to get values for configuration.
+    {ok, {Host, Port}} = application:get_env(dl_core, couch_host),
+    Conf1 = dict:store(couch_host, Host, Conf0),
+    Conf2 = dict:store(couch_port, Port, Conf1),
+    
+    %% look for a config file.  if it can be loaded, use the values
+    %% to set our configuration dictionary up.
+    ConfN = case init:get_argument(extra_config) of
+		error ->
+		    Conf2;
+		{ok, [[FName]]} ->
+		    {ok, C} = process_config_file(FName, Conf2),
+		    C
+	    end,
+    ConfN.
+
+-spec process_config_file(string(), dict()) -> dict().
+process_config_file(FName, InitConf) ->
+    case file:consult(FName) of
+	{error, _Reason}=Err ->
+	    lager:error("the config file: ~p couldn't be loaded! (~p)~n",[FName,Err]),
+	    Err;
+	{ok, ConfigData} ->
+	    {ok, update_config_dict(InitConf, ConfigData)}
+    end.
+
+-spec update_config_dict(dict(), [proplists:property()]) -> dict().
+update_config_dict(InitialConf, Props) ->				
+    lists:foldl(fun({K,V}, Acc) ->
+			dict:store(K, V, Acc)
+		end,
+		InitialConf,
+		Props).
 
 -spec create_ch_data_table() -> ok | term().
 create_ch_data_table() ->
@@ -557,12 +610,30 @@ update_logger(DtData) ->
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
+-spec is_real_channel(atom()) -> boolean().
+is_real_channel(heartbeat) ->
+    true;
+is_real_channel(ChName) ->
+    case get_ch_data(ChName) of
+        {ok, _} ->
+            true;
+        {_, _} ->
+            false
+    end.
+
 -spec is_local_channel(atom()) -> boolean().
 is_local_channel(heartbeat) ->
     true;
 is_local_channel(ChName) ->
-    {ok, Dt} = get_ch_data(ChName),
-    is_local_instr(dl_ch_data:get_instr(Dt)).
+    {Exists, Dt} = get_ch_data(ChName),
+    case Exists of
+        ok ->
+            is_local_instr(dl_ch_data:get_instr(Dt));
+        _ ->
+            lager:warning("Channel '~p' unrecognized",[ChName]),
+            lager:error("This should have been tested earlier"),
+            false
+    end.
 
 -spec is_local_instr(atom()) -> boolean().
 is_local_instr(InstrName) ->

@@ -57,7 +57,7 @@ start_link(?MODULE, _Args) ->
     gen_dl_agent:start_link(?MODULE, ?MODULE).
 
 init(_Args) ->
-    {ok, {Host,Port}} = application:get_env(dl_core, couch_host),
+    {Host,Port} = dl_conf_mgr:couch_info(),
     DbConn = couchbeam:server_connection(Host,Port),
     {ok, ConfDbHndl} = couchbeam:open_db(DbConn, "dripline_conf"),
     {ok, CmdDbHndl} = couchbeam:open_db(DbConn, "dripline_cmd"),

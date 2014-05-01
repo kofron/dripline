@@ -41,7 +41,7 @@ handle_call(_Call, _From, State) ->
 handle_cast({process, Command}, State) ->
     case dl_compiler:compile(Command) of
 	{ok, Request} ->
-	    do_request_if_local(Request, State);
+	    do_request_if_exists(Request, State);
 	{error, Reason, BadRequest} ->
 	    Err = dl_compiler:compiler_error_msg(Reason),
 	    do_error_response(BadRequest, Err, State)
@@ -56,6 +56,16 @@ terminate(_Reason, _StateData) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+do_request_if_exists(RequestData, StateData) ->
+    case dl_conf_mgr:is_real_channel(dl_request:get_target(RequestData)) of
+    true ->
+        do_request_if_local(RequestData, StateData);
+    false ->
+        lager:warning("channel unknown"),
+	    do_error_response(RequestData, "unrecognized_channel", StateData),
+        ok
+    end.
 
 do_request_if_local(RequestData, StateData) ->
     case dl_conf_mgr:is_local_channel(dl_request:get_target(RequestData)) of
@@ -77,31 +87,55 @@ do_request(RequestData, StateData) ->
 do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
+    dbg:p(self(), m),
+    Err = case is_list(ErrorMsg) of
+        false -> 
+            lager:warning("ErrorMsg not an iolist: ~p",[ErrorMsg]),
+            io_lib:format("~p", [ErrorMsg]);
+        true -> ErrorMsg
+    end,
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
 		   NewJS, 
-		   erlang:iolist_to_binary(ErrorMsg)),
+		   erlang:iolist_to_binary(Err)),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
 do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     Dt = erlang:apply(M,F,A),
-    case dl_data:get_code(Dt) of
+    Final = try_finalize_data(Dt, RequestData),
+    case dl_data:get_code(Final) of
 	ok ->
 	    NodeName = erlang:atom_to_binary(dl_util:node_name(), utf8),
 	    NewJS = dl_util:new_json_obj(),
 	    ResD = ej:set_p({NodeName, <<"result">>}, 
 			   NewJS, 
-			   dl_data:get_data(Dt)),
+			   dl_data:get_data(Final)),
 	    ResT = ej:set_p({NodeName, <<"timestamp">>},
 			    ResD,
 			    dl_util:make_ts()),
-	    % TODO: final!
-	    update_cmd_doc(dl_request:get_id(RequestData), H, ResT);
+	    ResF = ej:set_p({NodeName, <<"final">>},
+			    ResT,
+			    dl_data:get_final(Final)),
+	    
+	    update_cmd_doc(dl_request:get_id(RequestData), H, ResF);
 	error ->
+        lager:debug("Data Collection Error"),
 	    do_error_response(RequestData, 
-			      dl_data:get_data(Dt),
+			      dl_data:get_data(Final),
 			     StateData)
     end.
+
+try_finalize_data(Data, Request) ->
+    ChName = dl_request:get_target(Request),
+    try
+	dl_hooks:apply_hooks(ChName,Data)
+    catch
+	C:E ->
+	    lager:info("failed to apply hooks for channel ~p (~p:~p)",
+		       [ChName,C,E]),
+	    Data
+    end.
+
 
 update_cmd_doc(DocID, DBHandle, JSON) ->
     {ok, Doc} = couchbeam:open_doc(DBHandle, DocID),
@@ -113,6 +147,7 @@ update_cmd_doc(DocID, DBHandle, JSON) ->
 	{error, conflict} ->
 	    update_cmd_doc_loop(DBHandle, NewDoc);
 	{error, _Other}=Err ->
+        lager:error("Doc update error"),
 	    Err
     end.
 
