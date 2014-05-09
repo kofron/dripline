@@ -97,7 +97,7 @@ handle_info({R, {done, _LastSeq}},
     {ok, ConfRef} = setup_conf_streaming(H),
     {noreply, State#state{conf_ch_ref=ConfRef}};
 %% When we receive {last_seq, N} messages, ignore them.
-handle_info({R, {change, {[{<<"last_seq">>, _}]}}}, StateData) ->
+handle_info({_R, {change, {[{<<"last_seq">>, _}]}}}, StateData) ->
     {noreply, StateData};
 %% We get two kinds of changes.  The first kind comes from the 
 %% configuration stream:
@@ -183,7 +183,7 @@ update_rev_data(ChangeData,RevisionInfo) ->
 %% @doc When a document passes through the changes feed, we automatically
 %%      ignore the next update.  This should work just fine.
 %%----------------------------------------------------------------------%%
--spec ignore_update_rev(ejson:json_object(), dict()) -> boolean().
+-spec ignore_update_rev(ejson:json_object(), dict:dict()) -> boolean().
 ignore_update_rev(ChangeLine, RevsDict) ->
     DocID = props:get('doc._id', ChangeLine),
     BinRev = props:get('doc._rev', ChangeLine),

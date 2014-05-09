@@ -1,6 +1,7 @@
 *~
 *#
 *.swp
+*.beam
 #*
 apps/*/ebin
 ebin/*

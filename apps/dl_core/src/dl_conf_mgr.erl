@@ -202,7 +202,7 @@ create_mnesia_tables() ->
     ok = create_bus_data_table(),
     ok = create_dt_data_table().
 
--spec init_node_config() -> dict().
+-spec init_node_config() -> dict:dict().
 init_node_config() ->
     %% new configuration
     Conf0 = dict:new(),
@@ -223,7 +223,7 @@ init_node_config() ->
 	    end,
     ConfN.
 
--spec process_config_file(string(), dict()) -> dict().
+-spec process_config_file(string(), dict:dict()) -> dict:dict().
 process_config_file(FName, InitConf) ->
     case file:consult(FName) of
 	{error, _Reason}=Err ->
@@ -233,7 +233,7 @@ process_config_file(FName, InitConf) ->
 	    {ok, update_config_dict(InitConf, ConfigData)}
     end.
 
--spec update_config_dict(dict(), [proplists:property()]) -> dict().
+-spec update_config_dict(dict:dict(), [proplists:property()]) -> dict:dict().
 update_config_dict(InitialConf, Props) ->				
     lists:foldl(fun({K,V}, Acc) ->
 			dict:store(K, V, Acc)

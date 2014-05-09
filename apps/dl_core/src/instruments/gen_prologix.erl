@@ -134,8 +134,6 @@ handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
 			  {make_success_response(R), NewSD};
 		      {error, Reason, NewSD} ->
 			  {make_error_response(Reason), NewSD};
-		      {error, Reason, NewSD} ->
-			  {make_error_response(Reason), NewSD};
 		      {stop, _NewSD}=Die ->
 			  Die
 		  end,

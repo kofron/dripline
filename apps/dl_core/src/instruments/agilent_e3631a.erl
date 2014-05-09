@@ -35,10 +35,10 @@ init([]) ->
 start_link(InstrName, GPIBAddress, BusMod, BusName) ->
     gen_gpib_spoller:start_link(?MODULE, InstrName, GPIBAddress, BusMod, BusName).
 
-handle_get(Any, StateData) ->
+handle_get(_Any, StateData) ->
     {stop, unimplemented, StateData}.
 
-handle_set(Any, Value, StateData) ->
+handle_set(_Any, _Value, StateData) ->
     {stop, unimplemented, StateData}.
 
 %% 
