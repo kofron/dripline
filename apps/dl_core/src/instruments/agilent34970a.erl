@@ -195,7 +195,7 @@ raw_ch_to_spec(ChannelAtom) ->
 	_Error ->{error, bad_locator}
     end.
 
--spec channel_is_known(term(), dict()) -> boolean().
+-spec channel_is_known(term(), dict:dict()) -> boolean().
 channel_is_known(Channel, Cache) ->
     case dict:is_key(Channel, Cache) of
 	true -> % Channel is known.  Grab last data.

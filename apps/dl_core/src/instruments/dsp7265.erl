@@ -77,19 +77,19 @@ parse_twos_complement_acc(<<>>, Acc) ->
 parse_twos_complement_acc(<<DecodedInt:16/integer,Rest/binary>>,Acc) ->
     parse_twos_complement_acc(Rest,[DecodedInt|Acc]).
 
-is_positive(<<0:1,_Rest/binary>>) ->
-    true;
-is_positive(_MSBIsSet) ->
-    false.
-
-decode_negative_value(Bin) ->
-    Flipped = flip_bits(Bin),
-    binary_to_16bit(Flipped).
-flip_bits(Binary) ->
-    << <<(B bxor 1):1>> || <<B:1>> <= Binary >>.
-
-binary_to_16bit(<<Val:1/native-signed-integer-unit:16>>) ->
-    Val.
+%is_positive(<<0:1,_Rest/binary>>) ->
+%    true;
+%is_positive(_MSBIsSet) ->
+%    false.
+%
+%decode_negative_value(Bin) ->
+%    Flipped = flip_bits(Bin),
+%    binary_to_16bit(Flipped).
+%flip_bits(Binary) ->
+%    << <<(B bxor 1):1>> || <<B:1>> <= Binary >>.
+%
+%binary_to_16bit(<<Val:1/native-signed-integer-unit:16>>) ->
+%    Val.
 
 data_output(Outputs) when is_list(Outputs) ->
     data_output_acc(Outputs, 0);
