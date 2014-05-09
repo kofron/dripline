@@ -165,6 +165,8 @@ handle_call({mfa, Method, Request}, _From, StateData) ->
     Reply = case get_ch_mfa(Channel, Method) of
 		{ok, {{unix, _, _}, get, A}} ->
 		    {gen_os_cmd, execute, A};
+        {ok, {{shell, _, _}, get, A}} ->
+            {gen_os_shell_cmd, execute, A};
 		{ok, {{prologix, _, _}, get, A}} ->
 		    {gen_prologix, get, A};
 		{ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
@@ -703,6 +705,7 @@ update_bus(BsData) ->
 -spec try_bus_start(dl_bus_data:dl_bus_data()) -> ok.
 try_bus_start(BsData) ->
     try
+    lager:warning("~n~nTrying to start bus:~n~p", [BsData]),
 	dl_instr:start_bus(BsData)
     catch
 	Err:Reason ->
@@ -712,6 +715,7 @@ try_bus_start(BsData) ->
 -spec try_instr_start(dl_instr_data:dl_instr_data()) -> ok.
 try_instr_start(InData) ->
     try 
+    lager:warning("~n~nTrying to start instrument:~n~p", [InData]),
 	dl_instr:start_instr(InData)
     catch
 	C:E ->
