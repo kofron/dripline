@@ -48,15 +48,15 @@ start_link(CallbackMod, ID, Args) ->
 
 init([_ID,CallbackMod|_Rest]=Args) ->
     case CallbackMod:init(Args) of
-	{ok, ModStateData} ->
-	    dl_softbus:attach(agents),
-	    StateData = #gen_state{
-	      mod = CallbackMod,
-	      mod_sd = ModStateData
-	     },
-	    {ok, StateData};
-	StartFailed ->
-	    StartFailed
+    {ok, ModStateData} ->
+        dl_softbus:attach(agents),
+        StateData = #gen_state{
+          mod = CallbackMod,
+          mod_sd = ModStateData
+         },
+        {ok, StateData};
+    StartFailed ->
+        StartFailed
     end.
 
 handle_info({dl_sb_msg, Ref, Id, M}, #gen_state{mod=Mod, mod_sd=SD}=GSD) ->
@@ -64,20 +64,20 @@ handle_info({dl_sb_msg, Ref, Id, M}, #gen_state{mod=Mod, mod_sd=SD}=GSD) ->
     {noreply, GSD#gen_state{mod_sd=NewModState}};
 handle_info(Info, #gen_state{mod=Mod, mod_sd=SD}=GSD) ->
     case Mod:handle_info(Info, SD) of
-	{noreply, NewStateData} ->
-	    {noreply, GSD#gen_state{mod_sd=NewStateData}}
+    {noreply, NewStateData} ->
+        {noreply, GSD#gen_state{mod_sd=NewStateData}}
     end.
 
 handle_call(Call, From, #gen_state{mod=Mod, mod_sd=SD}=GSD) ->
     case Mod:handle_call(Call, From, SD) of
-	{reply, Reply, NewStateData} ->
-	    {reply, Reply, GSD#gen_state{mod_sd=NewStateData}}
+    {reply, Reply, NewStateData} ->
+        {reply, Reply, GSD#gen_state{mod_sd=NewStateData}}
     end.
 
 handle_cast(Cast, #gen_state{mod=Mod, mod_sd=SD}=GSD) ->
     case Mod:handle_cast(Cast, SD) of
-	{noreply, NewStateData} ->
-	    {noreply, GSD#gen_state{mod_sd=NewStateData}}
+    {noreply, NewStateData} ->
+        {noreply, GSD#gen_state{mod_sd=NewStateData}}
     end.
 
 code_change(Version, #gen_state{mod=Mod, mod_sd=SD}=GSD, Extra) ->

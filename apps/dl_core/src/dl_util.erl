@@ -1,5 +1,5 @@
 %% @doc dripline_util contains functions that are used all over
-%%		the code base as helpers.
+%%        the code base as helpers.
 %% @author jared kofron <jared.kofron@gmail.com>
 -module(dl_util).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -34,7 +34,7 @@ to_binary_ts({{Y,M,D},{HH,MM,SS}}) ->
 %%---------------------------------------------------------------------%%
 -spec binary_to_atom(binary()) -> atom().
 binary_to_atom(Binary) ->
-	erlang:list_to_atom(erlang:binary_to_list(Binary)).
+    erlang:list_to_atom(erlang:binary_to_list(Binary)).
 
 %%---------------------------------------------------------------------%%
 %% @doc binary_to_float converts a binary string with a floating point
@@ -44,7 +44,7 @@ binary_to_atom(Binary) ->
 %%---------------------------------------------------------------------%%
 -spec binary_to_float(binary()) -> float().
 binary_to_float(Binary) ->
-	erlang:list_to_float(erlang:binary_to_list(Binary)).
+    erlang:list_to_float(erlang:binary_to_list(Binary)).
 
 %%---------------------------------------------------------------------%%
 %% @doc binary_to_integer converts a binary string with an integer
@@ -54,7 +54,7 @@ binary_to_float(Binary) ->
 %%---------------------------------------------------------------------%%
 -spec binary_to_integer(binary()) -> integer().
 binary_to_integer(Binary) ->
-	erlang:list_to_integer(erlang:binary_to_list(Binary)).
+    erlang:list_to_integer(erlang:binary_to_list(Binary)).
 
 %%---------------------------------------------------------------------%%
 %% @doc node_name returns the name of the node that we are running on.

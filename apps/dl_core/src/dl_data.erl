@@ -11,10 +11,10 @@
 -type dl_data_ts_type() :: binary().
 
 -record(dl_data,{
-	  code,
-	  data,
-	  final,
-	  ts
+      code,
+      data,
+      final,
+      ts
 }).
 
 -opaque dl_data() :: #dl_data{}.
@@ -46,14 +46,14 @@ new() ->
 from_prologix(Result) ->
     N = new(),
     case Result of
-	{error, Reason} ->
-	    N#dl_data{code=error,
-		      data=Reason,
-		      ts=dl_util:make_ts()};
-	{Data, Ts} ->
-	    N#dl_data{code=ok,
-		      data=Data,
-		      ts=Ts}
+    {error, Reason} ->
+        N#dl_data{code=error,
+              data=Reason,
+              ts=dl_util:make_ts()};
+    {Data, Ts} ->
+        N#dl_data{code=ok,
+              data=Data,
+              ts=Ts}
     end.
 
 %%---------------------------------------------------------------------%%

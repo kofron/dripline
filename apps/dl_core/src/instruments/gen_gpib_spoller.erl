@@ -20,23 +20,23 @@
 
 %% API
 -export([start_link/5,
-	 get/2,
-	 set/3,
-	 send_sync/2]).
+     get/2,
+     set/3,
+     send_sync/2]).
 
 %% gen_fsm callbacks
 -export([init/1,handle_event/3,
-	 handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
+     handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 %% states
 -export([polling/2,
-	 polling/3,
-	 expect_response/2,
-	 expect_response/3,
-	 fetch_status_byte/2,
-	 fetch_status_byte/3,
-	 clear_status_byte/2,
-	 clear_status_byte/3]).
+     polling/3,
+     expect_response/2,
+     expect_response/3,
+     fetch_status_byte/2,
+     fetch_status_byte/3,
+     clear_status_byte/2,
+     clear_status_byte/3]).
 
 -export([behaviour_info/1]).
 
@@ -46,15 +46,15 @@
 -define(WAIT, 1000).
 
 -record(state, {
-	  req_queue,
-	  req_status,
-	  bus_mod,
-	  bus_name,
-	  instr_state,
-	  instr_name,
-	  instr_mod,
-	  instr_addr
-	 }).
+      req_queue,
+      req_status,
+      bus_mod,
+      bus_name,
+      instr_state,
+      instr_name,
+      instr_mod,
+      instr_addr
+     }).
 
 %% behavior
 behaviour_info(callbacks) ->
@@ -80,9 +80,9 @@ behaviour_info(_) ->
 %%--------------------------------------------------------------------
 start_link(InstrMod, InstrName, InstrAddr, BusMod, BusName) ->
     gen_fsm:start_link({local, InstrName}, 
-		       ?MODULE, 
-		       [InstrMod, InstrName, InstrAddr, BusMod, BusName], 
-		       []).
+               ?MODULE, 
+               [InstrMod, InstrName, InstrAddr, BusMod, BusName], 
+               []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -97,13 +97,13 @@ start_link(InstrMod, InstrName, InstrAddr, BusMod, BusName) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec send_sync(integer(), iolist()) -> 
-		       {ok, binary()} | 
-		       {device_error, binary()} | 
-		       {error, term()} |	
-		       timeout.
+               {ok, binary()} | 
+               {device_error, binary()} | 
+               {error, term()} |    
+               timeout.
 send_sync(InstrName, Data) ->
     gen_fsm:sync_send_all_state_event(InstrName,
-				      {send, Data}).
+                      {send, Data}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -115,7 +115,7 @@ send_sync(InstrName, Data) ->
 -spec get(atom(), atom()) -> dl_data:dl_data().
 get(InstrumentName, ChannelName) ->
     gen_fsm:sync_send_all_state_event(InstrumentName,
-				      {get, ChannelName}).
+                      {get, ChannelName}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -129,7 +129,7 @@ get(InstrumentName, ChannelName) ->
 -spec set(atom(), atom(), term()) -> dl_data:dl_data().
 set(InstrumentName, ChannelName, Value) ->
     gen_fsm:sync_send_all_state_event(InstrumentName,
-				      {set, ChannelName, Value}).
+                      {set, ChannelName, Value}).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -150,31 +150,31 @@ set(InstrumentName, ChannelName, Value) ->
 %%--------------------------------------------------------------------
 init([InstrMod, _InstrName, _InstrAddr, _BusMod, _BusName]=Args) ->
     case InstrMod:init([]) of
-	{ok, InstrState} ->
-	    normal_init(Args, InstrState);
-	AnyOther ->
-	    AnyOther
+    {ok, InstrState} ->
+        normal_init(Args, InstrState);
+    AnyOther ->
+        AnyOther
     end.
 normal_init([InstrMod, InstrName, InstrAddr, BusMod, BusName], InstrState) ->
     ok = setup_sre_registers(BusMod, BusName, InstrMod, InstrAddr),
     {ok, 
      polling, 
      #state{
-	req_queue=[],
-	req_status=ok,
-	bus_name=BusName,
-	bus_mod=BusMod,
-	instr_state=InstrState,
-	instr_name=InstrName,
-	instr_mod=InstrMod,
-	instr_addr=InstrAddr
+    req_queue=[],
+    req_status=ok,
+    bus_name=BusName,
+    bus_mod=BusMod,
+    instr_state=InstrState,
+    instr_name=InstrName,
+    instr_mod=InstrMod,
+    instr_addr=InstrAddr
        },
      0}.
 setup_sre_registers(BusMod, BusName, InstrMod, InstrAddr) ->
     SREMask = InstrMod:sre_register_bitmask(none),    
     ok = BusMod:send(BusName, 
-		     InstrAddr,
-		     [<<"*sre ">>, erlang:integer_to_binary(SREMask)]),
+             InstrAddr,
+             [<<"*sre ">>, erlang:integer_to_binary(SREMask)]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -246,8 +246,8 @@ clear_status_byte(_Event, _From, SD) ->
 %% @end
 %%--------------------------------------------------------------------
 fetch_status_byte(timeout, #state{bus_mod=M,
-				  bus_name=N,
-				  instr_addr=A}=StateData) ->
+                  bus_name=N,
+                  instr_addr=A}=StateData) ->
     ok = M:serial_poll(N, A),
     {next_state, fetch_status_byte, StateData, ?IMMEDIATE}.
 fetch_status_byte(_Event, _From, SD) ->
@@ -286,60 +286,60 @@ handle_event(_Event, StateName, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_sync_event({send, Dt}, Fr, 
-		  State, #state{req_queue=Q,
-				bus_mod=M,
-				bus_name=S,
-				instr_addr=Addr}=SD) ->
+          State, #state{req_queue=Q,
+                bus_mod=M,
+                bus_name=S,
+                instr_addr=Addr}=SD) ->
     {ToSend, Req} = case is_query(Dt) of
-			true ->
-			    {Dt, {qry, Fr}};
-			false ->
-			    %% actually need to strip whitespace and so on here
-			    %% to make sure this is a correctly formed query.
-			    {[Dt,<<";*OPC">>], {stmt, Fr}}
-		    end,
+            true ->
+                {Dt, {qry, Fr}};
+            false ->
+                %% actually need to strip whitespace and so on here
+                %% to make sure this is a correctly formed query.
+                {[Dt,<<";*OPC">>], {stmt, Fr}}
+            end,
     NewQueue = Q ++ [Req],
     ok = M:send(S,Addr,ToSend),
     {next_state, State, SD#state{req_queue=NewQueue}, ?IMMEDIATE};
 handle_sync_event({get, Ch}, Fr, StateName, 
-		  #state{
-		     instr_mod=I,
-		     instr_state=St
-		    }=SD) ->
+          #state{
+             instr_mod=I,
+             instr_state=St
+            }=SD) ->
     case I:handle_get(Ch, St) of
-	{send, ToSend, NewStateData} ->
-	    handle_sync_event({send, ToSend}, 
-			      Fr, 
-			      StateName, 
-			      SD#state{instr_state=NewStateData});
-	{error, Reason, NewStateData} ->
-	    Reply = make_error_response(Reason),
-	    gen_fsm:reply(Fr, Reply),
-	    {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
+    {send, ToSend, NewStateData} ->
+        handle_sync_event({send, ToSend}, 
+                  Fr, 
+                  StateName, 
+                  SD#state{instr_state=NewStateData});
+    {error, Reason, NewStateData} ->
+        Reply = make_error_response(Reason),
+        gen_fsm:reply(Fr, Reply),
+        {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
     end;
 handle_sync_event({set, Ch, Val}, Fr, StateName,
-		  #state{
-		     instr_mod=I,
-		     instr_state=St
-		    }=SD) ->
+          #state{
+             instr_mod=I,
+             instr_state=St
+            }=SD) ->
     case I:handle_set(Ch, Val, St) of
-	{send, ToSend, NewStateData} ->
-	    handle_sync_event({send, ToSend},
-			      Fr,
-			      StateName,
-			      SD#state{instr_state=NewStateData});
-	{error, Reason, NewStateData} ->
-	    Reply = make_error_response(Reason),
-	    gen_fsm:reply(Fr, Reply),
-	    {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
+    {send, ToSend, NewStateData} ->
+        handle_sync_event({send, ToSend},
+                  Fr,
+                  StateName,
+                  SD#state{instr_state=NewStateData});
+    {error, Reason, NewStateData} ->
+        Reply = make_error_response(Reason),
+        gen_fsm:reply(Fr, Reply),
+        {next_state, StateName, SD#state{instr_state=NewStateData}, ?IMMEDIATE}
     end.
 
 is_query(Bin) when is_binary(Bin) ->
     case binary:match(Bin, <<$?>>) of
-	nomatch ->
-	    false;
-	_AnyOther ->
-	    true
+    nomatch ->
+        false;
+    _AnyOther ->
+        true
     end;
 is_query(BinList) when is_list(BinList) ->
     is_query(lists:last(BinList)).
@@ -359,7 +359,7 @@ is_query(BinList) when is_list(BinList) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({gpib, B, Data}, polling,
-	    #state{bus_name=B}=SD) ->
+        #state{bus_name=B}=SD) ->
     %% convert the message to the value of the status byte register
     SBR = erlang:binary_to_integer(Data),
 
@@ -367,86 +367,86 @@ handle_info({gpib, B, Data}, polling,
     %% what to do.  this should get cleaned up so that the modules get
     %% everything, including the SRQ bit
     {NextState, NewSD} = case srq_asserted(SBR) of
-			     false when SBR =:= 0 ->
-				 {polling, SD};
-			     false when SBR =/= 0, SBR > 16 ->
-				 module_srq_feedback(SD, SBR);
-			     false ->
-				 {polling, SD};
-			     true ->
-				 module_srq_feedback(SD, SBR)
-			 end,
+                 false when SBR =:= 0 ->
+                 {polling, SD};
+                 false when SBR =/= 0, SBR > 16 ->
+                 module_srq_feedback(SD, SBR);
+                 false ->
+                 {polling, SD};
+                 true ->
+                 module_srq_feedback(SD, SBR)
+             end,
     {next_state, NextState, NewSD, ?IMMEDIATE};
 handle_info({gpib, N, Data}, fetch_status_byte,
-	    #state{bus_name=N,
-		   bus_mod=M,
-		   instr_addr=A}=SD) ->
+        #state{bus_name=N,
+           bus_mod=M,
+           instr_addr=A}=SD) ->
     %% convert the message to the value of the status byte register
     SBR = erlang:binary_to_integer(Data),
 
     %% if a message is available, that's the value of the ESR.  we want 
     %% to retrieve it.
     case SBR of
-	80 ->
-	    ok = M:read_eoi(N, A);
-	Other ->
-	    io:format("oh no we dont undertand ~p~n",[Other])
+    80 ->
+        ok = M:read_eoi(N, A);
+    Other ->
+        io:format("oh no we dont undertand ~p~n",[Other])
     end,
     {next_state, handle_status_byte, SD, ?WAIT};
 %%% TODO: this state is hidden from the outside world (might be fine to do)
 %%% but think about that!!
 handle_info({gpib, BusName, Data}, handle_status_byte,
-	    #state{bus_name=BusName,
-		   bus_mod=BusMod,
-		   instr_addr=InstrAddr,
-		   instr_mod=I,
-		   instr_state=IS,
-		   req_queue=[{_, From}|Queue]}=SD) ->
+        #state{bus_name=BusName,
+           bus_mod=BusMod,
+           instr_addr=InstrAddr,
+           instr_mod=I,
+           instr_state=IS,
+           req_queue=[{_, From}|Queue]}=SD) ->
     %% strip the terminator from the binary.
     StrippedESR = binary:part(Data, {0, erlang:byte_size(Data)-1}),
     ESR = erlang:binary_to_integer(StrippedESR),
 
     {NextState, NewSD} = case I:handle_esr(ESR, IS) of
-			     {op_complete, NewState} ->
-				 gen_fsm:reply(From, ok),
-				 {polling, SD#state{req_queue=Queue,instr_state=NewState}};
-			     {retrieve_error, ToSend, NewState} ->
-				 ok = BusMod:send(BusName, InstrAddr, ToSend),
-				 {polling, SD#state{req_status=error,instr_state=NewState}}
-			 end,
+                 {op_complete, NewState} ->
+                 gen_fsm:reply(From, ok),
+                 {polling, SD#state{req_queue=Queue,instr_state=NewState}};
+                 {retrieve_error, ToSend, NewState} ->
+                 ok = BusMod:send(BusName, InstrAddr, ToSend),
+                 {polling, SD#state{req_status=error,instr_state=NewState}}
+             end,
     {next_state, NextState, NewSD, ?IMMEDIATE};
 handle_info({gpib, B, Data}, 
-	    expect_response,
-	    #state{bus_name=B,
-		   req_queue=[{Type, From}|Waiting],
-		   req_status=Status}=SD) ->
+        expect_response,
+        #state{bus_name=B,
+           req_queue=[{Type, From}|Waiting],
+           req_status=Status}=SD) ->
     Reply = case Type of
-		stmt when Status =:= error ->
-		    make_error_response(Data);
-		stmt when Status =:= ok ->
-		    make_success_response(ok);
-		qry ->
-		    make_response(Status,Data)
-	    end,
+        stmt when Status =:= error ->
+            make_error_response(Data);
+        stmt when Status =:= ok ->
+            make_success_response(ok);
+        qry ->
+            make_response(Status,Data)
+        end,
     gen_fsm:reply(From, Reply),
     {next_state, 
      polling, 
      SD#state{req_queue=Waiting,req_status=ok}, 
      ?POLL_INTERVAL};
 handle_info({gpib, B, _Data},
-	   expect_response,
-	   #state{bus_name=B,
-		 req_queue=[],
-		 req_status=_Status}=SD) ->
+       expect_response,
+       #state{bus_name=B,
+         req_queue=[],
+         req_status=_Status}=SD) ->
     {next_state, 
      polling, 
      SD#state{req_status=ok}, 
      ?POLL_INTERVAL};
 handle_info({gpib, B, _Data},
-	    clear_status_byte,
-	   #state{bus_name=B,
-		  req_queue=[{_, From}|Waiting],
-		  req_status=ok}=SD) ->
+        clear_status_byte,
+       #state{bus_name=B,
+          req_queue=[{_, From}|Waiting],
+          req_status=ok}=SD) ->
     gen_fsm:reply(From, ok),
     {next_state,
      polling,
@@ -455,26 +455,26 @@ handle_info({gpib, B, _Data},
 srq_asserted(SRByte) ->
     ((SRByte bsr 6) band 1) == 1.
 module_srq_feedback(#state{bus_mod=BusMod,
-			   bus_name=BusName,
-			   req_status=RS,
-			   instr_addr=InstrAddr,
-			   instr_mod=InstrMod, 
-			   instr_state=S}=SD, SBR) ->
+               bus_name=BusName,
+               req_status=RS,
+               instr_addr=InstrAddr,
+               instr_mod=InstrMod, 
+               instr_state=S}=SD, SBR) ->
     case InstrMod:handle_stb(SBR, S) of
-	{retrieve_error, ToSend, NewState} ->
-	    ok = BusMod:send(BusName, InstrAddr, ToSend),
-	    {polling, SD#state{req_status=error,instr_state=NewState}};
-	{retrieve_data, NewState} ->
-	    ok = BusMod:read_eoi(BusName, InstrAddr),
-	    {expect_response, SD#state{req_status=RS,instr_state=NewState}};
-	{fetch_esr, ToSend, NewState} ->
-	    ok = BusMod:send(BusName, InstrAddr, ToSend),
-	    {fetch_status_byte, SD#state{req_status=RS, instr_state=NewState}};
-	{clear_esr, ToSend, NewState} ->
-	    ok = BusMod:send(BusName, InstrAddr, ToSend),
-	    {polling, SD#state{req_status=ok, instr_state=NewState}};
-	{ignore, NewState} ->
-	    {clear_status_byte, SD#state{instr_state=NewState}}
+    {retrieve_error, ToSend, NewState} ->
+        ok = BusMod:send(BusName, InstrAddr, ToSend),
+        {polling, SD#state{req_status=error,instr_state=NewState}};
+    {retrieve_data, NewState} ->
+        ok = BusMod:read_eoi(BusName, InstrAddr),
+        {expect_response, SD#state{req_status=RS,instr_state=NewState}};
+    {fetch_esr, ToSend, NewState} ->
+        ok = BusMod:send(BusName, InstrAddr, ToSend),
+        {fetch_status_byte, SD#state{req_status=RS, instr_state=NewState}};
+    {clear_esr, ToSend, NewState} ->
+        ok = BusMod:send(BusName, InstrAddr, ToSend),
+        {polling, SD#state{req_status=ok, instr_state=NewState}};
+    {ignore, NewState} ->
+        {clear_status_byte, SD#state{instr_state=NewState}}
     end.
     
 %%--------------------------------------------------------------------

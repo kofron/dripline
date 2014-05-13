@@ -52,14 +52,14 @@ handle_cast(_Msg, State) ->
 
 handle_info(do_record, #state{ival=I,tgt=T}=SD) ->
     Branch = case do_collect_data(T) of
-		 ok ->
-		     NewTRef = start_countdown(I),
-		     {noreply, SD#state{tref=NewTRef}};   
-		 {die, Reason} ->
-		     {stop, Reason}
-	     end,
+         ok ->
+             NewTRef = start_countdown(I),
+             {noreply, SD#state{tref=NewTRef}};   
+         {die, Reason} ->
+             {stop, Reason}
+         end,
     Branch.
-		 
+         
 handle_sb_msg({_Ref, Id, _Msg}, #state{id=Id}=State) ->
     {noreply, State};
 handle_sb_msg({_Ref, _OtherId, _Msg}, State) ->
@@ -82,21 +82,21 @@ gen_dt_id(ChannelId) ->
 
 do_collect_data(ChanData) ->
     case dl_conf_mgr:get_read_mfa(dl_ch_data:get_id(ChanData)) of
-	{error, no_channel} ->
-	    {die, no_channel};
-	{{prologix,_,_},read,[Instr,Chan]} ->
-	    do_read_prologix(Instr,Chan)
+    {error, no_channel} ->
+        {die, no_channel};
+    {{prologix,_,_},read,[Instr,Chan]} ->
+        do_read_prologix(Instr,Chan)
     end.
 
 do_read_prologix(Instr, Chan) ->
     case gen_prologix:read(Instr,Chan) of
-	{error, Reason} ->
-	    Arg = [Chan, Reason],
-	    lager:info("logger on channel ~p failed with reason ~p",Arg);
-	Data ->
-	    Msg = {nd, {Instr, Chan}, Data},
-	    dl_softbus:bcast(agents,self(),Msg),
-	    ok
+    {error, Reason} ->
+        Arg = [Chan, Reason],
+        lager:info("logger on channel ~p failed with reason ~p",Arg);
+    Data ->
+        Msg = {nd, {Instr, Chan}, Data},
+        dl_softbus:bcast(agents,self(),Msg),
+        ok
     end.
 
 %%%%%%%%%%%%%

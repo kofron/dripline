@@ -4,8 +4,8 @@
 -module(dl_softbus).
 
 -export([attach/1,
-	 detach/1,
-	 bcast/3]).
+     detach/1,
+     bcast/3]).
 
 -type group_name_type() :: atom().
 -type softbus_msg_type() :: atom().
@@ -21,15 +21,15 @@ attach(GroupName) ->
 -spec detach(group_name_type()) -> ok.
 detach(GroupName) ->
     case gproc:unreg({p, l, GroupName}) of
-	true ->
-	    ok;
-	false ->
-	    false
+    true ->
+        ok;
+    false ->
+        false
     end.
 
 % Send a softbus message to all members of a certain group.
 -spec bcast(group_name_type(), group_member_type(), softbus_msg_type()) ->
-		   ok | {error, nogrp}.
+           ok | {error, nogrp}.
 bcast(GroupName, Sndr, Msg) ->
     Ref = make_ref(),
     FullMsg = {dl_sb_msg, Ref, Sndr, Msg},

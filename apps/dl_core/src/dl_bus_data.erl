@@ -15,11 +15,11 @@
 %%% Core Record %%%
 %%%%%%%%%%%%%%%%%%%
 -record(dl_bus_data, {
-	  id :: id_type(),
-	  module :: mod_type(),
-	  info :: info_type(),
-	  node :: node_type()
-	 }).
+      id :: id_type(),
+      module :: mod_type(),
+      info :: info_type(),
+      node :: node_type()
+     }).
 
 %%%%%%%%%%%
 %%% API %%%
@@ -69,7 +69,7 @@ fields() ->
 %% @end
 %%---------------------------------------------------------------------%%
 -spec from_json(ejson:json_object()) -> {ok, dl_bus_data()} 
-					    | {error, term()}.
+                        | {error, term()}.
 from_json(JS) ->
     D = new(),
     do_from_json(props:drop(['_id','_rev','type'],JS),D).
@@ -101,10 +101,10 @@ parse_info({[{<<"port">>,V}|T]}, Acc) ->
 parse_info({[{<<"ip_address">>,V}|T]}, Acc) ->
     Digits = binary:split(V,<<".">>,[global]),
     Integers = lists:map(fun(X) ->
-				 B = erlang:binary_to_list(X),
-				 erlang:list_to_integer(B)
-			 end,
-			 Digits),
+                 B = erlang:binary_to_list(X),
+                 erlang:list_to_integer(B)
+             end,
+             Digits),
     Final = erlang:list_to_tuple(Integers),
     parse_info({T}, [{ip_addr, Final}|Acc]).
 
@@ -114,7 +114,7 @@ parse_info({[{<<"ip_address">>,V}|T]}, Acc) ->
 %%---------------------------------------------------------------------%%
 -spec set_id(id_type(),dl_bus_data()) -> dl_bus_data().
 set_id(A,D) when is_record(D,dl_bus_data) ->
-	D#dl_bus_data{id=A}.
+    D#dl_bus_data{id=A}.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_id/3 returns the id field of an dl_bus_data object.
@@ -122,7 +122,7 @@ set_id(A,D) when is_record(D,dl_bus_data) ->
 %%---------------------------------------------------------------------%%
 -spec get_id(dl_bus_data()) -> id_type().
 get_id(#dl_bus_data{id=Id}) ->
-	Id.
+    Id.
 
 %%---------------------------------------------------------------------%%
 %% @doc set_module/2 sets the module field of an dl_bus_data object.
@@ -130,7 +130,7 @@ get_id(#dl_bus_data{id=Id}) ->
 %%---------------------------------------------------------------------%%
 -spec set_module(mod_type(),dl_bus_data()) -> dl_bus_data().
 set_module(A,D) when is_record(D,dl_bus_data) ->
-	D#dl_bus_data{module=A}.
+    D#dl_bus_data{module=A}.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_module/2 gets the module field of an dl_bus_data object.
@@ -138,7 +138,7 @@ set_module(A,D) when is_record(D,dl_bus_data) ->
 %%---------------------------------------------------------------------%%
 -spec get_module(dl_bus_data()) -> mod_type().
 get_module(#dl_bus_data{module=M}) ->
-	M.
+    M.
 
 %%---------------------------------------------------------------------%%
 %% @doc set_info/2 sets the info field of an dl_bus_data object.
@@ -146,9 +146,9 @@ get_module(#dl_bus_data{module=M}) ->
 %%---------------------------------------------------------------------%%
 -spec set_info(info_type(), dl_bus_data()) -> dl_bus_data().
 set_info(A,D) when is_list(A), is_record(D,dl_bus_data) ->
-	D#dl_bus_data{info=A};
+    D#dl_bus_data{info=A};
 set_info(A,D) when is_record(D,dl_bus_data) ->
-	D#dl_bus_data{info=[A]}.
+    D#dl_bus_data{info=[A]}.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_info/1 gets the info field of an dl_bus_data object.
@@ -156,7 +156,7 @@ set_info(A,D) when is_record(D,dl_bus_data) ->
 %%---------------------------------------------------------------------%%
 -spec get_info(dl_bus_data()) -> info_type().
 get_info(#dl_bus_data{info=S}) ->
-	S.
+    S.
 
 %%---------------------------------------------------------------------%%
 %% @doc set_node/2 sets the node field of an dl_node_data object.
@@ -164,7 +164,7 @@ get_info(#dl_bus_data{info=S}) ->
 %%---------------------------------------------------------------------%%
 -spec set_node(node_type(),dl_bus_data()) -> dl_bus_data().
 set_node(A,D) when is_record(D,dl_bus_data) ->
-	D#dl_bus_data{node=A}.
+    D#dl_bus_data{node=A}.
 
 %%---------------------------------------------------------------------%%
 %% @doc get_node/1 sets the model field of an dl_node_data object.
@@ -172,4 +172,4 @@ set_node(A,D) when is_record(D,dl_bus_data) ->
 %%---------------------------------------------------------------------%%
 -spec get_node(dl_bus_data()) -> node_type().
 get_node(#dl_bus_data{node=B}) ->
-	B.
+    B.

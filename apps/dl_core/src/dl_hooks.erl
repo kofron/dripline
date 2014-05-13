@@ -23,24 +23,24 @@
 %%% Calibration hooks %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%
 -export([kjlc354_cal/1, 
-	 linear_r_to_z/1,
-	 force_positive/1,
-	 cernox33122/1,
-	 cernox43022/1,
-	 cernox01912/1,
-	 cernox01929/1,
-	 cernox31305/1,
-	 cernox87820/1,
-	 cernox87821/1,
-	 cernox87821_recalibrated/1,
-	 cernox87791/1,
-	 cernox87771/1,
-	 tm220/1,
-	 celsius_to_kelvin/1,
-	 precision_shunt/1,
-	 lakeshore_hall_cal_80K/1,
-	 nmr_hall_cal_77K/1,
-	 power_meter_cal/1]).
+     linear_r_to_z/1,
+     force_positive/1,
+     cernox33122/1,
+     cernox43022/1,
+     cernox01912/1,
+     cernox01929/1,
+     cernox31305/1,
+     cernox87820/1,
+     cernox87821/1,
+     cernox87821_recalibrated/1,
+     cernox87791/1,
+     cernox87771/1,
+     tm220/1,
+     celsius_to_kelvin/1,
+     precision_shunt/1,
+     lakeshore_hall_cal_80K/1,
+     nmr_hall_cal_77K/1,
+     power_meter_cal/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% Aesthetic hooks %%%
@@ -51,29 +51,29 @@
 %%% API Definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
 -spec apply_hooks(binary, dl_ch_data:ch_data()) -> 
-			 dl_ch_data:ch_data().
+             dl_ch_data:ch_data().
 apply_hooks(ChName, Data) ->
     case is_binary(dl_data:get_data(Data)) of
-	true ->
-	    D = dl_conf_mgr:channel_info(ChName),
-	    Hooks = dl_ch_data:get_post_hooks(D),
-	    do_apply_hooks(Data, Hooks);
-	false ->
-	    skip_processing(Data)
+    true ->
+        D = dl_conf_mgr:channel_info(ChName),
+        Hooks = dl_ch_data:get_post_hooks(D),
+        do_apply_hooks(Data, Hooks);
+    false ->
+        skip_processing(Data)
     end.
 
 do_apply_hooks(Data, Hooks) ->
     case dl_data:get_code(Data) of
-	ok ->
-	    Raw = dl_data:get_data(Data),
-	    Final = lists:foldl(fun(X,Acc) ->
-					apply(dl_hooks, X, [Acc]) 
-				end, Raw, Hooks),
-	    dl_data:set_final(Data, Final);
-	error ->
-	    Raw = dl_data:get_data(Data),
-	    Final = error_to_proplist(Raw),
-	    dl_data:set_final(Data, Final)
+    ok ->
+        Raw = dl_data:get_data(Data),
+        Final = lists:foldl(fun(X,Acc) ->
+                    apply(dl_hooks, X, [Acc]) 
+                end, Raw, Hooks),
+        dl_data:set_final(Data, Final);
+    error ->
+        Raw = dl_data:get_data(Data),
+        Final = error_to_proplist(Raw),
+        dl_data:set_final(Data, Final)
     end.
 
 %%%%%%%%%%%%%%%%%%%
@@ -124,10 +124,10 @@ strip_newline_chars(<<>>) ->
 strip_newline_chars(Bin) ->
     lager:debug("strip newline chars: ~p",[Bin]),
     case binary:last(Bin) of
-	$\n ->
-	    strip_newline_chars(binary:part(Bin,{0, byte_size(Bin) -1}));
-	_AnyOther ->
-	    Bin
+    $\n ->
+        strip_newline_chars(binary:part(Bin,{0, byte_size(Bin) -1}));
+    _AnyOther ->
+        Bin
     end.
 
 -spec power_meter_cal(binary()) -> binary().
@@ -251,47 +251,47 @@ locate_interval(Pt, [_Hd|Tail]) ->
 -spec cernox33122_points() -> [{float(), float()}].
 cernox33122_points() ->
     Raw = [{47.6,300}, % R was originally 57.6 here, but changed due to empirical error
-	   {81.1,200},
-	   {149,100},
-	   {180,80},
-	   {269,50},
-	   {598,20}],
+       {81.1,200},
+       {149,100},
+       {180,80},
+       {269,50},
+       {598,20}],
     lists:map(fun({X,Y}) ->
-		      {math:log(X),math:log(Y)}
-	      end,
-	      Raw).
+              {math:log(X),math:log(Y)}
+          end,
+          Raw).
 
 -spec cernox43022_points() -> [{float(), float()}].
 cernox43022_points() ->
         Raw = [{68.6,300},
-	   {248,78},
-	   {3771,4.2}],
+       {248,78},
+       {3771,4.2}],
     lists:map(fun({X,Y}) ->
-		      {math:log(X),math:log(Y)}
-	      end,
-	      Raw).
+              {math:log(X),math:log(Y)}
+          end,
+          Raw).
 
 -spec cernox01912_points() -> [{float(), float()}].
 cernox01912_points() ->
         Raw = [{45.5,297},
-	   {167.5,77},
+       {167.5,77},
            {310.9,40},
            {318.2,39},
            {433.4,28}],
     lists:map(fun({X,Y}) ->
-		      {math:log(X),math:log(Y)}
-	      end,
-	      Raw).
+              {math:log(X),math:log(Y)}
+          end,
+          Raw).
 
 -spec cernox31305_points() -> [{float(), float()}].
 cernox31305_points() ->
         Raw = [{62.8,300},
-	       {186,78},
-	       {4203,4.2}],
+           {186,78},
+           {4203,4.2}],
     lists:map(fun({X,Y}) ->
-		      {math:log(X),math:log(Y)}
-	      end,
-	      Raw).
+              {math:log(X),math:log(Y)}
+          end,
+          Raw).
 
 -spec cernox87821_recal_points() -> [{float(), float()}].
 cernox87821_recal_points() ->
@@ -306,8 +306,8 @@ cernox87821_recal_points() ->
 -spec cernox87821_points() -> [{float(), float()}].
 cernox87821_points() ->
         Raw = [{68.7, 305},
-	       {218,77},
-	       {1764,4.2}],
+           {218,77},
+           {1764,4.2}],
     lists:map(fun({X,Y}) ->
               {math:log(X),math:log(Y)}
           end,
@@ -316,8 +316,8 @@ cernox87821_points() ->
 -spec cernox87820_points() -> [{float(), float()}].
 cernox87820_points() ->
         Raw = [{69.2, 305},
-	       {212,77},
-	       {1522,4.2}],
+           {212,77},
+           {1522,4.2}],
     lists:map(fun({X,Y}) ->
               {math:log(X),math:log(Y)}
           end,
@@ -346,20 +346,20 @@ cernox87771_points() ->
 -spec cernox01929_points() -> [{float(), float()}].
 cernox01929_points() ->
         Raw = [{45.5,297},
-	       {187.5,77},
-	       {440.9,30.5},
-	       {1922,6.7},
-	       {2249,5.9},
-	       {3445,4.3},
-	       {4611,3.5},
-	       {6146,3},
-	       {8338,2.5},
-	       {11048,2.1},
-	       {11352,2}],
+           {187.5,77},
+           {440.9,30.5},
+           {1922,6.7},
+           {2249,5.9},
+           {3445,4.3},
+           {4611,3.5},
+           {6146,3},
+           {8338,2.5},
+           {11048,2.1},
+           {11352,2}],
     lists:map(fun({X,Y}) ->
-		      {math:log(X),math:log(Y)}
-	      end,
-	      Raw).
+              {math:log(X),math:log(Y)}
+          end,
+          Raw).
 
 
 

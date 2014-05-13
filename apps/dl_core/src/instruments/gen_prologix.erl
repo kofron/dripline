@@ -46,97 +46,97 @@ start_link(CallbackMod, ID, EProID, GPIBAddr) ->
 
 init([CallbackMod,_ID,EProID,GPIBAddr]=Args) ->
     case CallbackMod:init(Args) of
-	{ok, ModStateData} = _StartOK ->
-	    StateData = #pro_st{
-		  mod = CallbackMod,
-	      mod_sd = ModStateData,
-	      ep_d = #ep_st{
-		ep_id = EProID,
-		gpib_addr = GPIBAddr
-	       }
-	     },
-	    {ok, StateData};
-	{ok, ToSend, ModStateData} = _StartOKWithInit ->
-	    StateData = #pro_st{
-		  mod = CallbackMod,
-	      mod_sd = ModStateData,
-	      ep_d = #ep_st{
-		ep_id = EProID,
-		gpib_addr = GPIBAddr
-	       }
-	     },
-	    eprologix_cmdr:send(EProID, 
-				GPIBAddr,
-				ToSend),
-	    {ok, StateData};
-	StartFailed ->
-	    StartFailed
+    {ok, ModStateData} = _StartOK ->
+        StateData = #pro_st{
+          mod = CallbackMod,
+          mod_sd = ModStateData,
+          ep_d = #ep_st{
+        ep_id = EProID,
+        gpib_addr = GPIBAddr
+           }
+         },
+        {ok, StateData};
+    {ok, ToSend, ModStateData} = _StartOKWithInit ->
+        StateData = #pro_st{
+          mod = CallbackMod,
+          mod_sd = ModStateData,
+          ep_d = #ep_st{
+        ep_id = EProID,
+        gpib_addr = GPIBAddr
+           }
+         },
+        eprologix_cmdr:send(EProID, 
+                GPIBAddr,
+                ToSend),
+        {ok, StateData};
+    StartFailed ->
+        StartFailed
     end.
 
 handle_call({r, _In, Ch}, _From, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     {Rp,NMSDt} = case M:handle_get(Ch,MS) of
-		     {data, D, NewSD} ->
-			 Reply = make_success_response(D),
-			 {Reply, NewSD};
-		     {send, ToSend, NewSD} ->
-			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
-						     E#ep_st.gpib_addr,
-						     ToSend),
-			 Reply = make_success_response(R),
-			 {Reply, NewSD};
-		     {send_then_parse, ToSend, NewSD} ->
-			 R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
-						      E#ep_st.gpib_addr,
-						      ToSend),
-			 case R of
-			     {error, Reason} ->
-				 {make_error_response(Reason), NewSD};
-			     _AnyOther ->
-				 {PR, NewNewSD} = case M:handle_parse(R, NewSD) of
-						      {ok, Parsed, StateData} ->
-							  {Parsed, StateData};
-						      {error, Reason, StateData} ->
-							  {{error, Reason}, StateData}
-						  end,
-				 {make_success_response(PR), NewNewSD}
-			 end;
-		     {error, Reason, NewSD} ->
-			 Reply = make_error_response(Reason),
-			 {Reply, NewSD};
-		     {update_cache, NewSD} ->
-			 {ok, ToSend, NewSDP} = M:do_update_cache(NewSD),
-			 ActList = generate_action_list(ToSend),
-			 R = evaluate_action_list(ActList, E#ep_st.ep_id,
-						  E#ep_st.gpib_addr),
-			 {ok, NewNewSD} = M:parse_instrument_reply(R, NewSDP),
-			 case M:handle_get(Ch, NewNewSD) of
-			     {data, D, SDPPP} ->
-				 Reply = make_success_response(D),
-				 {Reply, SDPPP};
-			     _Other ->
-				 {{error, max_cmd_depth_exceeded}, NewNewSD}
-			 end;
-		    {stop, _NewSD}=Die ->
-			Die
-		end,
+             {data, D, NewSD} ->
+             Reply = make_success_response(D),
+             {Reply, NewSD};
+             {send, ToSend, NewSD} ->
+             R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
+                             E#ep_st.gpib_addr,
+                             ToSend),
+             Reply = make_success_response(R),
+             {Reply, NewSD};
+             {send_then_parse, ToSend, NewSD} ->
+             R = eprologix_cmdr:send_sync(E#ep_st.ep_id,
+                              E#ep_st.gpib_addr,
+                              ToSend),
+             case R of
+                 {error, Reason} ->
+                 {make_error_response(Reason), NewSD};
+                 _AnyOther ->
+                 {PR, NewNewSD} = case M:handle_parse(R, NewSD) of
+                              {ok, Parsed, StateData} ->
+                              {Parsed, StateData};
+                              {error, Reason, StateData} ->
+                              {{error, Reason}, StateData}
+                          end,
+                 {make_success_response(PR), NewNewSD}
+             end;
+             {error, Reason, NewSD} ->
+             Reply = make_error_response(Reason),
+             {Reply, NewSD};
+             {update_cache, NewSD} ->
+             {ok, ToSend, NewSDP} = M:do_update_cache(NewSD),
+             ActList = generate_action_list(ToSend),
+             R = evaluate_action_list(ActList, E#ep_st.ep_id,
+                          E#ep_st.gpib_addr),
+             {ok, NewNewSD} = M:parse_instrument_reply(R, NewSDP),
+             case M:handle_get(Ch, NewNewSD) of
+                 {data, D, SDPPP} ->
+                 Reply = make_success_response(D),
+                 {Reply, SDPPP};
+                 _Other ->
+                 {{error, max_cmd_depth_exceeded}, NewNewSD}
+             end;
+            {stop, _NewSD}=Die ->
+            Die
+        end,
     NewState = St#pro_st{mod_sd = NMSDt},
     {reply, Rp, NewState};
 handle_call({w, _In, Ch, V}, _F, #pro_st{mod=M,mod_sd=MS,ep_d=E}=St) ->
     {Rp, NMSDt} = case M:handle_set(Ch,V,MS) of
-		    {data, D, NewSD} ->
-			  Reply = make_success_response(D),
+            {data, D, NewSD} ->
+              Reply = make_success_response(D),
       {Reply, NewSD};
-		    {send, ToSend, NewSD} ->
-			R = eprologix_cmdr:send(E#ep_st.ep_id,
-						E#ep_st.gpib_addr,
-						ToSend),
-			  
-			  {make_success_response(R), NewSD};
-		      {error, Reason, NewSD} ->
-			  {make_error_response(Reason), NewSD};
-		      {stop, _NewSD}=Die ->
-			  Die
-		  end,
+            {send, ToSend, NewSD} ->
+            R = eprologix_cmdr:send(E#ep_st.ep_id,
+                        E#ep_st.gpib_addr,
+                        ToSend),
+              
+              {make_success_response(R), NewSD};
+              {error, Reason, NewSD} ->
+              {make_error_response(Reason), NewSD};
+              {stop, _NewSD}=Die ->
+              Die
+          end,
     NewState = St#pro_st{mod_sd = NMSDt},
     {reply, Rp, NewState}.
 
@@ -182,22 +182,22 @@ generate_action_list([], Acc) ->
     lists:reverse(Acc);
 generate_action_list([{sleep, NMilliSecs}|T],Acc) ->
     Append = fun(_,_) ->
-		     timer:sleep(NMilliSecs)
-	     end,
+             timer:sleep(NMilliSecs)
+         end,
     generate_action_list(T, [Append|Acc]);
 generate_action_list(RawList, Acc) ->
     case lists:takewhile(fun not_a_tuple/1, RawList) of
-	List when List == RawList ->
-	    Append = fun(Id,Addr) ->
-			     eprologix_cmdr:send_sync(Id, Addr, RawList)
-		     end,
-	    generate_action_list([], [Append|Acc]);
-	List ->
-	    Append = fun(Id,Addr) ->
-			     eprologix_cmdr:send(Id, Addr, List)
-		     end,
-	    MatchLen = erlang:length(List),
-	    generate_action_list(lists:nthtail(MatchLen,RawList),[Append|Acc])
+    List when List == RawList ->
+        Append = fun(Id,Addr) ->
+                 eprologix_cmdr:send_sync(Id, Addr, RawList)
+             end,
+        generate_action_list([], [Append|Acc]);
+    List ->
+        Append = fun(Id,Addr) ->
+                 eprologix_cmdr:send(Id, Addr, List)
+             end,
+        MatchLen = erlang:length(List),
+        generate_action_list(lists:nthtail(MatchLen,RawList),[Append|Acc])
     end.
 
 -spec not_a_tuple(term()) -> boolean().

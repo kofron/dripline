@@ -31,7 +31,7 @@
 %%% API definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%
 -spec compile(ejson:json_object()) -> 
-		     {ok, fun()} | {error, dl_error:error()}.
+             {ok, fun()} | {error, dl_error:error()}.
 compile(JSON) ->
     gen_server:call(?MODULE,{compile, JSON}).
 
@@ -52,11 +52,11 @@ init([]) ->
 
 handle_call({compile, JS}, _From, State) ->
     Reply = case drip_compile(JS) of
-		{ok, _F}=Success ->
-		    Success;
-		{error, _E, _Req}=Err ->
-		    Err
-	    end,
+        {ok, _F}=Success ->
+            Success;
+        {error, _E, _Req}=Err ->
+            Err
+        end,
     {reply, Reply, State}.
 
 handle_cast(_Msg, State) ->
@@ -75,56 +75,56 @@ code_change(_OldVsn, State, _Extra) ->
 %%% internal functions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec drip_compile(ejson:json_object()) -> 
-			  {ok, fun()} | {error, dl_error:error()}.
+              {ok, fun()} | {error, dl_error:error()}.
 drip_compile(JS) ->
     ID = ej:get({<<"doc">>, <<"_id">>}, JS),
     Command = ej:get({<<"doc">>, <<"command">>}, JS),
     New = dl_request:new(),
     Req = dl_request:set_id(New, ID),
     case json_to_request(Command,Req) of
-	{ok, _Request}=Success ->
-	    Success;
-	{error, Reason} ->
-	    {error, Reason, Req}
+    {ok, _Request}=Success ->
+        Success;
+    {error, Reason} ->
+        {error, Reason, Req}
     end.
 
 -spec json_to_request(ejson:json_object(), dl_request:dl_request()) ->
-			     {ok, dl_request:dl_request()} | {error, term()}.
+                 {ok, dl_request:dl_request()} | {error, term()}.
 json_to_request(JS, Req) ->
     case check_request_validity(JS) of
-	{ok, Method} -> 
-	    parse_valid_json(JS, Method, Req);
-	{error, _Reason} = E ->
-	    E
+    {ok, Method} -> 
+        parse_valid_json(JS, Method, Req);
+    {error, _Reason} = E ->
+        E
     end. 
 
 -spec check_request_validity(ejson:json_object()) -> 
-				    {ok, method()} | {error, term()}.
+                    {ok, method()} | {error, term()}.
 check_request_validity(JS) ->
     case ej:valid(request_spec(), JS) of
-	ok ->
-	    {ok, verb(JS)};
-	BadRequest -> 
-	    {error, BadRequest}
+    ok ->
+        {ok, verb(JS)};
+    BadRequest -> 
+        {error, BadRequest}
     end.
 
 -spec verb(ejson:json_object()) -> method().
 verb(JS) ->
     Verbs = [
-	     {get,<<"get">>}, 
-	     {set,<<"set">>},
-	     {syscmd,<<"syscmd">>},
-	     {run, <<"run">>}
-	    ],
+         {get,<<"get">>}, 
+         {set,<<"set">>},
+         {syscmd,<<"syscmd">>},
+         {run, <<"run">>}
+        ],
     verb0(JS, Verbs).
 
 -spec verb0(ejson:json_object(), [{method(),binary()}]) -> method().
 verb0(JS, [{Verb, Value}|R]) ->
     case ej:get({<<"do">>}, JS) of
-	V when V == Value ->
-	    Verb;
-	_AnyOther ->
-	    verb0(JS, R)
+    V when V == Value ->
+        Verb;
+    _AnyOther ->
+        verb0(JS, R)
     end.
     
 -spec regex_for(atom()) -> {string(), string()}.
@@ -144,7 +144,7 @@ request_spec() ->
      ]}.
 
 -spec parse_valid_json(ejson:json_object(), method(), dl_request:dl_request()) -> 
-			      dl_request:dl_request().
+                  dl_request:dl_request().
 parse_valid_json(JSON, get, I) ->
     Req = dl_request:set_method(I, get),
     {ok, dl_request:set_target(Req, get_json_channel(JSON))};
@@ -152,11 +152,11 @@ parse_valid_json(JSON, set, I) ->
     Req = dl_request:set_method(I, set),
     Req0 = dl_request:set_target(Req, get_json_channel(JSON)),
     case get_json_value(JSON) of
-	undefined ->
-	    Err = key_undef_error(<<"value">>),
-	    {error, Err};
-	Value ->
-	    {ok, dl_request:set_value(Req0, Value)}
+    undefined ->
+        Err = key_undef_error(<<"value">>),
+        {error, Err};
+    Value ->
+        {ok, dl_request:set_value(Req0, Value)}
     end;
 parse_valid_json(JSON, run, I) -> 
     Req = dl_request:set_method(I, run),
@@ -166,7 +166,7 @@ parse_valid_json(JSON, run, I) ->
     % in the long run.
     {Args} = drop_json_keys([<<"do">>, <<"channel">>], JSON),
     {ok, dl_request:set_value(Req0, Args)}.
-    		     
+                 
 -spec get_json_channel(ejson:json_object()) -> binary() | undefined.
 get_json_channel(JS) ->
     erlang:binary_to_atom(ej:get({<<"channel">>}, JS), latin1).
@@ -178,7 +178,7 @@ get_json_value(JS) ->
 -spec key_undef_error(binary()) -> term().
 key_undef_error(<<"value">>=Key) ->
     #key_error{msg="set commands must have the key \"value\" defined with a legal value.",
-	       key=Key}.
+           key=Key}.
 
 -spec drop_json_keys([binary()],ejson:json_object()) -> ejson:json_object().
 drop_json_keys(KeyList, {JSON}) ->
@@ -187,10 +187,10 @@ drop_json_keys(_KeyList, [], Acc) ->
     {Acc};
 drop_json_keys(KeyList, [{K,_V}=El|R], Acc) ->
     case lists:member(K, KeyList) of
-	true ->
-	    drop_json_keys(KeyList, R, Acc);
-	false ->
-	    drop_json_keys(KeyList, R, [El|Acc])
+    true ->
+        drop_json_keys(KeyList, R, Acc);
+    false ->
+        drop_json_keys(KeyList, R, [El|Acc])
     end.
 
 %-spec compile_to_mfa(dl_request:dl_request()) -> {ok, term()}.
@@ -216,10 +216,10 @@ drop_json_keys(KeyList, [{K,_V}=El|R], Acc) ->
 %% -spec gen_run_params(ejson:json_object()) -> [{atom(), string()}].
 %% gen_run_params(P) ->
 %%     lists:map(fun({K,V}) ->
-%% 		      {erlang:binary_to_atom(K,latin1), 
-%% 		       erlang:binary_to_list(V)}
-%% 	      end,
-%% 	      P).
+%%               {erlang:binary_to_atom(K,latin1), 
+%%                erlang:binary_to_list(V)}
+%%           end,
+%%           P).
 
 %%%%%%%%%%%%%
 %%% EUNIT %%%
@@ -240,7 +240,7 @@ get_compile_good_result() ->
 
 get_compile_good_test() ->
     ?assertEqual(drip_compile(get_compile_good_data()), 
-		 {ok, get_compile_good_result()}).
+         {ok, get_compile_good_result()}).
 
 set_compile_good_data() ->
     {[
@@ -257,7 +257,7 @@ set_compile_good_result() ->
 
 set_compile_good_test() ->
     ?assertEqual(drip_compile(set_compile_good_data()),
-		 {ok, set_compile_good_result()}).
+         {ok, set_compile_good_result()}).
 
 
 -endif.

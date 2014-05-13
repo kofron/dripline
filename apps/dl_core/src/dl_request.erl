@@ -2,21 +2,21 @@
 %% about external requests.
 -module(dl_request).
 -export([new/0,
-	 set_id/2,
-	 get_id/1,
-	 set_method/2,
-	 get_method/1,
-	 set_target/2,
-	 get_target/1,
-	 set_value/2,
-	 get_value/1
-	]).
+     set_id/2,
+     get_id/1,
+     set_method/2,
+     get_method/1,
+     set_target/2,
+     get_target/1,
+     set_value/2,
+     get_value/1
+    ]).
 
 -record(dl_request, {
-	  id,
-	  method,
-	  target,
-	  value
+      id,
+      method,
+      target,
+      value
 }).
 
 -type method() :: get | set | run | syscmd.

@@ -28,8 +28,8 @@ start_link(InstrumentID,EProID,GPIBAddress) ->
     gen_prologix:start_link(?MODULE, InstrumentID, EProID, GPIBAddress).
 
 init(_Args) ->
-	InitialState = #state{},
-	{ok, InitialState}.
+    InitialState = #state{},
+    {ok, InitialState}.
 
 handle_get(supply_current, StateData) ->
     {send, <<"CURR:MAG?">>, StateData};

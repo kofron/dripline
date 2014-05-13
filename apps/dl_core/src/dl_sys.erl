@@ -87,21 +87,21 @@ do_start_loggers([],Acc) ->
 do_start_loggers([Lg|R], Acc) ->
     LgDt = dl_conf_mgr:logger_info(Lg),
     case LgDt of
-	{error, no_logger}=Er ->
-	    do_start_loggers(R, [{Lg, Er}|Acc]);
-	_Data ->
-	    Res = start_logger(LgDt),
-	    do_start_loggers(R, [{Lg, Res}|Acc])
+    {error, no_logger}=Er ->
+        do_start_loggers(R, [{Lg, Er}|Acc]);
+    _Data ->
+        Res = start_logger(LgDt),
+        do_start_loggers(R, [{Lg, Res}|Acc])
     end.
 
 start_logger(LoggerData) ->
     ChName = dl_dt_data:get_channel(LoggerData),
     Ival = dl_dt_data:get_interval(LoggerData),
     case supervisor:start_child(dl_data_taker_sup, [dl_conf_mgr:channel_info(ChName), Ival]) of
-	{ok, _Pid} ->
-	    ok;
-	{error, _Reason}=E ->
-	    E
+    {ok, _Pid} ->
+        ok;
+    {error, _Reason}=E ->
+        E
     end.
 
 do_stop_loggers([], Acc) ->
@@ -109,11 +109,11 @@ do_stop_loggers([], Acc) ->
 do_stop_loggers([Lg|R], Acc) ->
     LgDt = dl_conf_mgr:logger_info(Lg),
     case LgDt of
-	{error, no_logger}=Er ->
-	    do_stop_loggers(R, [{Lg, Er}|Acc]);
-	_Data ->
-	    Res = stop_logger(LgDt),
-	    do_stop_loggers(R, [{Lg, Res}|Acc])
+    {error, no_logger}=Er ->
+        do_stop_loggers(R, [{Lg, Er}|Acc]);
+    _Data ->
+        Res = stop_logger(LgDt),
+        do_stop_loggers(R, [{Lg, Res}|Acc])
     end.
 
 stop_logger(LgDt) ->

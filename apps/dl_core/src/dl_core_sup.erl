@@ -33,9 +33,9 @@ init([]) ->
     SysMgr = {
       dl_sys,
       {
-	dl_sys,
-	start_link,
-	[dl_sys,[]]
+    dl_sys,
+    start_link,
+    [dl_sys,[]]
       },
       permanent,
       5000,
@@ -46,9 +46,9 @@ init([]) ->
     ConfMgr = {
       dl_conf_mgr,
       {
-	dl_conf_mgr,
-	start_link,
-	[dl_conf_mgr,[]]
+    dl_conf_mgr,
+    start_link,
+    [dl_conf_mgr,[]]
       },
       permanent,
       5000,
@@ -59,9 +59,9 @@ init([]) ->
     CdbAdapter = {
       dl_cdb_adapter,
       {
-	dl_cdb_adapter,
-	start_link,
-	[dl_cdb_adapter,[]]
+    dl_cdb_adapter,
+    start_link,
+    [dl_cdb_adapter,[]]
       },
       permanent,
       5000,
@@ -72,9 +72,9 @@ init([]) ->
     CdbWorkerSup = {
       dl_cdb_worker_sup,
       {
-	dl_cdb_worker_sup,
-	start_link,
-	[]
+    dl_cdb_worker_sup,
+    start_link,
+    []
       },
       permanent,
       5000,
@@ -83,9 +83,9 @@ init([]) ->
      },
 
     Children = [EproSup, DlInstrSup, 
-		Compiler, ConfMgr,
-		CdbAdapter, CdbWorkerSup, SysMgr, 
-		DTSup],
+        Compiler, ConfMgr,
+        CdbAdapter, CdbWorkerSup, SysMgr, 
+        DTSup],
 
     {ok, { {one_for_one, 5, 10}, Children} }.
 

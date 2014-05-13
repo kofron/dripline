@@ -21,17 +21,17 @@
 %%% State records and such %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -record(cdb_loc, {
-	  host, 
-	  port
-	 }).
+      host, 
+      port
+     }).
 -record(state, {
-	  revs,
-	  db_cnf_hndl,
-	  db_cmd_hndl,
-	  conf_ch_ref,
-	  cmd_ch_ref,
-	  db_loc = #cdb_loc{}
-	 }).
+      revs,
+      db_cnf_hndl,
+      db_cmd_hndl,
+      conf_ch_ref,
+      cmd_ch_ref,
+      db_loc = #cdb_loc{}
+     }).
 
 %%%%%%%%%%%
 %%% API %%%
@@ -42,13 +42,13 @@
 %%% gen_dl_agent callbacks %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([start_link/2,
-	 init/1,
-	 handle_sb_msg/2,
-	 handle_info/2,
-	 handle_cast/2,
-	 handle_call/3,
-	 code_change/3,
-	 terminate/2]).
+     init/1,
+     handle_sb_msg/2,
+     handle_info/2,
+     handle_cast/2,
+     handle_call/3,
+     code_change/3,
+     terminate/2]).
 
 %%%%%%%%%%%%%%%%%%%%%
 %%% Callback defs %%%
@@ -70,8 +70,8 @@ init(_Args) ->
       conf_ch_ref = ConfRef,
       cmd_ch_ref = CmdRef,
       db_loc = #cdb_loc{
-	host = Host,
-	port = Port
+    host = Host,
+    port = Port
        }
      },
     {ok, InitialState}.
@@ -89,11 +89,11 @@ handle_sb_msg({_Ref, _AnyID, _Msg}, #state{}=State) ->
 
 %% When our streams go down, recuisitate them
 handle_info({R, {done, _LastSeq}}, 
-	    #state{cmd_ch_ref=R,db_cmd_hndl=H}=State) ->
+        #state{cmd_ch_ref=R,db_cmd_hndl=H}=State) ->
     {ok, CmdRef} = setup_cmd_streaming(H),
     {noreply, State#state{cmd_ch_ref=CmdRef}};
 handle_info({R, {done, _LastSeq}}, 
-	    #state{conf_ch_ref=R,db_cnf_hndl=H}=State) ->
+        #state{conf_ch_ref=R,db_cnf_hndl=H}=State) ->
     {ok, ConfRef} = setup_conf_streaming(H),
     {noreply, State#state{conf_ch_ref=ConfRef}};
 %% When we receive {last_seq, N} messages, ignore them.
@@ -107,12 +107,12 @@ handle_info({R, {change, ChangeData}}, #state{conf_ch_ref=R, revs=_Revs}=State) 
 %% The second kind of changes come from the command stream.
 handle_info({R, {change, ChangeData}}, #state{cmd_ch_ref=R, revs=Revs}=State) ->
     NewState = case ignore_update_rev(ChangeData, Revs) of
-		   true ->
-		       State;
-		   false ->
-		       spawn_cmd_worker(ChangeData),
-		       State#state{revs=update_rev_data(ChangeData,Revs)}
-	       end,    
+           true ->
+               State;
+           false ->
+               spawn_cmd_worker(ChangeData),
+               State#state{revs=update_rev_data(ChangeData,Revs)}
+           end,    
     {noreply, NewState}.
 
 handle_call(_Call, _From, StateData) ->
@@ -143,10 +143,10 @@ terminate(_Reason, _StateData) ->
 setup_conf_streaming(DbHandle) ->
     StreamOpts = [continuous, include_docs, {since, 0}],
     case couchbeam_changes:follow(DbHandle, StreamOpts) of
-	{ok, StartRef} ->
-	    {ok, StartRef};
-	{error, _Error}=E ->
-	    E
+    {ok, StartRef} ->
+        {ok, StartRef};
+    {error, _Error}=E ->
+        E
     end.
 
 %%----------------------------------------------------------------------%%
@@ -162,22 +162,22 @@ setup_cmd_streaming(DbHandle) ->
     LastSeq = props:get('update_seq',Info),
     StreamOpts = [continuous, include_docs, {since, LastSeq}],
     case couchbeam_changes:follow(DbHandle, StreamOpts) of
-	{ok, StartRef} ->
-	    {ok, StartRef};
-	{error, _Error}=E ->
-	    E
+    {ok, StartRef} ->
+        {ok, StartRef};
+    {error, _Error}=E ->
+        E
     end.
 
 %%---------------------------------------------------------------------%%
 %% @doc update_rev_data adds an ignore flag to the revision dictionary 
-%%		for a given document and revision tag.
+%%        for a given document and revision tag.
 %% @end
 %%---------------------------------------------------------------------%%
 update_rev_data(ChangeData,RevisionInfo) ->
-	Id = props:get('doc._id',ChangeData),
-	BinRev = props:get('doc._rev',ChangeData),
-	Rev = strip_rev_no(BinRev),
-	dict:store(Id,Rev + 1,RevisionInfo).
+    Id = props:get('doc._id',ChangeData),
+    BinRev = props:get('doc._rev',ChangeData),
+    Rev = strip_rev_no(BinRev),
+    dict:store(Id,Rev + 1,RevisionInfo).
 
 %%----------------------------------------------------------------------%%
 %% @doc When a document passes through the changes feed, we automatically
@@ -189,10 +189,10 @@ ignore_update_rev(ChangeLine, RevsDict) ->
     BinRev = props:get('doc._rev', ChangeLine),
     RevNo = strip_rev_no(BinRev),
     case dict:find(DocID, RevsDict) of
-	{ok, RevNo} ->
-	    true;
-	_ ->
-	    false
+    {ok, RevNo} ->
+        true;
+    _ ->
+        false
     end.
 
 %%---------------------------------------------------------------------%%
@@ -203,14 +203,14 @@ ignore_update_rev(ChangeLine, RevsDict) ->
 -spec spawn_cmd_worker(ejson:json_object()) -> pid().
 spawn_cmd_worker(Command) ->
     ok = poolboy:transaction(couchdb_command_pool,
-			     fun(Worker) ->
-				     gen_server:cast(Worker, {process, Command})
-			     end).
+                 fun(Worker) ->
+                     gen_server:cast(Worker, {process, Command})
+                 end).
 
 %%---------------------------------------------------------------------%%
 %% @doc strip_rev_no/1 takes a binary "_rev" tag and strips the revision
-%% 		sequence number.  this is very useful for notifying the monitor
-%%		that a sequence number is about to be changed by e.g. us.
+%%         sequence number.  this is very useful for notifying the monitor
+%%        that a sequence number is about to be changed by e.g. us.
 %% @end
 %%---------------------------------------------------------------------%%
 -spec strip_rev_no(binary()) -> integer().
@@ -230,13 +230,13 @@ worker_dt(Instr,Ch,RawData) ->
     ChInfo = dl_conf_mgr:channel_info(Instr, Ch),
     ChName = dl_ch_data:get_id(ChInfo),
     HookedData = try
-		     dl_hooks:apply_hooks(ChName,DlDt)
-		 catch
-		     C:E ->
-			 lager:info("failed to apply hooks for channel ~p (~p:~p) [~p,~p]",
-				    [ChName,C,E,DlDt,ChInfo]),
-			 DlDt
-		 end,
+             dl_hooks:apply_hooks(ChName,DlDt)
+         catch
+             C:E ->
+             lager:info("failed to apply hooks for channel ~p (~p:~p) [~p,~p]",
+                    [ChName,C,E,DlDt,ChInfo]),
+             DlDt
+         end,
     CouchDoc = dl_dt_data_to_couch(ChName,HookedData),
     post_dt_couch_doc(CouchDoc).
 
@@ -260,15 +260,15 @@ post_dt_couch_doc(CD) ->
 dl_dt_data_to_couch(Name,DlDt) ->
     SName = erlang:atom_to_binary(Name,latin1),
     case dl_data:get_code(DlDt) of
-	ok ->
-	    Rs = dl_data:get_data(DlDt),
-	    Ts = dl_data:get_ts(DlDt),
-	    Fn = dl_data:get_final(DlDt),
-	    [
-	     {<<"sensor_name">>, SName},
-	     {<<"uncalibrated_value">>, Rs},
-	     {<<"timestamp_localstring">>, Ts},
-	     {<<"calibrated_value">>, Fn}
-	    ]
+    ok ->
+        Rs = dl_data:get_data(DlDt),
+        Ts = dl_data:get_ts(DlDt),
+        Fn = dl_data:get_final(DlDt),
+        [
+         {<<"sensor_name">>, SName},
+         {<<"uncalibrated_value">>, Rs},
+         {<<"timestamp_localstring">>, Ts},
+         {<<"calibrated_value">>, Fn}
+        ]
     end.
-	    
+        

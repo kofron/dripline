@@ -28,9 +28,9 @@ init([]) ->
     LoggerProcess = {
       dl_data_taker,
       {
-	dl_data_taker,
-	start_link,
-	[]
+    dl_data_taker,
+    start_link,
+    []
       },
       transient,
       5000,
