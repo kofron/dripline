@@ -34,9 +34,6 @@ handle_get(Locator, StateData) ->
             lager:warning("device atom illformed"),
             {error, {unsupported_get, {no_locator, Locator}}, StateData}
     end.
-%handle_get(ChName, StateData) ->
-%    lager:warning("unrecognized get"),
-%    {error, {unsupported_get, {no_locator, ChName}}, StateData}.
 
 %%This set is only for debugging purposes
 handle_set(disk_usage, Disk, State) ->
