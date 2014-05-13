@@ -34,17 +34,12 @@
 %% API Functions
 %%--------------------------------------------------------------------
 start_link(CallbackMod, ID) ->
-    lager:notice("my ID is:~p",[ID]),
-    Res = gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []),
-    lager:notice("new vsn start_link result is: ~p", [Res]),
-    Res.
+    gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
 
 get(Instrument, Channel) ->
-    lager:notice("an os_shell get ch:(~p) on instr:(~p)", [Channel, Instrument]),
     gen_server:call(Instrument, {get, Channel}).
 
 set(Instrument, Channel, Value) ->
-    lager:notice("an os_shell set ch:(~p) on instr:(~p) to val:(~p)", [Channel, Instrument, Value]),
     gen_server:call(Instrument, {set, Channel, Value}).
 
 %%--------------------------------------------------------------------
@@ -64,14 +59,13 @@ init([CallbackMod]=Args) ->
         end.
 
 handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
-    lager:notice("handling call to os_shell get"),
-    {reply, OsCmd, NewModSt} = Mod:handle_get({Channel}, ModSt),
-    lager:notice("command is: ~p", [OsCmd]),
+    {reply, OsCmd, NewModSt} = Mod:handle_get(Channel, ModSt),
     Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
     {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
-handle_call({set, _Channel, _Value}, _From, State) ->
-    lager:notice("os_shell set"),
-    {reply, ok, State};
+handle_call({set, Channel, Value}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
+    {reply, OsCmd, NewModSt} = Mod:handle_set(Channel, Value, ModSt),
+    Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
+    {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
 handle_call(_Args, _From, State)->
     lager:warning("shell is busy"),
     {reply, busy, State};
