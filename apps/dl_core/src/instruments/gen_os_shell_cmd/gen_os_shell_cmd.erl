@@ -17,7 +17,8 @@
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
--export([get/2,
+-export([start_link/2,
+         get/2,
          set/3]).
 %%--------------------------------------------------------------------
 %% gen_server
@@ -32,10 +33,20 @@
 %%--------------------------------------------------------------------
 %% API Functions
 %%--------------------------------------------------------------------
+start_link(CallbackMod, ID) ->
+    lager:notice("my ID is:~p",[ID]),
+    Res = gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []),
+    lager:notice("new vsn start_link result is: ~p", [Res]),
+    Res.
+
 get(Instrument, Channel) ->
+    lager:notice("the instruments are:~n~p", [supervisor:which_children(dl_instr_sup)]),
+    lager:notice("and I am:~p", [self()]),
+    lager:notice("an os_shell get ch:(~p) on instr:(~p)", [Channel, Instrument]),
     gen_server:call(Instrument, {get, Channel}).
 
 set(Instrument, Channel, Value) ->
+    lager:notice("an os_shell set ch:(~p) on instr:(~p) to val:(~p)", [Channel, Instrument, Value]),
     gen_server:call(Instrument, {set, Channel, Value}).
 
 %%--------------------------------------------------------------------
@@ -45,10 +56,13 @@ init(_Args) ->
     ignore.
 
 handle_call({get, _Channel}, _From, State) ->
+    lager:notice("os_shell get"),
     {reply, ok, State};
 handle_call({set, _Channel, _Value}, _From, State) ->
+    lager:notice("os_shell set"),
     {reply, ok, State};
 handle_call(_Request, _From, State) ->
+    lager:warning("os_shell unknown request"),
     {stop, unrecognized_request, State}.
 
 handle_cast(_Request, State) ->

@@ -52,7 +52,9 @@ execute(ID,Arglist) ->
 %%% gen_server API and callback definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(CallbackMod,ID) ->
-  gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
+  Res = gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []),
+  lager:notice("start_link result is: ~p", [Res]),
+  Res.
 
 init([CallbackMod]=Args) ->
     case CallbackMod:init(Args) of

@@ -10,6 +10,11 @@
 %%%-------------------------------------------------------------------
 %%% Instrument callbacks
 %%%-------------------------------------------------------------------
+-callback start_link(ID::atom()) ->
+    {ok, PID::pid()}|
+    ignore|
+    {error, Error::term()}.
+
 -callback handle_get(atom(), State::term()) ->
     {send, term(), State::term()}|
     {error, {Type::atom(), {Reason::atom(), Detail::term()}}, NewState::term()}.
