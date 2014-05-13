@@ -66,7 +66,7 @@ handle_call({set, Channel, Value}, From, #state{mod=Mod, mod_state=ModSt, from=n
     {reply, OsCmd, NewModSt} = Mod:handle_set(Channel, Value, ModSt),
     Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
     {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
-handle_call(_Args, _From, State)->
+handle_call(_Args, _From, #state{from=_F}=State)->
     lager:warning("shell is busy"),
     {reply, busy, State};
 handle_call(_Request, _From, State) ->
@@ -95,6 +95,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %% helper Functions
 %%--------------------------------------------------------------------
+construct_err_response({error, {_Class, _Error}=E}) ->
+    D0 = dl_data:new(),
+    D1 = dl_data:set_data(D0, E),
+    D2 = dl_data:set_code(D1, error),
+    dl_data:set_ts(D2, dl_util:make_ts()).
+
 construct_response(Status, Data)->
     D0 = dl_data:new(),
     D1 = set_err_code(Status, dl_data:set_data(D0, erlang:list_to_binary(Data))),

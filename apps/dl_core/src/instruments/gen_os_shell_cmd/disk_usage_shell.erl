@@ -17,21 +17,30 @@
 %%--------------------------------------------------------------------
 %% API Functions
 %%--------------------------------------------------------------------
-init(Args) ->
+init(_Args) ->
     {ok, #state{}}.
 
 start_link(ID) ->
     gen_os_shell_cmd:start_link(?MODULE, ID).
 
 handle_get(disk_usage, StateData) ->
-    {reply, assemble_df_cmd("/dev/sda1"), StateData};
-handle_get(ChName, StateData) ->
-    lager:warning("unrecognized get"),
-    {error, {unsupported_get, {no_locator, ChName}}, StateData}.
+    lager:warning("depricated usage"),
+    {error, {deprecated_usage, {device_specification_required}}, StateData};
+handle_get(Locator, StateData) ->
+    case parse_as_device(Locator) of
+        {ok, Device} ->
+            {reply, assemble_df_cmd(Device), StateData};
+        nomatch ->
+            lager:warning("device atom illformed"),
+            {error, {unsupported_get, {no_locator, Locator}}, StateData}
+    end.
+%handle_get(ChName, StateData) ->
+%    lager:warning("unrecognized get"),
+%    {error, {unsupported_get, {no_locator, ChName}}, StateData}.
 
 %%This set is only for debugging purposes
 handle_set(disk_usage, Disk, State) ->
-    lager:warning("Set should *NOT* be used to get disk usage, this is for testing only")
+    lager:warning("Set should *NOT* be used to get disk usage, this is for testing only"),
     {reply, assemble_df_cmd(Disk), State};
 handle_set(ChName, _Value, StateData) ->
     lager:warning("unrecognized set"),
@@ -40,6 +49,15 @@ handle_set(ChName, _Value, StateData) ->
 %%--------------------------------------------------------------------
 %% Helper Functions
 %%--------------------------------------------------------------------
+parse_as_device(Locator) ->
+    LocList = atom_to_list(Locator),
+    case lists:prefix("disk_usage:", LocList) of
+        true ->
+            {_, Device} = lists:split(length("disk_usage:"), LocList),
+            {ok, Device};
+        false ->
+            nomatch
+        end.
 
 assemble_df_cmd(Disk) ->
     FmtStr = "/bin/df ~p",
