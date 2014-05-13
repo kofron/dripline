@@ -31,8 +31,6 @@ start_bus(BsData) ->
 -spec start_instr(dl_instr_data:dl_instr_data()) -> ok.
 start_instr(InData) ->
     InChSpec = generate_instr_cspec(InData),
-    lager:notice("start child: ~p",[InData]),
-    lager:notice("cspec of: ~p", [InChSpec]),
     case supervisor:start_child(dl_instr_sup, InChSpec) of
     {ok, _} ->
         ok;
@@ -132,8 +130,8 @@ start_bus_from_spec({_N,{_,_,_},_Tm,_Tmo,_Role,[M]}=Ch)
         ok
     end;
 start_bus_from_spec({_N,{_,_,_},_Tm,_Tmo,_Role,[unix]}) ->
-    lager:notice("starting unix"),
+    lager:debug("starting unix"),
     ok;
 start_bus_from_spec({_N,{_,_,_},_Tm,_Tmo,_Role,[shell]}) ->
-    lager:notice("starting shell"),
+    lager:debug("starting shell"),
     ok.

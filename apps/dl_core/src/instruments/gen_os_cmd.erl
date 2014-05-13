@@ -53,7 +53,6 @@ execute(ID,Arglist) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(CallbackMod,ID) ->
   Res = gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []),
-  lager:notice("start_link result is: ~p", [Res]),
   Res.
 
 init([CallbackMod]=Args) ->
