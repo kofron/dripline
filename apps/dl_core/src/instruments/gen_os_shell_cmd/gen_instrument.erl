@@ -10,6 +10,9 @@
 %%%-------------------------------------------------------------------
 %%% Instrument callbacks
 %%%-------------------------------------------------------------------
+-callback init(Args::term()) ->
+    {ok, State::term()}.
+
 -callback start_link(ID::atom()) ->
     {ok, PID::pid()}|
     ignore|

@@ -7,7 +7,8 @@
 -module(disk_usage_shell).
 -behavior(gen_instrument).
 
--export([start_link/1,
+-export([init/1,
+         start_link/1,
          handle_get/2,
          handle_set/3]).
 
@@ -16,6 +17,8 @@
 %%--------------------------------------------------------------------
 %% API Functions
 %%--------------------------------------------------------------------
+init(Args) ->
+    {ok, #state{}}.
 
 start_link(ID) ->
     gen_os_shell_cmd:start_link(?MODULE, ID).

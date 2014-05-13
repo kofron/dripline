@@ -12,7 +12,7 @@
 -module(gen_os_shell_cmd).
 -behaviour(gen_server).
 
-%-export([behaviour_info/1]).
+-record(state,{mod, mod_state, port, from, data}).
 
 %%--------------------------------------------------------------------
 %% API
@@ -40,8 +40,6 @@ start_link(CallbackMod, ID) ->
     Res.
 
 get(Instrument, Channel) ->
-    lager:notice("the instruments are:~n~p", [supervisor:which_children(dl_instr_sup)]),
-    lager:notice("and I am:~p", [self()]),
     lager:notice("an os_shell get ch:(~p) on instr:(~p)", [Channel, Instrument]),
     gen_server:call(Instrument, {get, Channel}).
 
@@ -52,15 +50,31 @@ set(Instrument, Channel, Value) ->
 %%--------------------------------------------------------------------
 %% gen_server Functions
 %%--------------------------------------------------------------------
-init(_Args) ->
-    ignore.
+init([CallbackMod]=Args) ->
+    case CallbackMod:init(Args) of
+        {ok, ModStateData} = _StartOK ->
+            StateData = #state{mod = CallbackMod,
+                               mod_state = ModStateData,
+                               port = none,
+                               from = none,
+                               data = []},
+            {ok, StateData};
+        Failure ->
+            Failure
+        end.
 
-handle_call({get, _Channel}, _From, State) ->
-    lager:notice("os_shell get"),
-    {reply, ok, State};
+handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
+    lager:notice("handling call to os_shell get"),
+    {reply, OsCmd, NewModSt} = Mod:handle_get({Channel}, ModSt),
+    lager:notice("command is: ~p", [OsCmd]),
+    Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
+    {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
 handle_call({set, _Channel, _Value}, _From, State) ->
     lager:notice("os_shell set"),
     {reply, ok, State};
+handle_call(_Args, _From, State)->
+    lager:warning("shell is busy"),
+    {reply, busy, State};
 handle_call(_Request, _From, State) ->
     lager:warning("os_shell unknown request"),
     {stop, unrecognized_request, State}.
@@ -68,6 +82,13 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}.
 
+handle_info({P, {data, Data}}, #state{port=P, data=OldData}=State) ->
+    {noreply, State#state{data=[OldData|Data]}};
+handle_info({P, {exit_status, Status}}, #state{port=P, from=From, data=Data}=State) ->
+    FlatList = lists:flatten(Data),
+    Reply = construct_response(Status, FlatList),
+    gen_server:reply(From, Reply),
+    {noreply, State#state{port=none, from=none, data=[]}};
 handle_info(_Info, State) ->
     {reply, State}.
 
@@ -80,3 +101,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %% helper Functions
 %%--------------------------------------------------------------------
+construct_response(Status, Data)->
+    D0 = dl_data:new(),
+    D1 = set_err_code(Status, dl_data:set_data(D0, erlang:list_to_binary(Data))),
+    dl_data:set_ts(D1, dl_util:make_ts()).
+
+set_err_code(0, Dl_data) ->
+    dl_data:set_code(Dl_data, ok);
+set_err_code(_NonZero, Dl_data) ->
+    dl_data:set_code(Dl_data, error).
