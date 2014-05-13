@@ -25,7 +25,7 @@ start_link(ID) ->
 
 handle_get(disk_usage, StateData) ->
     lager:warning("depricated usage"),
-    {error, {deprecated_usage, {device_specification_required}}, StateData};
+    {error, {deprecated_usage, {missing_info, device_name}}, StateData};
 handle_get(Locator, StateData) ->
     case parse_as_device(Locator) of
         {ok, Device} ->

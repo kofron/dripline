@@ -65,6 +65,7 @@ handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=St
             Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
             {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
         {error, {Type, Details}, NewModSt} ->
+            lager:notice("constructing error"),
             {reply, construct_err_response({error, {Type, Details}}), State}
         end;
             
