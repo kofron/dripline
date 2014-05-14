@@ -30,8 +30,6 @@ handle_get(ChName, StateData) ->
     {error, {unsupported_get, {no_locator, ChName}}, StateData}.
 
 handle_set(attenuation, Value, StateData) ->
-    lager:info("setting attenuator"),
-    lager:info("calling:~n~p",[assemble_atten_cmd(Value, StateData)]),
     {send, assemble_atten_cmd(Value, StateData), StateData};
 handle_set(ChName, _Value, StateData) ->
     {error, {unsupported_set, {no_locator, ChName}}, StateData}.
@@ -41,7 +39,5 @@ handle_set(ChName, _Value, StateData) ->
 %%--------------------------------------------------------------------
 
 assemble_atten_cmd(Value, #state{locator={Maj,Min}}) ->
-    %FmtStr = "/home/laroque/virt_env/spidev/bin/python -c 'import spidev;spi=spidev.SpiDev();spi.open(~p,~p);spi.xfer([~p])'",
-    FmtStr = "/usr/bin/python -c 'import datetime;foo=~p+~p;bar=~p;datetime.datetime.now()'",
-    io_lib:format(FmtStr, [Maj, Min, erlang:binary_to_list(Value)]).%,
-    %io_lib:format("/usr/bin/python -c 'import datetime;~p+~p'", [Maj, Min]).
+    FmtStr = "/home/laroque/virt_env/spidev/bin/python -c 'import spidev;spi=spidev.SpiDev();spi.open(~p,~p);spi.xfer([~p])'",
+    io_lib:format(FmtStr, [Maj, Min, erlang:binary_to_integer(Value)]).%,
