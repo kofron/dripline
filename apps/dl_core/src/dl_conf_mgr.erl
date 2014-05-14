@@ -518,7 +518,7 @@ declare_nonsense(Msg) ->
 maybe_add_or_update_channel(ChData) ->
     case get_ch_data(dl_ch_data:get_id(ChData)) of
     {error, no_channel} ->
-        lager:info("new channel recvd: ~p",[ChData]),
+        lager:notice("new channel recvd: ~p",[ChData]),
         add_channel(ChData);
     {ok, ChData} ->
         lager:debug("ignoring redundant channel conf (~p = ~p)",[ChData,ChData]);
@@ -531,7 +531,7 @@ maybe_add_or_update_channel(ChData) ->
 maybe_add_or_update_logger(LgData) ->
     case get_dt_data(dl_dt_data:get_channel(LgData)) of
     {error, no_logger} ->
-        lager:info("new logger recvd: ~p",[LgData]),
+        lager:notice("new logger recvd: ~p",[LgData]),
         add_logger(LgData);
     {ok, LgData} ->
         lager:debug("ignoring redundant logger conf");
@@ -544,7 +544,7 @@ maybe_add_or_update_logger(LgData) ->
 maybe_add_or_update_bus(ChData) ->
     case get_bus_data(dl_bus_data:get_id(ChData)) of
     {error, no_bus} ->
-        lager:info("new bus recvd: ~p",[ChData]),
+        lager:notice("new bus recvd: ~p",[ChData]),
         add_bus(ChData);
     {ok, ChData} ->
         lager:debug("ignoring redundant bus conf");
@@ -557,7 +557,7 @@ maybe_add_or_update_bus(ChData) ->
 maybe_add_or_update_instrument(InData) ->
     case get_instr_data(dl_instr_data:get_id(InData)) of
     {error, no_instrument} ->
-        lager:info("new instrument recvd: ~p",[InData]),
+        lager:notice("new instrument recvd: ~p",[InData]),
         add_instrument(InData);
     {ok, InData} ->
         lager:debug("ignoring redundant instrument conf");
@@ -577,7 +577,7 @@ add_instrument(InData) ->
                 lists:map(fun dl_bus_data:get_id/1,get_local_bss())),
     case IsLocalInstr of
     true ->
-        lager:info("starting local instrument (~p)",[InData]),
+        lager:notice("starting local instrument (~p)",[InData]),
         ok = try_instr_start(InData);
     false ->
         ok
@@ -693,7 +693,7 @@ add_bus(BsData) ->
               end,
               Instr);
     false ->
-        lager:info("non-local bus info recvd (~p)",[BusName]),
+        lager:notice("non-local bus info recvd (~p)",[BusName]),
         ok
     end,
     dl_softbus:bcast(agents, ?MODULE, {nbs, BsData}).

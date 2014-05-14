@@ -37,6 +37,8 @@ start_link(CallbackMod, ID) ->
     gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
 
 get(Instrument, Channel) ->
+    lager:info("processing call to ~p", [Instrument]),
+    lager:info("sent to port ~p", [self()]),
     gen_server:call(Instrument, {get, Channel}).
 
 set(Instrument, Channel, Value) ->
@@ -60,7 +62,7 @@ init([CallbackMod]=Args) ->
 
 handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
     case Mod:handle_get(Channel, ModSt) of
-        {reply, OsCmd, NewModSt} ->
+        {send, OsCmd, NewModSt} ->
             Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
             {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
         {error, {Type, Details}, NewModSt} ->
@@ -68,7 +70,7 @@ handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=St
         end;
             
 handle_call({set, Channel, Value}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
-    {reply, OsCmd, NewModSt} = Mod:handle_set(Channel, Value, ModSt),
+    {send, OsCmd, NewModSt} = Mod:handle_set(Channel, Value, ModSt),
     Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
     {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
 handle_call(_Args, _From, #state{from=_F}=State)->

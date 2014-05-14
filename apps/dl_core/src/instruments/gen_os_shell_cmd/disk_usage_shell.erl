@@ -15,7 +15,7 @@
 -record(state, {locator}).
 
 %%--------------------------------------------------------------------
-%% API Functions
+%% gen_instrument Functions
 %%--------------------------------------------------------------------
 init(_Args) ->
     {ok, #state{}}.
@@ -29,7 +29,7 @@ handle_get(disk_usage, StateData) ->
 handle_get(Locator, StateData) ->
     case parse_as_device(Locator) of
         {ok, Device} ->
-            {reply, assemble_df_cmd(Device), StateData};
+            {send, assemble_df_cmd(Device), StateData};
         nomatch ->
             lager:warning("device atom illformed"),
             {error, {unsupported_get, {no_locator, Locator}}, StateData}
@@ -38,7 +38,7 @@ handle_get(Locator, StateData) ->
 %%This set is only for debugging purposes
 handle_set(disk_usage, Disk, State) ->
     lager:warning("Set should *NOT* be used to get disk usage, this is for testing only"),
-    {reply, assemble_df_cmd(Disk), State};
+    {send, assemble_df_cmd(Disk), State};
 handle_set(ChName, _Value, StateData) ->
     lager:warning("unrecognized set"),
     {error, {unsupported_set, {no_locator, ChName}}, StateData}.

@@ -30,6 +30,7 @@ init(_Args) ->
 handle_call(_Call, _From, State) ->
     % should die here, no calls are expected
     {reply, ok, State}.
+
 % when a command is sent to the worker, the following happens:
 %   1) an attempt is made to compile the command to a dl_request
 %   1a) if that succeeds, then we enter do_request
@@ -38,9 +39,22 @@ handle_call(_Call, _From, State) ->
 % we can update with impunity.  first we should update to say 
 % if we will process this request or not, then update with whatever
 % the result may be.  is all this communication necessary?  maybe
+%
+% It seems to have been decided that it isn't, though I'm not inclined to
+% agree. Without acknowledgement, there is no garuntee of a response.
+% Without indicating if there will be processed or not, it isn't clear if
+% lack of further response is because the node doesn't care, or because the
+% node is working. A nice behavior would be that for every command posted,
+% every running node responds to indicate on of four states:
+% 1) received, doc seems ill formed
+% 2) received, doc not relevant to this node
+% 3) received, this node is processing this doc -> expect further response
+% 4) complete, previously in state (3) this node has finished responding
 handle_cast({process, Command}, State) ->
+    lager:info("command doc received"),
     case dl_compiler:compile(Command) of
     {ok, Request} ->
+        lager:info("request received: ~p", [Request]),
         do_request_if_exists(Request, State);
     {error, Reason, BadRequest} ->
         Err = dl_compiler:compiler_error_msg(Reason),
@@ -130,7 +144,7 @@ try_finalize_data(Data, Request) ->
     dl_hooks:apply_hooks(ChName,Data)
     catch
     C:E ->
-        lager:info("failed to apply hooks for channel ~p (~p:~p)",
+        lager:notice("failed to apply hooks for channel ~p (~p:~p)",
                [ChName,C,E]),
         Data
     end.
@@ -151,5 +165,6 @@ update_cmd_doc(DocID, DBHandle, JSON) ->
     end.
 
 update_cmd_doc_loop(_DBHandle, _NewDoc) ->
-    io:format("looping to resolve conflict.~n"),
+    lager:info("looping to resolve conflict."),
+    lager:error("there's no way this is currently correct"),
     ok.

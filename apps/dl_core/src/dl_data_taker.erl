@@ -92,7 +92,7 @@ do_read_prologix(Instr, Chan) ->
     case gen_prologix:read(Instr,Chan) of
     {error, Reason} ->
         Arg = [Chan, Reason],
-        lager:info("logger on channel ~p failed with reason ~p",Arg);
+        lager:notice("logger on channel ~p failed with reason ~p",Arg);
     Data ->
         Msg = {nd, {Instr, Chan}, Data},
         dl_softbus:bcast(agents,self(),Msg),

@@ -233,7 +233,7 @@ worker_dt(Instr,Ch,RawData) ->
              dl_hooks:apply_hooks(ChName,DlDt)
          catch
              C:E ->
-             lager:info("failed to apply hooks for channel ~p (~p:~p) [~p,~p]",
+             lager:notice("failed to apply hooks for channel ~p (~p:~p) [~p,~p]",
                     [ChName,C,E,DlDt,ChInfo]),
              DlDt
          end,
