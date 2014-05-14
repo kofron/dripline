@@ -39,5 +39,5 @@ handle_set(ChName, _Value, StateData) ->
 %%--------------------------------------------------------------------
 
 assemble_atten_cmd(Value, #state{locator={Maj,Min}}) ->
-    FmtStr = "/home/laroque/virt_env/spidev/bin/python -c 'import spidev;spi=spidev.SpiDev();spi.open(~p,~p);spi.xfer([~p])'",
+    FmtStr = "python -c 'import spidev;spi=spidev.SpiDev();spi.open(~p,~p);spi.xfer([~p])'",
     io_lib:format(FmtStr, [Maj, Min, erlang:binary_to_integer(Value)]).%,
