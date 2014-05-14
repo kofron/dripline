@@ -110,10 +110,19 @@ construct_err_response({error, {_Class, _Error}=E}) ->
 
 construct_response(Status, Data)->
     D0 = dl_data:new(),
-    D1 = set_err_code(Status, dl_data:set_data(D0, erlang:list_to_binary(Data))),
-    dl_data:set_ts(D1, dl_util:make_ts()).
+    D1 = dl_data:set_data(D0, erlang:list_to_binary(Data)),
+    D2 = set_err_code(Status, D1),
+    dl_data:set_ts(D2, dl_util:make_ts()).
 
 set_err_code(0, Dl_data) ->
-    dl_data:set_code(Dl_data, ok);
+    NewData = case dl_data:get_data(Dl_data) of
+        <<>> -> dl_data:set_data(Dl_data, <<"ok">>);
+        _ -> Dl_data
+        end,
+    dl_data:set_code(NewData, ok);
 set_err_code(_NonZero, Dl_data) ->
-    dl_data:set_code(Dl_data, error).
+    NewData = case dl_data:get_data(Dl_data) of
+        <<>> -> dl_data:set_data(Dl_data, <<"error">>);
+        _ -> Dl_data
+        end,
+    dl_data:set_code(NewData, error).
