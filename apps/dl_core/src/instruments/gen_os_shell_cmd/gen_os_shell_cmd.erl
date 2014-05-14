@@ -37,12 +37,10 @@ start_link(CallbackMod, ID) ->
     gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
 
 get(Instrument, Channel) ->
-    lager:info("processing call to ~p", [Instrument]),
-    lager:info("sent to port ~p", [self()]),
-    gen_server:call(Instrument, {get, Channel}).
+    gen_server:call(Instrument, {get, Channel}, 60000).
 
 set(Instrument, Channel, Value) ->
-    gen_server:call(Instrument, {set, Channel, Value}).
+    gen_server:call(Instrument, {set, Channel, Value}, 60000).
 
 %%--------------------------------------------------------------------
 %% gen_server Functions
@@ -66,13 +64,17 @@ handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=St
             Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
             {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
         {error, {Type, Details}, NewModSt} ->
-            {reply, construct_err_response({error, {Type, Details}}), State}
+            {reply, construct_err_response({error, {Type, Details}}), NewModSt}
         end;
             
 handle_call({set, Channel, Value}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
-    {send, OsCmd, NewModSt} = Mod:handle_set(Channel, Value, ModSt),
-    Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
-    {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
+    case Mod:handle_set(Channel, Value, ModSt) of
+        {send, OsCmd, NewModSt} ->
+            Port = erlang:open_port({spawn, OsCmd}, [exit_status, stderr_to_stdout]),
+            {noreply, State#state{port=Port, from=From, mod_state=NewModSt}};
+        {error, {Type, Details}, NewModSt} ->
+            {reply, construct_err_response({error, {Type, Details}}), NewModSt}
+        end;
 handle_call(_Args, _From, #state{from=_F}=State)->
     lager:warning("shell is busy"),
     {reply, busy, State};
