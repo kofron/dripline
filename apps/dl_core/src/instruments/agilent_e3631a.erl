@@ -10,14 +10,14 @@
 -behavior(gen_gpib_spoller).
 
 -export([start_link/4,
-	 init/1,
-	 handle_stb/2,
-	 handle_esr/2,
-	 handle_get/2,
-	 handle_set/3,
-	 sre_register_bitmask/1,
-	 ese_register_bitmask/1
-	]).
+     init/1,
+     handle_stb/2,
+     handle_esr/2,
+     handle_get/2,
+     handle_set/3,
+     sre_register_bitmask/1,
+     ese_register_bitmask/1
+    ]).
 
 -record(state, {}).
 
@@ -47,21 +47,21 @@ handle_set(_Any, _Value, StateData) ->
 %%
 handle_stb(StatusByte, StateData) when ?srq_asserted(StatusByte) ->
     case StatusByte of
-	_MsgAvail when ?mav_asserted(StatusByte) ->
-	    {retrieve_data, StateData};
-	Err when Err =:= 224; Err =:= 144; Err =:= 192; Err =:= 208 ->
-	    {retrieve_error, <<"err?">>, StateData};
-	ESR when ESR =:= 96; ESR =:= 112 ->
-	    {fetch_esr, <<"*esr?">>, StateData}
+    _MsgAvail when ?mav_asserted(StatusByte) ->
+        {retrieve_data, StateData};
+    Err when Err =:= 224; Err =:= 144; Err =:= 192; Err =:= 208 ->
+        {retrieve_error, <<"err?">>, StateData};
+    ESR when ESR =:= 96; ESR =:= 112 ->
+        {fetch_esr, <<"*esr?">>, StateData}
     end;
 handle_stb(StatusByte, StateData) ->
     case StatusByte of
-	Err when Err =:= 160; Err =:= 80; Err =:= 128; Err =:= 144 ->
-	    {retrieve_error, <<"err?">>, StateData};
-	ESR when ESR =:= 32; ESR =:= 48 ->
-	    {fetch_esr, <<"*esr?">>, StateData};
-	_MsgAvail when ?mav_asserted(StatusByte) ->
-	    {retrieve_data, StateData}
+    Err when Err =:= 160; Err =:= 80; Err =:= 128; Err =:= 144 ->
+        {retrieve_error, <<"err?">>, StateData};
+    ESR when ESR =:= 32; ESR =:= 48 ->
+        {fetch_esr, <<"*esr?">>, StateData};
+    _MsgAvail when ?mav_asserted(StatusByte) ->
+        {retrieve_data, StateData}
     end.
 
 handle_esr(1, StateData) ->

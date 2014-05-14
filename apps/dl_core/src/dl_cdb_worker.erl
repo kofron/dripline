@@ -6,10 +6,10 @@
 
 -export([start_link/1]).
 -export([init/1, 
-	 handle_call/3, 
-	 handle_cast/2, 
-	 handle_info/2, 
-	 terminate/2,
+     handle_call/3, 
+     handle_cast/2, 
+     handle_info/2, 
+     terminate/2,
          code_change/3]).
 
 -record(state, {cdb_conn, cdb_handle}).
@@ -30,6 +30,7 @@ init(_Args) ->
 handle_call(_Call, _From, State) ->
     % should die here, no calls are expected
     {reply, ok, State}.
+
 % when a command is sent to the worker, the following happens:
 %   1) an attempt is made to compile the command to a dl_request
 %   1a) if that succeeds, then we enter do_request
@@ -38,13 +39,26 @@ handle_call(_Call, _From, State) ->
 % we can update with impunity.  first we should update to say 
 % if we will process this request or not, then update with whatever
 % the result may be.  is all this communication necessary?  maybe
+%
+% It seems to have been decided that it isn't, though I'm not inclined to
+% agree. Without acknowledgement, there is no garuntee of a response.
+% Without indicating if there will be processed or not, it isn't clear if
+% lack of further response is because the node doesn't care, or because the
+% node is working. A nice behavior would be that for every command posted,
+% every running node responds to indicate on of four states:
+% 1) received, doc seems ill formed
+% 2) received, doc not relevant to this node
+% 3) received, this node is processing this doc -> expect further response
+% 4) complete, previously in state (3) this node has finished responding
 handle_cast({process, Command}, State) ->
+    lager:info("command doc received"),
     case dl_compiler:compile(Command) of
-	{ok, Request} ->
-	    do_request_if_exists(Request, State);
-	{error, Reason, BadRequest} ->
-	    Err = dl_compiler:compiler_error_msg(Reason),
-	    do_error_response(BadRequest, Err, State)
+    {ok, Request} ->
+        lager:info("request received: ~p", [Request]),
+        do_request_if_exists(Request, State);
+    {error, Reason, BadRequest} ->
+        Err = dl_compiler:compiler_error_msg(Reason),
+        do_error_response(BadRequest, Err, State)
     end,
     {noreply, State}.
 
@@ -63,40 +77,39 @@ do_request_if_exists(RequestData, StateData) ->
         do_request_if_local(RequestData, StateData);
     false ->
         lager:warning("channel unknown"),
-	    do_error_response(RequestData, "unrecognized_channel", StateData),
+        do_error_response(RequestData, "unrecognized_channel", StateData),
         ok
     end.
 
 do_request_if_local(RequestData, StateData) ->
     case dl_conf_mgr:is_local_channel(dl_request:get_target(RequestData)) of
-	true ->
-	    do_request(RequestData, StateData);
-	false ->
-	    ok
+    true ->
+        do_request(RequestData, StateData);
+    false ->
+        ok
     end.
 
 do_request(RequestData, StateData) ->
     case dl_conf_mgr:mfa_from_request(RequestData) of
-	{error, no_channel} ->
-	    ErrorMsg = "no such channel", 
-	    do_error_response(RequestData, ErrorMsg, StateData);
-	MFA ->
-	    do_collect_data(MFA, RequestData, StateData)
+    {error, no_channel} ->
+        ErrorMsg = "no such channel", 
+        do_error_response(RequestData, ErrorMsg, StateData);
+    MFA ->
+        do_collect_data(MFA, RequestData, StateData)
     end,
     StateData.
+
 do_error_response(RequestData, ErrorMsg, #state{cdb_handle=H}=StateData) ->
     NewJS = dl_util:new_json_obj(),
     NodeName = dl_util:node_name(),
     dbg:p(self(), m),
-    Err = case is_list(ErrorMsg) of
-        false -> 
-            lager:warning("ErrorMsg not an iolist: ~p",[ErrorMsg]),
-            io_lib:format("~p", [ErrorMsg]);
-        true -> ErrorMsg
+    Err = if is_list(ErrorMsg) -> erlang:iolist_to_binary(ErrorMsg);
+       is_binary(ErrorMsg) -> ErrorMsg;
+       true -> erlang:iolist_to_binary(io_lib:format("~p", [ErrorMsg]))
     end,
     Res = ej:set_p({erlang:atom_to_binary(NodeName, utf8), <<"error">>}, 
-		   NewJS, 
-		   erlang:iolist_to_binary(Err)),
+           NewJS, 
+           Err),
     ok = update_cmd_doc(dl_request:get_id(RequestData), H, Res),
     StateData.
 
@@ -104,36 +117,36 @@ do_collect_data({M,F,A}, RequestData, #state{cdb_handle=H}=StateData) ->
     Dt = erlang:apply(M,F,A),
     Final = try_finalize_data(Dt, RequestData),
     case dl_data:get_code(Final) of
-	ok ->
-	    NodeName = erlang:atom_to_binary(dl_util:node_name(), utf8),
-	    NewJS = dl_util:new_json_obj(),
-	    ResD = ej:set_p({NodeName, <<"result">>}, 
-			   NewJS, 
-			   dl_data:get_data(Final)),
-	    ResT = ej:set_p({NodeName, <<"timestamp">>},
-			    ResD,
-			    dl_util:make_ts()),
-	    ResF = ej:set_p({NodeName, <<"final">>},
-			    ResT,
-			    dl_data:get_final(Final)),
-	    
-	    update_cmd_doc(dl_request:get_id(RequestData), H, ResF);
-	error ->
+    ok ->
+        NodeName = erlang:atom_to_binary(dl_util:node_name(), utf8),
+        NewJS = dl_util:new_json_obj(),
+        ResD = ej:set_p({NodeName, <<"result">>}, 
+               NewJS, 
+               dl_data:get_data(Final)),
+        ResT = ej:set_p({NodeName, <<"timestamp">>},
+                ResD,
+                dl_util:make_ts()),
+        ResF = ej:set_p({NodeName, <<"final">>},
+                ResT,
+                dl_data:get_final(Final)),
+        
+        update_cmd_doc(dl_request:get_id(RequestData), H, ResF);
+    error ->
         lager:debug("Data Collection Error"),
-	    do_error_response(RequestData, 
-			      dl_data:get_data(Final),
-			     StateData)
+        do_error_response(RequestData, 
+                  dl_data:get_data(Final),
+                 StateData)
     end.
 
 try_finalize_data(Data, Request) ->
     ChName = dl_request:get_target(Request),
     try
-	dl_hooks:apply_hooks(ChName,Data)
+    dl_hooks:apply_hooks(ChName,Data)
     catch
-	C:E ->
-	    lager:info("failed to apply hooks for channel ~p (~p:~p)",
-		       [ChName,C,E]),
-	    Data
+    C:E ->
+        lager:notice("failed to apply hooks for channel ~p (~p:~p)",
+               [ChName,C,E]),
+        Data
     end.
 
 
@@ -142,15 +155,16 @@ update_cmd_doc(DocID, DBHandle, JSON) ->
     NewDoc = ej:set({<<"result">>}, Doc, JSON),
     % TODO: this is probably wrong.
     case couchbeam:save_doc(DBHandle, NewDoc) of
-	{ok, _} ->
-	    ok;
-	{error, conflict} ->
-	    update_cmd_doc_loop(DBHandle, NewDoc);
-	{error, _Other}=Err ->
+    {ok, _} ->
+        ok;
+    {error, conflict} ->
+        update_cmd_doc_loop(DBHandle, NewDoc);
+    {error, _Other}=Err ->
         lager:error("Doc update error"),
-	    Err
+        Err
     end.
 
 update_cmd_doc_loop(_DBHandle, _NewDoc) ->
-    io:format("looping to resolve conflict.~n"),
+    lager:info("looping to resolve conflict."),
+    lager:error("there's no way this is currently correct"),
     ok.

@@ -141,29 +141,29 @@ data_output_table(ref_bits_16t32) ->
 
 data_output_test() ->
     BitsDef = [{x_out, 1}, 
-	       {y_out, 2},
-	       {mag_out, 4},
-	       {phase, 8},
-	       {sensitivity, 16},
-	       {adc1, 32},
-	       {adc2, 64},
-	       {adc3, 128},
-	       {dac1, 256},
-	       {dac2, 512},
-	       {noise, 1024},
-	       {ratio, 2048},
-	       {log_ratio, 4096},
-	       {event, 8192},
-	       {ref_bits_0t15,16384},
-	       {ref_bits_16t32,32768}],
+           {y_out, 2},
+           {mag_out, 4},
+           {phase, 8},
+           {sensitivity, 16},
+           {adc1, 32},
+           {adc2, 64},
+           {adc3, 128},
+           {dac1, 256},
+           {dac2, 512},
+           {noise, 1024},
+           {ratio, 2048},
+           {log_ratio, 4096},
+           {event, 8192},
+           {ref_bits_0t15,16384},
+           {ref_bits_16t32,32768}],
     BitsMap = lists:map(fun({B,D}) ->
-				{data_output(B),D}
-			end,
-			BitsDef),
+                {data_output(B),D}
+            end,
+            BitsDef),
     lists:map(fun({X,Y}) ->
-		      ?assertEqual(X,Y)
-	      end,
-	      BitsMap).
+              ?assertEqual(X,Y)
+          end,
+          BitsMap).
 
 use_case_test() ->
     Outputs = [x_out, y_out, sensitivity, adc1],

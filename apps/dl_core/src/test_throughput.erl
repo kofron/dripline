@@ -20,11 +20,11 @@ do_loop(N) ->
 
 do_recv(Ref) ->
     receive
-	{dl_sb_msg, Ref, _From, _Msg} ->
-	    ok;
-	_AnyOther ->
-	    do_recv(Ref)
+    {dl_sb_msg, Ref, _From, _Msg} ->
+        ok;
+    _AnyOther ->
+        do_recv(Ref)
     after 
-	500 ->
-	    timeout
+    500 ->
+        timeout
     end.

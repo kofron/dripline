@@ -7,10 +7,10 @@
 %%% Core record %%%
 %%%%%%%%%%%%%%%%%%%
 -record(dl_dt_data,{
-	  channel :: atom(),
-	  interval :: integer(),
-	  pid :: pid()
-	 }).
+      channel :: atom(),
+      interval :: integer(),
+      pid :: pid()
+     }).
 
 -opaque dt_data() :: #dl_dt_data{}.
 -export_type([dt_data/0]).
@@ -20,8 +20,8 @@
 %%%%%%%%%%%
 -export([new/0, fields/0, from_json/1]).
 -export([get_pid/1, set_pid/2,
-	 get_channel/1,set_channel/2,
-	 get_interval/1,set_interval/2]).
+     get_channel/1,set_channel/2,
+     get_interval/1,set_interval/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API definitions %%%

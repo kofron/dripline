@@ -37,38 +37,38 @@ start_link(InstrumentID,EProID,GPIBAddress) ->
 
 init(_Args) ->
     InitialState = #state{ttl=3,
-			 last_upd=erlang:now(),
-			 cache=dict:new(),
-			 new_ch=false},
+             last_upd=erlang:now(),
+             cache=dict:new(),
+             new_ch=false},
     {ok, setup_cmds([]), InitialState}.
 
 handle_get(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
     Dt = timer:now_diff(erlang:now(), L)/1000000, % Dt in seconds
     DecodedCh = raw_ch_to_spec(Ch),
     Branch = case channel_is_known(DecodedCh, C) of
-		 {false, bad_channel} ->
-		     %% The channel is not a valid identifier for the unit.
-		     {error, bad_channel, SD};
-		 {false, new_channel} ->
-		     %% The channel is valid, but so far we have not taken
-		     %% data on it.  We need to update the cache which now
-		     %% includes the new channel.
-		     ChType = munge_ch_type(Ch),
-		     NewDict = dict:store(DecodedCh, 
-					  #cache_v{ch_type = ChType}, 
-					  C),
-		     NewSD = SD#state{cache = NewDict,new_ch=true},
-		     {update_cache, NewSD};
-		 {true, data, #cache_v{lastval=_Ls, ts=_Ts}} when Dt > T ->
-		     %% The channel is valid, but more time has passed than
-		     %% the TTL for the unit.  We need to update the *existing*
-		     %% cache.
-		     {update_cache, SD#state{new_ch=false}};
-		 {true, data, #cache_v{lastval=Ls, ts=Ts}} ->
-		     %% The channel is valid and the cache is valid.  Just 
-		     %% return the data.
-		     {data, {Ls, Ts}, SD}
-	     end,
+         {false, bad_channel} ->
+             %% The channel is not a valid identifier for the unit.
+             {error, bad_channel, SD};
+         {false, new_channel} ->
+             %% The channel is valid, but so far we have not taken
+             %% data on it.  We need to update the cache which now
+             %% includes the new channel.
+             ChType = munge_ch_type(Ch),
+             NewDict = dict:store(DecodedCh, 
+                      #cache_v{ch_type = ChType}, 
+                      C),
+             NewSD = SD#state{cache = NewDict,new_ch=true},
+             {update_cache, NewSD};
+         {true, data, #cache_v{lastval=_Ls, ts=_Ts}} when Dt > T ->
+             %% The channel is valid, but more time has passed than
+             %% the TTL for the unit.  We need to update the *existing*
+             %% cache.
+             {update_cache, SD#state{new_ch=false}};
+         {true, data, #cache_v{lastval=Ls, ts=Ts}} ->
+             %% The channel is valid and the cache is valid.  Just 
+             %% return the data.
+             {data, {Ls, Ts}, SD}
+         end,
     Branch.
 
 handle_set(_Ch, _Value, _StateData) ->
@@ -80,24 +80,24 @@ do_update_cache(#state{cache=C,new_ch=true}=StateData) ->
     TrigCmd = trig_cmd(),
     NCh = dict:size(C),
     Cmd = [<<"ABOR;:">>,
-	   ConfCmd,
-	   ScanCmd,
-	   <<";:">>,
-	   "FORM:READ:CHAN ON;",
-	   ":FORM:READ:TIME ON;", 
-	   ":FORM:READ:TIME:TYPE ABS;",
-	   ":FORM:READ:UNIT ON;:",
-	   TrigCmd,
-	   {sleep, 1500},
-	   io_lib:format("DATA:REMOVE? ~B",[NCh])
-	  ],
+       ConfCmd,
+       ScanCmd,
+       <<";:">>,
+       "FORM:READ:CHAN ON;",
+       ":FORM:READ:TIME ON;", 
+       ":FORM:READ:TIME:TYPE ABS;",
+       ":FORM:READ:UNIT ON;:",
+       TrigCmd,
+       {sleep, 1500},
+       io_lib:format("DATA:REMOVE? ~B",[NCh])
+      ],
     {ok, Cmd, StateData};
 do_update_cache(#state{cache=C,new_ch=false}=StateData) ->
     NCh = dict:size(C),
     Cmd = [<<"*TRG">>,
-	   {sleep,600},
-	   io_lib:format("DATA:REMOVE? ~B",[NCh])
-	  ],
+       {sleep,600},
+       io_lib:format("DATA:REMOVE? ~B",[NCh])
+      ],
     {ok, Cmd, StateData}.
 parse_instrument_reply({error, tcp_timeout}, StateData) ->
     {ok, StateData};
@@ -111,24 +111,24 @@ parse_instrument_reply(Rply, #state{cache=C}=StateData) ->
 %%%%%%%%%%%%%%%%
 configuration_string(Cache) ->
     Chs = dict:fold(fun(Loc,#cache_v{ch_type=T},A) ->
-			   [{Loc,T}|A]
-		    end,
-		    [],
-		    Cache),
+               [{Loc,T}|A]
+            end,
+            [],
+            Cache),
     configuration_string(Chs,[]).
 configuration_string([],Acc) ->
     Acc;
 configuration_string([{Loc,Type}|T],Acc) ->
     ChString = io_lib:format("~B",[channel_tuple_to_int(Loc)]),
     ConfStr = [
-	       "CONF:",
-	       chan_type_string(Type),
-	       " ",
-	       chan_opts_string(Type),
-	       ",(@",
-	       ChString,
-	       ");:"
-	      ],
+           "CONF:",
+           chan_type_string(Type),
+           " ",
+           chan_opts_string(Type),
+           ",(@",
+           ChString,
+           ");:"
+          ],
     configuration_string(T,[ConfStr|Acc]).
 
 chan_type_string(rtd85) ->
@@ -171,18 +171,18 @@ chan_opts_string(fourwire) ->
 munge_ch_type(ChannelLocator) ->
     RegName = proplists:get_value(registered_name, erlang:process_info(self())),
     case dl_conf_mgr:channel_info(RegName, ChannelLocator) of
-	{error, no_ch} ->
-	    dmm_dc;
-	ChInfo ->
-	    dl_ch_data:get_type(ChInfo)
+    {error, no_ch} ->
+        dmm_dc;
+    ChInfo ->
+        dl_ch_data:get_type(ChInfo)
     end.
 
 refresh_cache([],Cache) ->
     Cache;
 refresh_cache([{Loc,#cache_v{lastval=V,ts=Ts}}|T],Cache) ->
     ValUpdater = fun(#cache_v{}=CV) ->
-			 CV#cache_v{lastval=V,ts=Ts}
-		 end,
+             CV#cache_v{lastval=V,ts=Ts}
+         end,
     NewCache = dict:update(Loc,ValUpdater,Cache),
     refresh_cache(T,NewCache).    
 
@@ -190,23 +190,23 @@ refresh_cache([{Loc,#cache_v{lastval=V,ts=Ts}}|T],Cache) ->
 raw_ch_to_spec(ChannelAtom) ->
     LocatorString = erlang:atom_to_list(ChannelAtom),
     case io_lib:fread("{~u,~u}",LocatorString) of
-	{ok, [CardNumber,ChannelNumber], []} ->
-	    {CardNumber,ChannelNumber};
-	_Error ->{error, bad_locator}
+    {ok, [CardNumber,ChannelNumber], []} ->
+        {CardNumber,ChannelNumber};
+    _Error ->{error, bad_locator}
     end.
 
 -spec channel_is_known(term(), dict:dict()) -> boolean().
 channel_is_known(Channel, Cache) ->
     case dict:is_key(Channel, Cache) of
-	true -> % Channel is known.  Grab last data.
-	    {true, data, fetch_cached_value(Channel, Cache)};
-	false ->
-	    case is_valid_channel(Channel) of
-		true ->
-		    {false, new_channel};
-		false ->
-		    {false, bad_channel}
-	    end
+    true -> % Channel is known.  Grab last data.
+        {true, data, fetch_cached_value(Channel, Cache)};
+    false ->
+        case is_valid_channel(Channel) of
+        true ->
+            {false, new_channel};
+        false ->
+            {false, bad_channel}
+        end
     end.
 
 -spec is_valid_channel({integer(), integer()}) -> boolean().
@@ -253,66 +253,66 @@ sl_from_cache(Cache) ->
 
 %%---------------------------------------------------------------------%%
 %% @doc channel_spec_to_int/1 takes a channel specifier 
-%%		{CardNumber,ChannelNumber} and converts it to the data that the 
-%%		switch unit uses for addressing, which is a single integer.
+%%        {CardNumber,ChannelNumber} and converts it to the data that the 
+%%        switch unit uses for addressing, which is a single integer.
 %% @end
 %%---------------------------------------------------------------------%%
 -spec channel_tuple_to_int(channel_spec()) -> integer().
 channel_tuple_to_int({CardNumber,ChannelNumber}) ->
-	100*CardNumber + ChannelNumber.
+    100*CardNumber + ChannelNumber.
 
 %%---------------------------------------------------------------------%%
 %% @doc channel_spec_list_to_scan_string is a very fun function.  
-%%		it takes a list of 34970a channel specs and produces a
-%%		string that the agilent 34970a is expecting, which is of the form
-%%		"101,105,301...".  the cool part is range detection.  the 
-%%		instrument takes ranges in the form of 101:105, which means all
-%%		channels between 1 and 5 on card 1.  this function will 
-%%		automagically produce the appropriate range queries if ranges
-%%		are found in the list of tuples.
+%%        it takes a list of 34970a channel specs and produces a
+%%        string that the agilent 34970a is expecting, which is of the form
+%%        "101,105,301...".  the cool part is range detection.  the 
+%%        instrument takes ranges in the form of 101:105, which means all
+%%        channels between 1 and 5 on card 1.  this function will 
+%%        automagically produce the appropriate range queries if ranges
+%%        are found in the list of tuples.
 %% @end
 %%---------------------------------------------------------------------%%
 -spec channel_spec_list_to_scan_string([channel_spec()]) -> string().
 channel_spec_list_to_scan_string([]) ->
-	"";
+    "";
 channel_spec_list_to_scan_string({_,_}=SingleTuple) ->
-	channel_spec_list_to_scan_string([SingleTuple]);
+    channel_spec_list_to_scan_string([SingleTuple]);
 channel_spec_list_to_scan_string(Tuples) ->
-	IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
-	channel_ints_to_scan_string(lists:sort(IntChannels),false,[]).
+    IntChannels = [channel_tuple_to_int(Y) || Y <- Tuples],
+    channel_ints_to_scan_string(lists:sort(IntChannels),false,[]).
 
 %%---------------------------------------------------------------------%%
 %% @doc channel_ints_to_scan_string is where the magic happens in terms
-%%		of generating the scan list for the agilent 34970a.
+%%        of generating the scan list for the agilent 34970a.
 %% @see channel_spec_list_to_scan_string
 %% @end
 %%---------------------------------------------------------------------%%
 -spec channel_ints_to_scan_string([channel_spec()],atom(),string()) ->
-		string().
+        string().
 channel_ints_to_scan_string([], false, Acc) ->
-	lists:flatten(lists:reverse(Acc));
+    lists:flatten(lists:reverse(Acc));
 channel_ints_to_scan_string([], H0, Acc) ->
-	Str = io_lib:format(":~p",[H0]), 
-	lists:reverse([Str|Acc]);
+    Str = io_lib:format(":~p",[H0]), 
+    lists:reverse([Str|Acc]);
 
 channel_ints_to_scan_string([H1,H2|T],false,Acc) when H2 == (H1 + 1) ->
-	Str = io_lib:format("~p",[H1]),
-	channel_ints_to_scan_string(T,H2,[Str|Acc]);
+    Str = io_lib:format("~p",[H1]),
+    channel_ints_to_scan_string(T,H2,[Str|Acc]);
 
 channel_ints_to_scan_string([H|T],H0,Acc) when H == (H0 + 1) ->
-	channel_ints_to_scan_string(T,H,Acc);
+    channel_ints_to_scan_string(T,H,Acc);
 
 channel_ints_to_scan_string([S],false,Acc) ->
-	Str = io_lib:format("~p",[S]),
-	channel_ints_to_scan_string([],false,[Str|Acc]);
+    Str = io_lib:format("~p",[S]),
+    channel_ints_to_scan_string([],false,[Str|Acc]);
 
 channel_ints_to_scan_string([H|T],false,Acc) ->
-	Str = io_lib:format("~p",[H]),
-	channel_ints_to_scan_string(T,false,[Str ++ ","|Acc]);
+    Str = io_lib:format("~p",[H]),
+    channel_ints_to_scan_string(T,false,[Str ++ ","|Acc]);
 
 channel_ints_to_scan_string([_H|_T]=L,H0,Acc) ->
-	Str = io_lib:format(":~p",[H0]),
-	channel_ints_to_scan_string(L,false,[Str ++ ","|Acc]).
+    Str = io_lib:format(":~p",[H0]),
+    channel_ints_to_scan_string(L,false,[Str ++ ","|Acc]).
 
 %%---------------------------------------------------------------------%%
 %% @doc parse_instrument_response takes the response from the unit and 
@@ -326,31 +326,31 @@ parse_instrument_response(<<"\n">>, Acc) ->
 parse_instrument_response(<<",",Rest/binary>>, Acc) ->
     parse_instrument_response(Rest,Acc);
 parse_instrument_response(<<V:152/bitstring,
-			    ",",
-			    Y:32/bitstring,
-			    ",",
-			    M:16/bitstring,
-			    ",",
-			    D:16/bitstring,
-			    ",",
-			    HH:16/bitstring,
-			    ",",
-			    MM:16/bitstring,
-			    ",",
-			    SS:16/bitstring,
-			    ".",
-			    _MS:24/bitstring,
-			    ",",
-			    Ch:24/bitstring,
-			    Rest/binary>>, Acc) ->
+                ",",
+                Y:32/bitstring,
+                ",",
+                M:16/bitstring,
+                ",",
+                D:16/bitstring,
+                ",",
+                HH:16/bitstring,
+                ",",
+                MM:16/bitstring,
+                ",",
+                SS:16/bitstring,
+                ".",
+                _MS:24/bitstring,
+                ",",
+                Ch:24/bitstring,
+                Rest/binary>>, Acc) ->
     Locator = ch_spec_from_binary(Ch),
     Ts = <<Y/binary,"-",M/binary,"-",D/binary,
-	   "T", 
-	   HH/binary,":",MM/binary,":",SS/binary,"Z">>,
+       "T", 
+       HH/binary,":",MM/binary,":",SS/binary,"Z">>,
     R = #cache_v{
-	  lastval = V,
-	  ts = Ts
-	 },
+      lastval = V,
+      ts = Ts
+     },
     parse_instrument_response(Rest,[{Locator,R}|Acc]).
 
 ch_spec_from_binary(Bin) ->

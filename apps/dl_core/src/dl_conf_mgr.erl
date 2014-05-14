@@ -7,13 +7,13 @@
 -record(state,{id,conf}).
 
 -export([start_link/2,
-	 init/1,
-	 handle_sb_msg/2,
-	 handle_info/2,
-	 handle_cast/2,
-	 handle_call/3,
-	 code_change/3,
-	 terminate/2]).
+     init/1,
+     handle_sb_msg/2,
+     handle_info/2,
+     handle_cast/2,
+     handle_call/3,
+     code_change/3,
+     terminate/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%% Includes for QLC %%%
@@ -66,11 +66,11 @@ bus_info(Bs) ->
 -spec mfa_from_request(dl_request:dl_request()) -> mfa() | {error, term()}.
 mfa_from_request(ParsedRequest) ->
     case dl_request:get_method(ParsedRequest) of
-	none ->
-	    {error, {bad_request, ParsedRequest}};
-	Method ->
-	    Resp = gen_dl_agent:call(?MODULE, {mfa, Method, ParsedRequest}),
-	    Resp
+    none ->
+        {error, {bad_request, ParsedRequest}};
+    Method ->
+        Resp = gen_dl_agent:call(?MODULE, {mfa, Method, ParsedRequest}),
+        Resp
     end.
 
 get_read_mfa(ChannelName) ->
@@ -96,7 +96,7 @@ handle_sb_msg({_Ref, ?MODULE, _Msg}, #state{}=State) ->
 handle_sb_msg({_Ref, dl_cdb_adapter, Msg}, #state{}=State) ->
     maybe_update_tables(Msg),
     {noreply, State};
-handle_sb_msg({_Ref, Pid, {dtb, _LgId, ChData, _Ival}}, State) ->		    
+handle_sb_msg({_Ref, Pid, {dtb, _LgId, ChData, _Ival}}, State) ->            
     ChName = dl_ch_data:get_id(ChData),
     record_logger_pid(ChName, Pid),
     {noreply, State};
@@ -121,66 +121,72 @@ handle_call(local_bs, _From, StateData) ->
     {reply, get_local_bss(), StateData};
 handle_call({info, ch, {In, Loc}}, _From, StateData) ->
     Reply = case get_rev_ch_data(In, Loc) of
-		{ok, Data} ->
-		    Data;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, Data} ->
+            Data;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData};
 handle_call({info, ch, Ch}, _From, StateData) ->
     Reply = case get_ch_data(Ch) of
-		{ok, Data} ->
-		    Data;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, Data} ->
+            Data;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData};
 handle_call({info, in, In}, _From, StateData) ->
     Reply = case get_instr_data(In) of
-		{ok, Data} ->
-		    Data;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, Data} ->
+            Data;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData};
 handle_call({info, bs, Bs}, _From, StateData) ->
     Reply = case get_bus_data(Bs) of
-		{ok, Data} ->
-		    Data;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, Data} ->
+            Data;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData};
 handle_call({info, lg, Ch}, _From, StateData) ->
     Reply = case get_dt_data(Ch) of
-		{ok, Data} ->
-		    Data;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, Data} ->
+            Data;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData};
 handle_call({mfa, Method, Request}, _From, StateData) ->
     Channel = dl_request:get_target(Request),
     Value = dl_request:get_value(Request),
     Reply = case get_ch_mfa(Channel, Method) of
-		{ok, {{unix, _, _}, get, A}} ->
-		    {gen_os_cmd, execute, A};
-		{ok, {{prologix, _, _}, get, A}} ->
-		    {gen_prologix, get, A};
-		{ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
-		    {gen_prologix, set, A ++ Value};
-		{ok, {{prologix, _, _}, set, A}} ->
-		    {gen_prologix, set, A ++ [Value]};
-		{ok, {{prologix_gpib2ethernet, _, _}, get, A}} ->
-		    %% this is a hack.  how to handle this...
-		    {gen_gpib_spoller, get, A};
-		{ok, {{prologix_gpib2ethernet, _, _}, set, A}} ->
-		    {gen_gpib_spoller, set, A ++ [Value]};
-		{ok, {dl_sys, heartbeat, []}=MFA} ->
-		    MFA;
-		{error, _Reason}=E ->
-		    E
-	    end,
+        {ok, {{unix, _, _}, get, A}} ->
+            {gen_os_cmd, execute, A};
+        {ok, {{shell, _, _}, get, A}} ->
+            {gen_os_shell_cmd, get, A};
+        {ok, {{shell, _, _}, set, A}} when is_list(Value) ->
+            {gen_os_shell_cmd, set, A ++ Value};
+        {ok, {{shell, _, _}, set, A}} ->
+            {gen_os_shell_cmd, set, A ++ [Value]};
+        {ok, {{prologix, _, _}, get, A}} ->
+            {gen_prologix, get, A};
+        {ok, {{prologix, _, _}, set, A}} when is_list(Value) ->
+            {gen_prologix, set, A ++ Value};
+        {ok, {{prologix, _, _}, set, A}} ->
+            {gen_prologix, set, A ++ [Value]};
+        {ok, {{prologix_gpib2ethernet, _, _}, get, A}} ->
+            %% this is a hack.  how to handle this...
+            {gen_gpib_spoller, get, A};
+        {ok, {{prologix_gpib2ethernet, _, _}, set, A}} ->
+            {gen_gpib_spoller, set, A ++ [Value]};
+        {ok, {dl_sys, heartbeat, []}=MFA} ->
+            MFA;
+        {error, _Reason}=E ->
+            E
+        end,
     {reply, Reply, StateData}.
 
 handle_cast(_Cast, StateData) ->
@@ -215,210 +221,210 @@ init_node_config() ->
     %% look for a config file.  if it can be loaded, use the values
     %% to set our configuration dictionary up.
     ConfN = case init:get_argument(extra_config) of
-		error ->
-		    Conf2;
-		{ok, [[FName]]} ->
-		    {ok, C} = process_config_file(FName, Conf2),
-		    C
-	    end,
+        error ->
+            Conf2;
+        {ok, [[FName]]} ->
+            {ok, C} = process_config_file(FName, Conf2),
+            C
+        end,
     ConfN.
 
 -spec process_config_file(string(), dict:dict()) -> dict:dict().
 process_config_file(FName, InitConf) ->
     case file:consult(FName) of
-	{error, _Reason}=Err ->
-	    lager:error("the config file: ~p couldn't be loaded! (~p)~n",[FName,Err]),
-	    Err;
-	{ok, ConfigData} ->
-	    {ok, update_config_dict(InitConf, ConfigData)}
+    {error, _Reason}=Err ->
+        lager:error("the config file: ~p couldn't be loaded! (~p)~n",[FName,Err]),
+        Err;
+    {ok, ConfigData} ->
+        {ok, update_config_dict(InitConf, ConfigData)}
     end.
 
 -spec update_config_dict(dict:dict(), [proplists:property()]) -> dict:dict().
-update_config_dict(InitialConf, Props) ->				
+update_config_dict(InitialConf, Props) ->                
     lists:foldl(fun({K,V}, Acc) ->
-			dict:store(K, V, Acc)
-		end,
-		InitialConf,
-		Props).
+            dict:store(K, V, Acc)
+        end,
+        InitialConf,
+        Props).
 
 -spec create_ch_data_table() -> ok | term().
 create_ch_data_table() ->
     case mnesia:create_table(dl_ch_data,
-			     [
-			      {ram_copies, [node()]},
-			      {attributes, dl_ch_data:fields()}
-			     ]) of
-	{atomic, ok} ->
-	    ok;
-	{aborted,{already_exists,dl_ch_data}} ->
-	    ok;
-	AnyOther ->
-	    AnyOther
+                 [
+                  {ram_copies, [node()]},
+                  {attributes, dl_ch_data:fields()}
+                 ]) of
+    {atomic, ok} ->
+        ok;
+    {aborted,{already_exists,dl_ch_data}} ->
+        ok;
+    AnyOther ->
+        AnyOther
     end.
 
 -spec create_instr_data_table() -> ok | term().
 create_instr_data_table() ->
     case mnesia:create_table(dl_instr_data,
-			     [
-			      {ram_copies, [node()]},
-			      {attributes, dl_instr_data:fields()}
-			     ]) of
-	{atomic, ok} ->
-	    ok;
-	{aborted,{already_exists,dl_instr_data}} ->
-	    ok;
-	AnyOther ->
-	    AnyOther
+                 [
+                  {ram_copies, [node()]},
+                  {attributes, dl_instr_data:fields()}
+                 ]) of
+    {atomic, ok} ->
+        ok;
+    {aborted,{already_exists,dl_instr_data}} ->
+        ok;
+    AnyOther ->
+        AnyOther
     end.
 
 -spec create_bus_data_table() -> ok | term().
 create_bus_data_table() ->
     case mnesia:create_table(dl_bus_data,
-			     [
-			      {ram_copies, [node()]},
-			      {attributes, dl_bus_data:fields()}
-			     ]) of
-	{atomic, ok} ->
-	    ok;
-	{aborted,{already_exists,dl_bus_data}} ->
-	    ok;
-	AnyOther ->
-	    AnyOther
+                 [
+                  {ram_copies, [node()]},
+                  {attributes, dl_bus_data:fields()}
+                 ]) of
+    {atomic, ok} ->
+        ok;
+    {aborted,{already_exists,dl_bus_data}} ->
+        ok;
+    AnyOther ->
+        AnyOther
     end.
 
 -spec create_dt_data_table() -> ok | term().
 create_dt_data_table() ->
     case mnesia:create_table(dl_dt_data,
-			     [
-			      {ram_copies, [node()]},
-			      {attributes, dl_dt_data:fields()}
-			     ]) of
-	{atomic, ok} ->
-	    ok;
-	{aborted,{already_exists,dl_dt_data}} ->
-	    ok;
-	AnyOther ->
-	    AnyOther
+                 [
+                  {ram_copies, [node()]},
+                  {attributes, dl_dt_data:fields()}
+                 ]) of
+    {atomic, ok} ->
+        ok;
+    {aborted,{already_exists,dl_dt_data}} ->
+        ok;
+    AnyOther ->
+        AnyOther
     end.
 
 -spec local_lgs() -> [atom()].
 local_lgs() ->
     Qs = qlc:q([dl_dt_data:get_channel(Lg) 
-		|| Lg <- mnesia:table(dl_dt_data),
-		   is_local_channel(dl_dt_data:get_channel(Lg))]),
+        || Lg <- mnesia:table(dl_dt_data),
+           is_local_channel(dl_dt_data:get_channel(Lg))]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     Ans.
 
 -spec get_lg_by_pid(pid()) -> [atom()].
 get_lg_by_pid(Pid) ->
     Qs = qlc:q([Lg
-		|| Lg <- mnesia:table(dl_dt_data),
-		   dl_dt_data:get_pid(Lg) == Pid]),
+        || Lg <- mnesia:table(dl_dt_data),
+           dl_dt_data:get_pid(Lg) == Pid]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    [];
-	[Lgr] ->
-	    Lgr
+    [] ->
+        [];
+    [Lgr] ->
+        Lgr
     end. 
 
 -spec run_lgs() -> [atom()].
 run_lgs() ->
     Qs = qlc:q([dl_dt_data:get_channel(Lg) 
-		|| Lg <- mnesia:table(dl_dt_data),
-		   dl_dt_data:get_pid(Lg) =/= undefined]),
+        || Lg <- mnesia:table(dl_dt_data),
+           dl_dt_data:get_pid(Lg) =/= undefined]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     Ans.
 
 -spec get_local_bss() -> [atom()].
 get_local_bss() ->
     NodeName = dl_util:node_name(),
     Qs = qlc:q([Bs || Bs <- mnesia:table(dl_bus_data),
-		      dl_bus_data:get_node(Bs) == NodeName
-	       ]),
+              dl_bus_data:get_node(Bs) == NodeName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     Ans.
 
 -spec instr_on_bus(atom()) -> [dl_ch_data:ch_data()].
 instr_on_bus(BusName) ->
     Mid = fun({_,X,_}) -> X end,
     Qs = qlc:q([In || In <- mnesia:table(dl_instr_data),
-		      Mid(dl_instr_data:get_bus(In)) == BusName]),
+              Mid(dl_instr_data:get_bus(In)) == BusName]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     Ans.
 
 -spec get_ch_data(atom()) -> {ok, dl_ch_data:ch_data()}
-				 | {error, term()}.
+                 | {error, term()}.
 get_ch_data(ChName) ->
     Qs = qlc:q([Ch || Ch <- mnesia:table(dl_ch_data),
-		      dl_ch_data:get_id(Ch) == ChName
-	       ]),
+              dl_ch_data:get_id(Ch) == ChName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_channel};
-	[H] ->
-	    {ok, H}
+    [] ->
+        {error, no_channel};
+    [H] ->
+        {ok, H}
     end.
 
 -spec get_dt_data(atom()) -> {ok, dl_dt_data:dt_data()}
-				 | {error, term()}.
+                 | {error, term()}.
 get_dt_data(ChName) ->
     Qs = qlc:q([Dt || Dt <- mnesia:table(dl_dt_data),
-		      dl_dt_data:get_channel(Dt) == ChName
-	       ]),
+              dl_dt_data:get_channel(Dt) == ChName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_logger};
-	[H] ->
-	    {ok, H}
+    [] ->
+        {error, no_logger};
+    [H] ->
+        {ok, H}
     end.
 
 -spec get_rev_ch_data(atom(), atom()) -> {ok, dl_ch_data:ch_data()}
-				 | {error, term()}.
+                 | {error, term()}.
 get_rev_ch_data(Instrument, Locator) ->
     Qs = qlc:q([Ch || Ch <- mnesia:table(dl_ch_data),
-		      dl_ch_data:get_locator(Ch) == Locator,
-		      dl_ch_data:get_instr(Ch) == Instrument]),
+              dl_ch_data:get_locator(Ch) == Locator,
+              dl_ch_data:get_instr(Ch) == Instrument]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_ch};
-	[H] ->
-	    {ok, H}
-    end.				       
+    [] ->
+        {error, no_ch};
+    [H] ->
+        {ok, H}
+    end.                       
 
 -spec get_bus_data(atom()) -> {ok, dl_bus_data:bus_data()}
-				 | {error, term()}.
+                 | {error, term()}.
 get_bus_data(BsName) ->
     Qs = qlc:q([Ch || Ch <- mnesia:table(dl_bus_data),
-		      dl_bus_data:get_id(Ch) == BsName
-	       ]),
+              dl_bus_data:get_id(Ch) == BsName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_bus};
-	[H] ->
-	    {ok, H}
+    [] ->
+        {error, no_bus};
+    [H] ->
+        {ok, H}
     end.
 
 -spec get_ch_mfa(atom(), atom()) -> {ok, term()} | {error, term()}.
@@ -426,62 +432,62 @@ get_ch_mfa(heartbeat, get) ->
     {ok, {dl_sys, heartbeat, []}};
 get_ch_mfa(ChannelName, Action) ->
     Qc = qlc:q([
-		Ch || Ch <- mnesia:table(dl_ch_data)
-	       ]),
+        Ch || Ch <- mnesia:table(dl_ch_data)
+           ]),
     Qi = qlc:q([
-		In || In <- mnesia:table(dl_instr_data)
-	       ]),
+        In || In <- mnesia:table(dl_instr_data)
+           ]),
     Qs = qlc:q([{dl_instr_data:get_bus(I),
-		 Action,
-		 [dl_instr_data:get_id(I),dl_ch_data:get_locator(C)]} ||
-		   C <- Qc, 
-		   I <- Qi,
-		   dl_instr_data:get_id(I) =:= dl_ch_data:get_instr(C),
-		   dl_ch_data:get_id(C) =:= ChannelName
-	       ]),
+         Action,
+         [dl_instr_data:get_id(I),dl_ch_data:get_locator(C)]} ||
+           C <- Qc, 
+           I <- Qi,
+           dl_instr_data:get_id(I) =:= dl_ch_data:get_instr(C),
+           dl_ch_data:get_id(C) =:= ChannelName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_channel};
-	[H] ->
-	    {ok, H}
+    [] ->
+        {error, no_channel};
+    [H] ->
+        {ok, H}
     end.
 
 -spec get_instr_data(atom()) -> {ok, dl_instr_data:dl_instr_data()}
-				 | {error, term()}.
+                 | {error, term()}.
 get_instr_data(InName) ->
     Qs = qlc:q([In || In <- mnesia:table(dl_instr_data),
-		      dl_instr_data:get_id(In) == InName
-	       ]),
+              dl_instr_data:get_id(In) == InName
+           ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
-					       qlc:e(Qs)
-				       end),
+                           qlc:e(Qs)
+                       end),
     case Ans of
-	[] ->
-	    {error, no_instrument};
-	[H] ->
-	    {ok, H}
+    [] ->
+        {error, no_instrument};
+    [H] ->
+        {ok, H}
     end.
 
 -spec maybe_update_tables(ejson:json_object()) -> ok.
 maybe_update_tables(Msg) ->
     case props:get('doc.type',Msg) of
-	<<"channel">> ->
-	    update_channel_table(Msg);
-	<<"instrument">> ->
-	    update_instrument_table(Msg);
-	<<"bus">> ->
-	    update_bus_table(Msg);
-	<<"logger">> ->
-	    update_logger_table(Msg);
-	_AnyOther ->
-	    declare_nonsense(Msg)
+    <<"channel">> ->
+        update_channel_table(Msg);
+    <<"instrument">> ->
+        update_instrument_table(Msg);
+    <<"bus">> ->
+        update_bus_table(Msg);
+    <<"logger">> ->
+        update_logger_table(Msg);
+    _AnyOther ->
+        declare_nonsense(Msg)
     end.
-	
+    
 -spec update_channel_table(ejson:json_object()) -> ok.
-update_channel_table(Msg) ->	      
+update_channel_table(Msg) ->          
     Doc = props:get('doc', Msg),
     {ok, ChData} = dl_ch_data:from_json(Doc),
     maybe_add_or_update_channel(ChData).
@@ -511,102 +517,102 @@ declare_nonsense(Msg) ->
 -spec maybe_add_or_update_channel(dl_ch_data:ch_data()) -> ok.
 maybe_add_or_update_channel(ChData) ->
     case get_ch_data(dl_ch_data:get_id(ChData)) of
-	{error, no_channel} ->
-	    lager:info("new channel recvd: ~p",[ChData]),
-	    add_channel(ChData);
-	{ok, ChData} ->
-	    lager:debug("ignoring redundant channel conf (~p = ~p)",[ChData,ChData]);
-	{ok, OldChData} ->
-	    lager:debug("overwriting conf for channel: (~p != ~p)",[ChData, OldChData]),
-	    update_channel(ChData)
+    {error, no_channel} ->
+        lager:notice("new channel recvd: ~p",[ChData]),
+        add_channel(ChData);
+    {ok, ChData} ->
+        lager:debug("ignoring redundant channel conf (~p = ~p)",[ChData,ChData]);
+    {ok, OldChData} ->
+        lager:debug("overwriting conf for channel: (~p != ~p)",[ChData, OldChData]),
+        update_channel(ChData)
     end.
 
 -spec maybe_add_or_update_logger(dl_dt_data:ch_data()) -> ok.
 maybe_add_or_update_logger(LgData) ->
     case get_dt_data(dl_dt_data:get_channel(LgData)) of
-	{error, no_logger} ->
-	    lager:info("new logger recvd: ~p",[LgData]),
-	    add_logger(LgData);
-	{ok, LgData} ->
-	    lager:debug("ignoring redundant logger conf");
-	{ok, NewLgData} ->
-	    lager:debug("overwriting conf for logger: ~p",[NewLgData]),
-	    update_logger(LgData)
+    {error, no_logger} ->
+        lager:notice("new logger recvd: ~p",[LgData]),
+        add_logger(LgData);
+    {ok, LgData} ->
+        lager:debug("ignoring redundant logger conf");
+    {ok, NewLgData} ->
+        lager:debug("overwriting conf for logger: ~p",[NewLgData]),
+        update_logger(LgData)
     end.
 
 -spec maybe_add_or_update_bus(dl_bus_data:bus_data()) -> ok.
 maybe_add_or_update_bus(ChData) ->
     case get_bus_data(dl_bus_data:get_id(ChData)) of
-	{error, no_bus} ->
-	    lager:info("new bus recvd: ~p",[ChData]),
-	    add_bus(ChData);
-	{ok, ChData} ->
-	    lager:debug("ignoring redundant bus conf");
-	{ok, NewChData} ->
-	    lager:debug("overwriting conf for bus: ~p",[NewChData]),
-	    update_bus(ChData)
+    {error, no_bus} ->
+        lager:notice("new bus recvd: ~p",[ChData]),
+        add_bus(ChData);
+    {ok, ChData} ->
+        lager:debug("ignoring redundant bus conf");
+    {ok, NewChData} ->
+        lager:debug("overwriting conf for bus: ~p",[NewChData]),
+        update_bus(ChData)
     end.
 
 -spec maybe_add_or_update_instrument(dl_instr_data:dl_instr_data()) -> ok.
 maybe_add_or_update_instrument(InData) ->
     case get_instr_data(dl_instr_data:get_id(InData)) of
-	{error, no_instrument} ->
-	    lager:info("new instrument recvd: ~p",[InData]),
-	    add_instrument(InData);
-	{ok, InData} ->
-	    lager:debug("ignoring redundant instrument conf");
-	{ok, NewInData} ->
-	    lager:debug("overwriting conf for instrument: ~p",[NewInData]),
-	    update_instrument(InData)
+    {error, no_instrument} ->
+        lager:notice("new instrument recvd: ~p",[InData]),
+        add_instrument(InData);
+    {ok, InData} ->
+        lager:debug("ignoring redundant instrument conf");
+    {ok, NewInData} ->
+        lager:debug("overwriting conf for instrument: ~p",[NewInData]),
+        update_instrument(InData)
     end.
-		
+        
 -spec add_instrument(dl_instr_data:dl_instr_data()) -> ok.
 add_instrument(InData) ->    
     F = fun() ->
-		mnesia:write(InData)
-	end,
+        mnesia:write(InData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     {_BusMod, BusName, _BusAddr} = dl_instr_data:get_bus(InData),
     IsLocalInstr = lists:member(BusName, 
-				lists:map(fun dl_bus_data:get_id/1,get_local_bss())),
+                lists:map(fun dl_bus_data:get_id/1,get_local_bss())),
     case IsLocalInstr of
-	true ->
-	    lager:info("starting local instrument (~p)",[InData]),
-	    ok = try_instr_start(InData);
-	false ->
-	    ok
+    true ->
+        lager:notice("starting local instrument (~p)",[InData]),
+        ok = try_instr_start(InData);
+    false ->
+        ok
     end,
     dl_softbus:bcast(agents, ?MODULE, {nin, InData}).
 
 -spec update_instrument(dl_instr_data:dl_instr_data()) -> ok.
 update_instrument(InData) ->
     F = fun() ->
-		mnesia:write(InData)
-	end,
+        mnesia:write(InData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {uin, dl_instr_data:get_id(InData)}).
 
 -spec add_channel(dl_ch_data:ch_data()) -> ok.
 add_channel(ChData) ->
     F = fun() ->
-		mnesia:write(ChData)
-	end,
+        mnesia:write(ChData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {nch, ChData}).
 
 -spec add_logger(dl_dt_data:dt_data()) -> ok.
 add_logger(DtData) ->
     F = fun() ->
-		mnesia:write(DtData)
-	end,
+        mnesia:write(DtData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {ndt, DtData}).
 
 -spec update_logger(dl_dt_data:dt_data()) -> ok.
 update_logger(DtData) ->
     F = fun() ->
-		mnesia:write(DtData)
-	end,
+        mnesia:write(DtData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {udt, DtData}).
 
@@ -640,22 +646,22 @@ is_local_instr(InstrName) ->
     {ok, Dt} = get_instr_data(InstrName),
     {_, BusName, _} = dl_instr_data:get_bus(Dt),
     lists:member(BusName, lists:map(fun(X) -> 
-					    dl_bus_data:get_id(X) 
-				    end,
-				    get_local_bss())).
+                        dl_bus_data:get_id(X) 
+                    end,
+                    get_local_bss())).
 
 -spec record_logger_pid(atom(),pid()) -> ok.
 record_logger_pid(ChName,LgPid) ->
     io:format("recording ~p~n",[LgPid]),
     Qs = qlc:q([Lg || Lg <- mnesia:table(dl_dt_data),
-		      dl_dt_data:get_channel(Lg) == ChName]),
+              dl_dt_data:get_channel(Lg) == ChName]),
     {atomic, ok} = mnesia:transaction(fun() ->
-					       [Dt] = qlc:e(Qs),
-					       Dtp = dl_dt_data:set_pid(Dt,LgPid),
-					       mnesia:write(Dtp)
-				       end),
+                           [Dt] = qlc:e(Qs),
+                           Dtp = dl_dt_data:set_pid(Dt,LgPid),
+                           mnesia:write(Dtp)
+                       end),
     start_logger_monitor(LgPid).
-		
+        
 -spec start_logger_monitor(pid() | undefined) -> ok.
 start_logger_monitor(undefined) ->
     ok;
@@ -665,56 +671,58 @@ start_logger_monitor(LgPid) ->
 -spec update_channel(dl_ch_data:ch_data()) -> ok.
 update_channel(ChData) ->
     F = fun() ->
-		mnesia:write(ChData)
-	end,
+        mnesia:write(ChData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {uch, dl_ch_data:get_id(ChData)}).
 
 -spec add_bus(dl_bus_data:bus_data()) -> ok.
 add_bus(BsData) ->
     F = fun() ->
-		mnesia:write(BsData)
-	end,
+        mnesia:write(BsData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     BusName = dl_bus_data:get_id(BsData),
     IsLocalBus = lists:member(BsData, get_local_bss()),
     case IsLocalBus of
-	true ->
-	    ok = try_bus_start(BsData),
-	    Instr = instr_on_bus(BusName),
-	    lists:foreach(fun(I) ->
-				  ok = try_instr_start(I)
-			  end,
-			  Instr);
-	false ->
-	    lager:info("non-local bus info recvd (~p)",[BusName]),
-	    ok
+    true ->
+        ok = try_bus_start(BsData),
+        Instr = instr_on_bus(BusName),
+        lists:foreach(fun(I) ->
+                  ok = try_instr_start(I)
+              end,
+              Instr);
+    false ->
+        lager:notice("non-local bus info recvd (~p)",[BusName]),
+        ok
     end,
     dl_softbus:bcast(agents, ?MODULE, {nbs, BsData}).
 
 -spec update_bus(dl_bus_data:bus_data()) -> ok.
 update_bus(BsData) ->
     F = fun() ->
-		mnesia:write(BsData)
-	end,
+        mnesia:write(BsData)
+    end,
     {atomic, ok} = mnesia:transaction(F),
     dl_softbus:bcast(agents, ?MODULE, {ubs, dl_bus_data:get_id(BsData)}).
 
 -spec try_bus_start(dl_bus_data:dl_bus_data()) -> ok.
 try_bus_start(BsData) ->
     try
-	dl_instr:start_bus(BsData)
+    dl_instr:start_bus(BsData)
     catch
-	Err:Reason ->
-	    lager:warning("couldn't start bus!!! ~p:~p",[Err,Reason])
+    Err:Reason ->
+        lager:warning("couldn't start bus!!! ~nError:~p~nReason:~p",[Err,Reason]),
+        lager:warning("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     end.
 
 -spec try_instr_start(dl_instr_data:dl_instr_data()) -> ok.
 try_instr_start(InData) ->
     try 
-	dl_instr:start_instr(InData)
+    dl_instr:start_instr(InData)
     catch
-	C:E ->
-	    lager:warning("Couldn't call dl_instr:start_instr! (~p~p)",[C,E])
+    C:E ->
+        lager:warning("Couldn't call dl_instr:start_instr!~nError: ~p~nReason: ~p",[C,E]),
+        lager:warning("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     end,
     ok.

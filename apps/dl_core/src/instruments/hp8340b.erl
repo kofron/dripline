@@ -1,5 +1,5 @@
 %% @doc the Hewlett-Packard HP8340B is a high frequency synthesized 
-%%		sweeper controlled via GPIB.
+%%        sweeper controlled via GPIB.
 %% @author jared kofron <jared.kofron@gmail.com>
 %% @version 0.1a
 -module(hp8340b).
@@ -27,8 +27,8 @@ start_link(InstrumentID,EProID,GPIBAddress) ->
     gen_prologix:start_link(?MODULE, InstrumentID, EProID, GPIBAddress).
 
 init(_Args) ->
-	InitialState = #state{},
-	{ok, InitialState}.
+    InitialState = #state{},
+    {ok, InitialState}.
 
 handle_get(cw_freq, StateData) ->
     {send, <<"OPCW">>, StateData};

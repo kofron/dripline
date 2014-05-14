@@ -52,44 +52,45 @@ execute(ID,Arglist) ->
 %%% gen_server API and callback definitions %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_link(CallbackMod,ID) ->
-  gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
+  Res = gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []),
+  Res.
 
 init([CallbackMod]=Args) ->
     case CallbackMod:init(Args) of
-	{ok, ModStateData} = _StartOK ->
-	    StateData = #state{
-	      cmd_port = none,
-	      mod = CallbackMod,
-	      mod_sd = ModStateData,
-	      sndr = none,
-	      data = []
-	     },
-	    {ok, StateData};
-	Failure ->
-	    Failure
+    {ok, ModStateData} = _StartOK ->
+        StateData = #state{
+          cmd_port = none,
+          mod = CallbackMod,
+          mod_sd = ModStateData,
+          sndr = none,
+          data = []
+         },
+        {ok, StateData};
+    Failure ->
+        Failure
     end.
 
 handle_call({ex, Args}, F, #state{mod=M,mod_sd=MSD,cmd_port=none}=SD) ->
     BaseCmd = M:base_cmd(),
     ArgList = M:process_args(Args,MSD),
     OSOpts = [exit_status, 
-	      {args, ArgList}, 
-	      {env, [{"LD_LIBRARY_PATH","/usr/local/lib"}]},
-	      stderr_to_stdout],
+          {args, ArgList}, 
+          {env, [{"LD_LIBRARY_PATH","/usr/local/lib"}]},
+          stderr_to_stdout],
     {Reply, Port} = try
-			P = erlang:open_port({spawn_executable, BaseCmd},
-					     OSOpts),
-			{ok, P}
-		    catch
-			C:E ->
-			    {{error, {C,E}}, none}
-		    end,
+            P = erlang:open_port({spawn_executable, BaseCmd},
+                         OSOpts),
+            {ok, P}
+            catch
+            C:E ->
+                {{error, {C,E}}, none}
+            end,
     case Port of
-	none ->
-	    ReplDt = make_err_reply_data(Reply),
-	    {reply, ReplDt, SD#state{cmd_port=Port}};
-	Port ->
-	    {noreply, SD#state{cmd_port=Port, sndr=F}}
+    none ->
+        ReplDt = make_err_reply_data(Reply),
+        {reply, ReplDt, SD#state{cmd_port=Port}};
+    Port ->
+        {noreply, SD#state{cmd_port=Port, sndr=F}}
     end;
 handle_call({ex, _Args}, _F, #state{cmd_port=_P}=SD) ->
     {reply, busy, SD}.

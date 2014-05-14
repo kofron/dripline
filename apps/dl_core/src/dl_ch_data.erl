@@ -1,5 +1,5 @@
 %% @doc dl_ch_data is a data structure module that encapsulates
-%%		all of the data that dripline has about a particular channel.
+%%        all of the data that dripline has about a particular channel.
 %% @author jared kofron <jared.kofron@gmail.com>
 -module(dl_ch_data).
 
@@ -9,14 +9,14 @@
 -type ch_type() :: rtd85 | rtd91 | dmm_dc | dmm_ac.
 
 -record(dl_ch_data,{
-	  id = <<>>:: binary(),
-	  node = local :: local | node(),
-	  instr = none :: binary(),
-	  model = none :: atom(),
-	  locator = none :: term(),
-	  type = dmm_dc :: ch_type(),
-	  post_hk = [] :: [dripline_hook:hook()]
-	 }).
+      id = <<>>:: binary(),
+      node = local :: local | node(),
+      instr = none :: binary(),
+      model = none :: atom(),
+      locator = none :: term(),
+      type = dmm_dc :: ch_type(),
+      post_hk = [] :: [dripline_hook:hook()]
+     }).
 
 -opaque ch_data() :: #dl_ch_data{}.
 -export_type([ch_data/0]).
@@ -26,13 +26,13 @@
 %%%%%%%%%%%
 -export([new/0, fields/0, from_json/1]).
 -export([
-	 get_id/1,get_node/1,get_instr/1,get_model/1,
-	 get_locator/1,get_type/1,get_post_hooks/1
-	]).
+     get_id/1,get_node/1,get_instr/1,get_model/1,
+     get_locator/1,get_type/1,get_post_hooks/1
+    ]).
 -export([
-	 set_id/2,set_node/2,set_instr/2,set_model/2,
-	 set_locator/2,set_type/2,add_post_hook/2
-	]).
+     set_id/2,set_node/2,set_instr/2,set_model/2,
+     set_locator/2,set_type/2,add_post_hook/2
+    ]).
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% API Definitions %%% 
@@ -75,14 +75,14 @@ do_from_json({[{<<"node">>,N}|T]},Acc) ->
     do_from_json({T}, dl_ch_data:set_node(Name, Acc));
 do_from_json({[{<<"post_hooks">>,N}|T]},Acc) ->
     Hooks = lists:map(fun(X) ->
-			      erlang:binary_to_atom(X, latin1)
-		      end,
-		      N),
+                  erlang:binary_to_atom(X, latin1)
+              end,
+              N),
     NewData = lists:foldl(fun(X,DatAcc) ->
-			     dl_ch_data:add_post_hook(X,DatAcc)
-			  end,
-			  Acc,
-			  Hooks),
+                 dl_ch_data:add_post_hook(X,DatAcc)
+              end,
+              Acc,
+              Hooks),
     do_from_json({T}, NewData);    
 do_from_json({[{_Other,_}|T]},Acc) ->
     do_from_json({T}, Acc).
@@ -155,10 +155,10 @@ add_post_hooks_test() ->
     Hooks = [a,b,c],
     D0 = dl_ch_data:new(),
     DF = lists:foldl(fun(X,Acc) ->
-			     dl_ch_data:add_post_hook(X,Acc)
-		     end,
-		     D0,
-		     Hooks),
+                 dl_ch_data:add_post_hook(X,Acc)
+             end,
+             D0,
+             Hooks),
     ?assertEqual(Hooks, dl_ch_data:get_post_hooks(DF)).
     
 set_type_test() ->
