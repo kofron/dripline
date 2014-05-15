@@ -63,7 +63,8 @@ behaviour_info(callbacks) ->
      {ese_register_bitmask,1},
      {handle_stb, 2},
      {handle_esr, 2},
-     {handle_get, 2}];
+     {handle_get, 2},
+     {handle_set, 3}];
 behaviour_info(_) ->
     undefined.
 
