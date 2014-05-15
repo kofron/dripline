@@ -183,7 +183,7 @@ update_rev_data(ChangeData,RevisionInfo) ->
 %% @doc When a document passes through the changes feed, we automatically
 %%      ignore the next update.  This should work just fine.
 %%----------------------------------------------------------------------%%
--spec ignore_update_rev(ejson:json_object(), dict:dict()) -> boolean().
+-spec ignore_update_rev(ejson:json_object(), dict()) -> boolean().
 ignore_update_rev(ChangeLine, RevsDict) ->
     DocID = props:get('doc._id', ChangeLine),
     BinRev = props:get('doc._rev', ChangeLine),
