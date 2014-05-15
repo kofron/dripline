@@ -5,7 +5,7 @@
 %%% Created : 9 May 2014 by Ben LaRoque
 %%%-------------------------------------------------------------------
 -module(disk_usage_shell).
--behavior(gen_instrument).
+-behavior(dl_gen_instrument).
 
 -export([init/1,
          start_link/1,
@@ -15,7 +15,7 @@
 -record(state, {locator}).
 
 %%--------------------------------------------------------------------
-%% gen_instrument Functions
+%% dl_gen_instrument Functions
 %%--------------------------------------------------------------------
 init(_Args) ->
     {ok, #state{}}.

@@ -5,7 +5,7 @@
 %%% use this behavior.
 %%% @end
 %%%-------------------------------------------------------------------
--module(gen_instrument).
+-module(dl_gen_instrument).
 
 %%%-------------------------------------------------------------------
 %%% Instrument callbacks
