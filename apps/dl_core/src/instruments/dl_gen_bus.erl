@@ -10,14 +10,6 @@
 %%%-------------------------------------------------------------------
 %%% Instrument callbacks
 %%%-------------------------------------------------------------------
--callback init(Args::term()) ->
-    {ok, State::term()}.
-
--callback start_link(CallbackMod::atom(), ID::atom()) ->
-    {ok, PID::pid()}|
-    ignore|
-    {error, Error::term()}.
-
 -callback get(Instrument::atom(), Channel::atom()) ->
     Reply::term().
 
