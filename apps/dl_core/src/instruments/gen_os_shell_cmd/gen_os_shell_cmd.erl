@@ -10,21 +10,22 @@
 % command along with the options that are passed in is executed
 % via os:cmd.
 -module(gen_os_shell_cmd).
+-behavior(dl_gen_bus).
 -behaviour(gen_server).
 
 -record(state,{mod, mod_state, port, from, data}).
 
 %%--------------------------------------------------------------------
-%% API
+%% dl_gen_bus callbacks
 %%--------------------------------------------------------------------
 -export([start_link/2,
+         init/1,
          get/2,
          set/3]).
 %%--------------------------------------------------------------------
-%% gen_server
+%% gen_server callbacks
 %%--------------------------------------------------------------------
--export([init/1,
-         handle_call/3,
+-export([handle_call/3,
          handle_cast/2,
          handle_info/2,
          terminate/2,
@@ -32,18 +33,6 @@
 
 %%--------------------------------------------------------------------
 %% API Functions
-%%--------------------------------------------------------------------
-start_link(CallbackMod, ID) ->
-    gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
-
-get(Instrument, Channel) ->
-    gen_server:call(Instrument, {get, Channel}, 60000).
-
-set(Instrument, Channel, Value) ->
-    gen_server:call(Instrument, {set, Channel, Value}, 60000).
-
-%%--------------------------------------------------------------------
-%% gen_server Functions
 %%--------------------------------------------------------------------
 init([CallbackMod]=Args) ->
     case CallbackMod:init(Args) of
@@ -58,6 +47,18 @@ init([CallbackMod]=Args) ->
             Failure
         end.
 
+start_link(CallbackMod, ID) ->
+    gen_server:start_link({local, ID}, ?MODULE, [CallbackMod], []).
+
+get(Instrument, Channel) ->
+    gen_server:call(Instrument, {get, Channel}, 60000).
+
+set(Instrument, Channel, Value) ->
+    gen_server:call(Instrument, {set, Channel, Value}, 60000).
+
+%%--------------------------------------------------------------------
+%% gen_server Functions
+%%--------------------------------------------------------------------
 handle_call({get, Channel}, From, #state{mod=Mod, mod_state=ModSt, from=none}=State) ->
     case Mod:handle_get(Channel, ModSt) of
         {send, OsCmd, NewModSt} ->
