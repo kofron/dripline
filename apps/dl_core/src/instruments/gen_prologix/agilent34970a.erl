@@ -67,7 +67,7 @@ handle_get(Ch, #state{ttl=T, last_upd=L, cache=C}=SD) ->
          {true, data, #cache_v{lastval=Ls, ts=Ts}} ->
              %% The channel is valid and the cache is valid.  Just 
              %% return the data.
-             {data, {Ls, Ts}, SD}
+             {data, Ls, SD}
          end,
     Branch.
 
