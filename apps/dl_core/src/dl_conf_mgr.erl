@@ -366,9 +366,7 @@ instr_on_bus(BusName) ->
 -spec get_ch_data(atom()) -> {ok, dl_ch_data:ch_data()}
                  | {error, term()}.
 get_ch_data(ChName) ->
-    Qs = qlc:q([Ch || Ch <- mnesia:table(dl_ch_data),
-              dl_ch_data:get_id(Ch) == ChName
-           ]),
+    Qs = qlc:q([Ch || Ch <- mnesia:table(dl_ch_data), dl_ch_data:get_id(Ch) == ChName ]),
     {atomic, Ans} = mnesia:transaction(fun() ->
                            qlc:e(Qs)
                        end),
@@ -620,6 +618,9 @@ update_logger(DtData) ->
 is_real_channel(heartbeat) ->
     true;
 is_real_channel(ChName) ->
+    lager:info("channel name is binary: ~p", [is_binary(ChName)]),
+    lager:info("channel name is atom: ~p", [is_atom(ChName)]),
+    lager:info("channel data is: ~p", [get_ch_data(ChName)]),
     case get_ch_data(ChName) of
         {ok, _} ->
             true;

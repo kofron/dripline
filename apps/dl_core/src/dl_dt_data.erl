@@ -41,7 +41,7 @@ from_json(JS) ->
 do_from_json({[]}, Acc) ->
     {ok, Acc};
 do_from_json({[{<<"channel">>,Ch}|T]}, Acc) ->
-    Channel = erlang:binary_to_atom(Ch, latin1),
+    Channel = Ch,%erlang:binary_to_atom(Ch, latin1),
     do_from_json({T}, set_channel(Acc,Channel));
 do_from_json({[{<<"interval">>,Ival}|T]}, Acc) ->
     Interval = dl_util:binary_to_integer(Ival),
