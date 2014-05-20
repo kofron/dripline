@@ -471,6 +471,7 @@ get_instr_data(InName) ->
 
 -spec maybe_update_tables(ejson:json_object()) -> ok.
 maybe_update_tables(Msg) ->
+    %lager:warning("handling new message: ~p", [props:get('doc.type', Msg)]),
     case props:get('doc.type',Msg) of
     <<"channel">> ->
         update_channel_table(Msg);

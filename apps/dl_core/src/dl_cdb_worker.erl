@@ -57,6 +57,7 @@ handle_cast({process, Command}, State) ->
         lager:info("request received: ~p", [Request]),
         do_request_if_exists(Request, State);
     {error, Reason, BadRequest} ->
+        lager:warning("bad request received"),
         Err = dl_compiler:compiler_error_msg(Reason),
         do_error_response(BadRequest, Err, State)
     end,
