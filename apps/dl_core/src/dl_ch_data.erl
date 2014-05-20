@@ -60,18 +60,23 @@ do_from_json({[]},Acc) ->
     {ok, Acc};
 do_from_json({[{<<"name">>,N}|T]},Acc) ->
     Name = erlang:binary_to_atom(N, latin1),
+    %Name = N,
     do_from_json({T}, dl_ch_data:set_id(Name, Acc));
 do_from_json({[{<<"instrument">>,N}|T]},Acc) ->
     Name = erlang:binary_to_atom(N, latin1),
+    %Name = N,
     do_from_json({T}, dl_ch_data:set_instr(Name, Acc));
 do_from_json({[{<<"locator">>,N}|T]},Acc) ->
     Name = erlang:binary_to_atom(N, latin1),
+    %Name = N,
     do_from_json({T}, dl_ch_data:set_locator(Name, Acc));
 do_from_json({[{<<"sensor_type">>,N}|T]},Acc) ->
     Name = erlang:binary_to_atom(N, latin1),
+    %Name = N,
     do_from_json({T}, dl_ch_data:set_type(Name, Acc));
 do_from_json({[{<<"node">>,N}|T]},Acc) ->
     Name = erlang:binary_to_atom(N, latin1),
+    %Name = N,
     do_from_json({T}, dl_ch_data:set_node(Name, Acc));
 do_from_json({[{<<"post_hooks">>,N}|T]},Acc) ->
     Hooks = lists:map(fun(X) ->

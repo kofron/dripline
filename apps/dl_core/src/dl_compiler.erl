@@ -170,6 +170,7 @@ parse_valid_json(JSON, run, I) ->
 -spec get_json_channel(ejson:json_object()) -> binary() | undefined.
 get_json_channel(JS) ->
     erlang:binary_to_atom(ej:get({<<"channel">>}, JS), latin1).
+    %ej:get({<<"channel">>}, JS).
 
 -spec get_json_value(ejson:json_object()) -> binary() | undefined.
 get_json_value(JS) ->

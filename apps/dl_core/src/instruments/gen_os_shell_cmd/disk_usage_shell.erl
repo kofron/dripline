@@ -23,7 +23,7 @@ init(_Args) ->
 start_link(ID) ->
     gen_os_shell_cmd:start_link(?MODULE, ID).
 
-handle_get(disk_usage, StateData) ->
+handle_get(<<"disk_usage">>, StateData) ->
     lager:warning("depricated usage"),
     {error, {deprecated_usage, {missing_info, device_name}}, StateData};
 handle_get(Locator, StateData) ->
