@@ -471,6 +471,7 @@ get_instr_data(InName) ->
 
 -spec maybe_update_tables(ejson:json_object()) -> ok.
 maybe_update_tables(Msg) ->
+    %lager:warning("handling new message: ~p", [props:get('doc.type', Msg)]),
     case props:get('doc.type',Msg) of
     <<"channel">> ->
         update_channel_table(Msg);
@@ -618,9 +619,6 @@ update_logger(DtData) ->
 is_real_channel(heartbeat) ->
     true;
 is_real_channel(ChName) ->
-    lager:info("channel name is binary: ~p", [is_binary(ChName)]),
-    lager:info("channel name is atom: ~p", [is_atom(ChName)]),
-    lager:info("channel data is: ~p", [get_ch_data(ChName)]),
     case get_ch_data(ChName) of
         {ok, _} ->
             true;

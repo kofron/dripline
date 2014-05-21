@@ -57,6 +57,7 @@ handle_cast({process, Command}, State) ->
         lager:info("request received: ~p", [Request]),
         do_request_if_exists(Request, State);
     {error, Reason, BadRequest} ->
+        lager:warning("bad request received"),
         Err = dl_compiler:compiler_error_msg(Reason),
         do_error_response(BadRequest, Err, State)
     end,
@@ -72,8 +73,6 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 do_request_if_exists(RequestData, StateData) ->
-    lager:notice("RequestData is: ~p",[dl_request:get_target(RequestData)]),
-    lager:notice("is real: ~p", [dl_conf_mgr:is_real_channel(higgsino_disk)]),
     case dl_conf_mgr:is_real_channel(dl_request:get_target(RequestData)) of
     true ->
         do_request_if_local(RequestData, StateData);

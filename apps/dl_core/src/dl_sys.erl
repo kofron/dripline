@@ -58,6 +58,7 @@ init(_Args) ->
     {ok, #state{}}.
 
 handle_call({st_lg, Lgs}, _From, State) ->
+    lager:notice("got a start loggers"),
     Reply = do_start_loggers(Lgs, []),
     {reply, Reply, State};
 handle_call({sp_lg, Lgs}, _From, State) ->
@@ -88,6 +89,7 @@ do_start_loggers([Lg|R], Acc) ->
     LgDt = dl_conf_mgr:logger_info(Lg),
     case LgDt of
     {error, no_logger}=Er ->
+        lager:warning("logger not configured"),
         do_start_loggers(R, [{Lg, Er}|Acc]);
     _Data ->
         Res = start_logger(LgDt),
@@ -95,6 +97,7 @@ do_start_loggers([Lg|R], Acc) ->
     end.
 
 start_logger(LoggerData) ->
+    lager:notice("doing start of logger"),
     ChName = dl_dt_data:get_channel(LoggerData),
     Ival = dl_dt_data:get_interval(LoggerData),
     case supervisor:start_child(dl_data_taker_sup, [dl_conf_mgr:channel_info(ChName), Ival]) of

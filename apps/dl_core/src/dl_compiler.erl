@@ -51,11 +51,17 @@ init([]) ->
   {ok, #state{}}.
 
 handle_call({compile, JS}, _From, State) ->
+    lager:warning("trying to compile JS"),
     Reply = case drip_compile(JS) of
         {ok, _F}=Success ->
+            lager:notice("compile worked"),
             Success;
         {error, _E, _Req}=Err ->
-            Err
+            lager:error("~nCompile of JS failed~n"),
+            Err;
+        Err ->
+            lager:error("~n!!!!!!!!!!!!!!!!!!!!!!!!!!!~n"),
+            lager:error("error catching failed, got Error: ~p", [Err])
         end,
     {reply, Reply, State}.
 
@@ -93,8 +99,10 @@ drip_compile(JS) ->
 json_to_request(JS, Req) ->
     case check_request_validity(JS) of
     {ok, Method} -> 
+        lager:notice("valid json"),
         parse_valid_json(JS, Method, Req);
     {error, _Reason} = E ->
+        lager:notice("bad json"),
         E
     end. 
 
@@ -139,7 +147,7 @@ regex_for(value) ->
 request_spec() ->
     {[
       {<<"do">>, {string_match, regex_for(verb)}},
-      {<<"channel">>, {string_match, regex_for(channel)}},
+      {{opt, <<"channel">>}, {string_match, regex_for(channel)}},
       {{opt, <<"value">>}, {string_match, regex_for(value)}}
      ]}.
 
