@@ -73,8 +73,6 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 do_request_if_exists(RequestData, StateData) ->
-    lager:notice("RequestData is: ~p",[dl_request:get_target(RequestData)]),
-    lager:notice("is real: ~p", [dl_conf_mgr:is_real_channel(higgsino_disk)]),
     case dl_conf_mgr:is_real_channel(dl_request:get_target(RequestData)) of
     true ->
         do_request_if_local(RequestData, StateData);

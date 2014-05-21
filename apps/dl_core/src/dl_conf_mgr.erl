@@ -619,9 +619,6 @@ update_logger(DtData) ->
 is_real_channel(heartbeat) ->
     true;
 is_real_channel(ChName) ->
-    lager:info("channel name is binary: ~p", [is_binary(ChName)]),
-    lager:info("channel name is atom: ~p", [is_atom(ChName)]),
-    lager:info("channel data is: ~p", [get_ch_data(ChName)]),
     case get_ch_data(ChName) of
         {ok, _} ->
             true;

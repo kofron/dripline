@@ -78,7 +78,8 @@ handle_call({set, Channel, Value}, From, #state{mod=Mod, mod_state=ModSt, from=n
         end;
 handle_call(_Args, _From, #state{from=_F}=State)->
     lager:warning("shell is busy"),
-    {reply, busy, State};
+    {reply, construct_err_response({error, {not_executed, busy}}), State};
+    %{reply, busy, State};
 handle_call(_Request, _From, State) ->
     lager:warning("os_shell unknown request"),
     {stop, unrecognized_request, State}.
