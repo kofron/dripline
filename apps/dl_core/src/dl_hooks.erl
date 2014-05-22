@@ -25,6 +25,7 @@
 -export([kjlc354_cal/1, 
      linear_r_to_z/1,
      force_positive/1,
+     mks_925_to_torr/1,
      cernox33122/1,
      cernox43022/1,
      cernox01912/1,
@@ -85,6 +86,12 @@ force_positive(<<"-",Rest/binary>>) ->
     <<A/binary, Rest/binary>>;
 force_positive(Other) ->
     Other.
+
+-spec mks_925_to_torr(binary()) -> binary().
+mks_925_to_torr(<<_Sign:1/binary,Val:14/binary,_Rest/binary>>) ->
+    Raw = dl_util:binary_to_float(Val),
+    Cal = math:pow(10, Raw-6.0),
+    erlang:list_to_binary([erlang:float_to_list(Cal), " Torr"]).
 
 -spec tm220(binary()) -> binary().
 tm220(<<Val:15/binary,_Rest/binary>>) ->
