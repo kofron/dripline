@@ -13,4 +13,5 @@ python/dripline/*.pyc
 python/dripline/__pycache__
 python/dripline/*/__pycache__
 python/dripline.egg-info/*
+python/build/*
 *.egg
