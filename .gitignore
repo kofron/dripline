@@ -9,9 +9,9 @@ rebar
 lib/
 priv/*.so
 rel/dripline
-python/dripline/*.pyc
-python/dripline/__pycache__
-python/dripline/*/__pycache__
+*.pyc
+*__pycache__
 python/dripline.egg-info/*
 python/build/*
+python/doc/_build/*
 *.egg
