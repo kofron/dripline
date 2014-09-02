@@ -13,7 +13,7 @@ from simple_scpi import SimpleSCPISensor
 def good_conf():
     filename = myPath + '/test_graph.yaml'
     c = Config(filename)
-    return c 
+    return c
 
 @pytest.fixture
 def bare_conf():

@@ -43,16 +43,17 @@ class Connection(object):
 
     def _bind_sensor(self, sensor):
         sensor_queue = self.chan.queue_declare(exclusive=True)
-        
-        self.chan.queue_bind(exchange='requests',
-            queue=sensor_queue.method.queue,
-            routing_key=sensor.name)
-        self.chan.queue_bind(exchange='requests',
-            queue=sensor_queue.method.queue,
-            routing_key='sensors.'+sensor.name)
 
-        self.chan.basic_consume(sensor.handle_request,queue=sensor_queue.method.queue)
-    
+        self.chan.queue_bind(exchange='requests',
+                            queue=sensor_queue.method.queue,
+                            routing_key=sensor.name)
+        self.chan.queue_bind(exchange='requests',
+                            queue=sensor_queue.method.queue,
+                            routing_key='sensors.'+sensor.name)
+
+        self.chan.basic_consume(sensor.handle_request,
+                                queue=sensor_queue.method.queue)
+
     def start(self):
         while True:
             self.conn.process_data_events()
@@ -62,12 +63,11 @@ class Connection(object):
         self.response = None
         self.corr_id = str(uuid.uuid4())
         self.chan.basic_publish(exchange='requests',
-            routing_key=target,
-            properties=pika.BasicProperties(
-                reply_to=self.queue.method.queue,
-                correlation_id=self.corr_id),
-            body=request
-            )
+                                routing_key=target,
+                                properties=pika.BasicProperties(
+                                    reply_to=self.queue.method.queue,
+                                    correlation_id=self.corr_id),
+                                body=request)
         while self.response is None:
             self.conn.process_data_events()
         return self.response
