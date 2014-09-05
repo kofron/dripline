@@ -1,5 +1,5 @@
 '''
-    Meta and derived classes for dripline messages
+Meta and derived classes for dripline messages
 '''
 
 __all__ = ['ReplyMessage', 'RequestMessage', 'InfoMessage', 'AlertMessage']
@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 
 class Message(dict, object):
     '''
-        metaclass for dripline messages
+    metaclass for dripline messages
     '''
     __metaclass__ = ABCMeta
 
@@ -28,28 +28,28 @@ class Message(dict, object):
     @msgop.setter
     def msgop(self, value):
         self['msgop'] = value
-    
+
     @property
     def target(self):
         return self['target']
     @target.setter
     def target(self, value):
         self['target'] = value
-    
+
     @property
     def timestamp(self):
         return self['timestamp']
     @timestamp.setter
     def timestamp(self, value):
         self['timestamp'] = value
-    
+
     @property
     def payload(self):
         return self['payload']
     @payload.setter
     def payload(self, value):
         self['payload'] = value
-    
+
     @property
     def exceptions(self):
         return self['exceptions']
@@ -86,10 +86,10 @@ class Message(dict, object):
         temp_dict = self.copy()
         temp_dict.update({'msgtype':self.msgtype})
         return msgpack.packb(temp_dict)
-    
+
 class ReplyMessage(Message):
     '''
-        Derrived class for Reply type messages
+    Derrived class for Reply type messages
     '''
     @property
     def msgtype(self):

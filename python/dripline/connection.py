@@ -1,5 +1,6 @@
 import pika
 import uuid
+from endpoint import Endpoint
 from sensor import Sensor
 
 import logging
@@ -17,9 +18,10 @@ class Connection(object):
     def __del__(self):
         self.conn.close()
 
-    # ensures all exchanges are present and creates a
-    # response queue.
     def _setup_amqp(self):
+        '''
+        ensures all exchanges are present and creates a response queue.
+        '''
         self.chan.exchange_declare(exchange='requests',type='topic')
         self.queue = self.chan.queue_declare(exclusive=True)
         self.chan.queue_bind(exchange='requests',
@@ -32,11 +34,15 @@ class Connection(object):
         if self.corr_id == props.correlation_id:
             self.response = response
 
-    # bind a sensor to the connection.  this forwards requests which are
-    # intended for that sensor to the object which is bound by this
-    # method.
     def bind(self, to_bind):
-        if isinstance(to_bind, Sensor):
+        '''
+        bind a sensor to the connection.  this forwards requests which are
+        intended for that sensor to the object which is bound by this
+        method.
+        '''
+        # TODO: need to back this up in terms of complexity.  do we really need
+        # multiple type checks?  I doubt it.
+        if isinstance(to_bind, Sensor) or isinstance(to_bind, Endpoint):
             self._bind_sensor(to_bind)
         else:
             raise TypeError("expected instance of abstract class Sensor")
@@ -58,12 +64,15 @@ class Connection(object):
         while True:
             self.conn.process_data_events()
 
-    # send a request to a specific consumer.
     def send_request(self, target, request):
+        '''
+        send a request to a specific consumer.
+        '''
         self.response = None
         self.corr_id = str(uuid.uuid4())
         self.chan.basic_publish(exchange='requests',
                                 routing_key=target,
+                                mandatory=True,
                                 properties=pika.BasicProperties(
                                     reply_to=self.queue.method.queue,
                                     correlation_id=self.corr_id),

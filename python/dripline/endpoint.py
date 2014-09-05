@@ -3,32 +3,32 @@ from message import Message, RequestMessage
 import constants
 import pika
 
-class Sensor(object):
+class Endpoint(object):
     __metaclass__ = ABCMeta
 
-    # when a sensor is bound to a connection, it will receive requests
+    # when a endpoint is bound to a connection, it will receive requests
     # in its handle_request method.
     @abstractmethod
     def handle_request(self, channel, method, properties, request):
         pass
 
-class AutoReply(Sensor):
+class AutoReply(Endpoint):
     __metaclass__ = ABCMeta
 
     def send_reply(self, channel, properties, result):
         channel.basic_publish(exchange='requests',
-            routing_key=properties.reply_to,
-            properties=pika.BasicProperties(
-                correlation_id=properties.correlation_id
-                ),
-            body=result)
+                              routing_key=properties.reply_to,
+                              properties=pika.BasicProperties(
+                                  correlation_id=properties.correlation_id
+                                  ),
+                              body=result)
 
     def handle_request(self, channel, method, properties, request):
-        msg = Message.from_msgpack(request), Message()
+        msg = Message.from_msgpack(request)
         if msg.msgop == constants.OP_SENSOR_GET:
-                result = self.on_get()
-                self.send_reply(channel, properties, result)
-                channel.basic_ack(delivery_tag = method.delivery_tag)
+            result = self.on_get()
+            self.send_reply(channel, properties, result)
+            channel.basic_ack(delivery_tag=method.delivery_tag)
 
     @abstractmethod
     def on_get(self):
