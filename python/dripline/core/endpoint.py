@@ -1,7 +1,11 @@
+from __future__ import absolute_import
+
 from abc import ABCMeta, abstractproperty, abstractmethod
-from message import Message, RequestMessage
-import constants
+from .message import Message, RequestMessage
+from . import constants
 import pika
+
+__all__ = ['Endpoint', 'AutoReply']
 
 class Endpoint(object):
     __metaclass__ = ABCMeta

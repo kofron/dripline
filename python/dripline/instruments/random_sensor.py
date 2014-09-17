@@ -1,7 +1,12 @@
-from sensor import AutoReply
+from __future__ import absolute_import
+
 from random import random
 
-class RandomSensor(AutoReply):
+from ..core import AutoReply
+
+__all__ = ['random_sensor']
+
+class random_sensor(AutoReply):
     def __init__(self, name):
         self.name = name
 
