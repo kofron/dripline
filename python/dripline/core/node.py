@@ -5,14 +5,9 @@ from .binding import Binding
 from . import message
 import logging
 
-logger = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.setLevel(logging.INFO)
-logger.addHandler(ch)
-
 __all__ = ['Node']
+logger = logging.getLogger(__name__)
+
 
 class Node(object):
     """
@@ -114,6 +109,8 @@ class Node(object):
                   on_get=endpoint.on_get,
                   on_set=endpoint.on_set,
                   on_config=endpoint.on_config)
+        setattr(endpoint, 'store_value', self.conn.send_alert)
+        endpoint.report_log = self.conn.send_alert
 
     # TODO: god these names are awkward, who came up with this???
     def provider_list(self):

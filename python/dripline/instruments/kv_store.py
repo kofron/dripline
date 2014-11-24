@@ -21,19 +21,21 @@ fully qualified hierarchical address e.g. somenode.kv.foo.
 """
 
 from __future__ import absolute_import
+import logging
 
-from ..core import Provider, Endpoint
+from ..core import Provider, Endpoint, DataLogger
 
 __all__ = ['kv_store', 'kv_store_key']
 
 
+logger = logging.getLogger(__name__)
 class kv_store(Provider):
     """
     The KV store.  This is just a wrapper around a dict.
     """
     def __init__(self, name, *args):
         self.name = name
-        self.dict = {}
+        self.conf = {}
         self.endpoints = {}
 
     def add_endpoint(self, endpoint):
@@ -44,7 +46,7 @@ class kv_store(Provider):
         """
         endpoint.provider = self
         self.endpoints[endpoint.name] = endpoint
-        self.dict[endpoint.name] = endpoint.initial_value
+        self.conf[endpoint.name] = endpoint.initial_value
 
     def endpoint(self, endpoint):
         """
@@ -58,23 +60,36 @@ class kv_store(Provider):
         This is the same as enumerating the keys in the
         dict.
         """
-        return self.dict.keys()
+        return self.conf.keys()
 
+    # TODO: is there a reason for this, rather than inherit from dict?
+    # I'll need to think about that
     def __getitem__(self, name):
-        return self.dict[name]
+        return self.conf[name]
 
     def __setitem__(self, name, value):
-        self.dict[name] = value
+        self.conf[name] = value
 
 
-class kv_store_key(Endpoint):
+class kv_store_key(Endpoint, DataLogger):
     """
     A key in the KV store.
     """
-    def __init__(self, name, initial_value=None):
+    def __init__(self, name, initial_value=None, log_interval=0.):
+        # DataLogger stuff
+        super(kv_store_key, self).__init__()
+        self.log_interval = log_interval
+        self.get_value = self.on_get
+        self.store_value = self.report_log
+
+        # derrived class stuff
         self.name = name
         self.provider = None
         self.initial_value = initial_value
+
+    @staticmethod
+    def report_log(value):  
+        logger.info("Should be logging value: {}\n".format(value))
 
     def on_get(self):
         """
@@ -95,9 +110,12 @@ class kv_store_key(Endpoint):
         except ValueError:
             raise ValueError('argument to set must be a float!')
 
-    def on_config(self):
+    def on_config(self, attribute, value):
         """
         Configuring a key is not defined.
         """
-        return NotImplementedError
-
+        if hasattr(self, attribute):
+            setattr(self, attribute, value)
+            logger.info('set {} to {}'.format(attribute, value))
+        else:
+            raise AttributeError("No attribute: {}".format(attribute))
