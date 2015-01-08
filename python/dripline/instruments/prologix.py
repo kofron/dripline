@@ -16,30 +16,38 @@ logger = logging.getLogger(__name__)
 __all__ = ['PrologixSpimescape',
            'GPIBInstrument',
            'SimpleGetSpime',
+           'MuxerGetSpime',
            'SimpleGetSetSpime',
           ]
 
 
 class PrologixSpimescape(Provider):
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 name,
+                 socket_timeout=1.0,
+                 socket_info=("localhost", 1234),
+                 **kwargs
+                ):
         '''
         '''
+        Provider.__init__(self, name=name, **kwargs)
         self.alock = threading.Lock()
         self._keep_polling = True
         self._poll_interval = 0.5
-        self.socket_timeout = 1.0
+        self.socket_timeout = float(socket_timeout)
         self.expecting = False
-        self.socket_info = ("localhost", 1234)
+        self.socket_info = socket_info
         self.poll_thread = threading.Timer([], {})
         self.socket = socket.socket()
         self._devices = {}
-        for k,v in kwargs.items():
-            setattr(self, k, v)
+#        for k,v in kwargs.items():
+#            setattr(self, k, v)
         if type(self.socket_info) is str:
             import re
             re_str = "\([\"'](\S+)[\"'], (\d+)\)"
             (ip, port) = re.findall(re_str, self.socket_info)[0]
             self.socket_info = (ip, int(port))
+        logger.debug('socket info is {}'.format(self.socket_info))
         self.reconnect()
 
     def reconnect(self):
@@ -127,8 +135,9 @@ class GPIBInstrument(Provider):
     The _cmd_term attribute is appended to those commands before being passed up to
     the higher level provider which actually maintains a connection (eg PrologixSpimescape).
     '''
-    def __init__(self, name, addr):
-        self.name = name
+    def __init__(self, name, addr, **kwargs):
+        Provider.__init__(self, name=name, **kwargs)
+        #self.name = name
         self.addr = addr
         self.queue = []
         self.expecting = False
@@ -155,12 +164,22 @@ class SimpleGetSpime(Spime):
 
     If either assumption is wrong then you need a different Spime derived class
     '''
-    def __init__(self, name, base_str):
+    def __init__(self, name, base_str, **kwargs):
         self.cmd_base = base_str
-        Spime.__init__(self, name)
+        Spime.__init__(self, name, **kwargs)
 
     def on_get(self):
         return self.provider.send(self.cmd_base)
+
+
+class MuxerGetSpime(SimpleGetSpime):
+    def __init__(self, name, **kwargs):
+        SimpleGetSpime.__init__(self, name=name, **kwargs)
+        self.get_value = self.get_parsed_value
+
+    def get_parsed_value(self):
+        raw_data = self.on_get()
+        return raw_data.split()[0]
 
 
 class SimpleGetSetSpime(Spime):
@@ -177,9 +196,9 @@ class SimpleGetSetSpime(Spime):
 
     If either of those assumptions is wrong then you want a different Spime derived class
     '''
-    def __init__(self, name, base_str):
+    def __init__(self, name, base_str, **kwargs):
         self.cmd_base = base_str
-        Spime.__init__(self, name)
+        Spime.__init__(self, name, **kwargs)
 
     def on_get(self):
         return self.provider.send(self.cmd_base + '?')
