@@ -1,0 +1,59 @@
+nodename: muxer
+broker: myrna.local
+providers:
+  - name: lagavulin_prologix
+    module: PrologixSpimescape
+    socket_info: ("lagavulin.local", 1234)
+    endpoints:
+      - name: multiplexer
+        module: GPIBInstrument
+        addr: 9
+        endpoints:
+          - name: amp_1_temp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@101)"
+          - name: amp_2_temp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@102)"
+          - name: coldhead_temp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@103)"
+          - name: hall_probe_voltage
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@106)"
+          - name: cell_temp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@108)"
+          - name: linear_encoder_voltage
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@301)"
+          - name: ion_gauge_1
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@302)"
+          - name: gas_line_upper_right_ptemp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@304)"
+          - name: gas_line_upper_left_ptemp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@305)"
+          - name: ion_gauge_2
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@312)"
+          - name: gas_line_lower_right_ptemp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@314)"
+          - name: gas_line_lower_left_ptemp
+            module: MuxerGetSpime
+            log_interval: 300
+            base_str: "DATA:LAST? (@315)"
