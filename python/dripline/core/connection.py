@@ -7,9 +7,12 @@ from __future__ import absolute_import
 
 import pika
 import uuid
+
 from .endpoint import Endpoint
 from .sensor import Sensor
-from .message import AlertMessage
+from .message import AlertMessage, ReplyMessage
+
+__all__ = ['Connection']
 
 import logging
 logger = logging.getLogger(__name__)
@@ -20,6 +23,7 @@ class Connection(object):
         conn_params = pika.ConnectionParameters(broker_host)
         self.conn = pika.BlockingConnection(conn_params)
         self.chan = self.conn.channel()
+        self.chan.confirm_delivery()
 
         self._setup_amqp()
 
@@ -60,13 +64,18 @@ class Connection(object):
         '''
         self.response = None
         self.corr_id = str(uuid.uuid4())
-        self.chan.basic_publish(exchange='requests',
-                                routing_key=target,
-                                mandatory=True,
-                                properties=pika.BasicProperties(
-                                    reply_to=self.queue.method.queue,
-                                    correlation_id=self.corr_id),
-                                body=request)
+        pr = self.chan.basic_publish(exchange='requests',
+                                     routing_key=target,
+                                     mandatory=True,
+                                     immediate=True,
+                                     properties=pika.BasicProperties(
+                                       reply_to=self.queue.method.queue,
+                                       correlation_id=self.corr_id),
+                                     body=request
+                                    )
+        logger.debug('publish success is: {}'.format(pr))
+        if not pr:
+            self.response = ReplyMessage(exceptions='no such queue', payload='key: {} not matched'.format(target)).to_msgpack()
         while self.response is None:
             self.conn.process_data_events()
         return self.response
@@ -80,5 +89,6 @@ class Connection(object):
         self.chan.basic_publish(exchange='alerts',
                                routing_key=severity,
                                mandatory=True,
+                               immediate=True,
                                body=message.to_msgpack(),
                               )

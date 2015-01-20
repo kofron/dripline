@@ -8,7 +8,7 @@ import time
 import json
 import socket
 
-from ..core import Spime, Provider
+from ..core import Spime, Provider, SimpleSCPIGetSpime, calibrate
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,14 +23,13 @@ __all__ = ['PrologixSpimescape',
 
 class PrologixSpimescape(Provider):
     def __init__(self,
-                 name,
                  socket_timeout=1.0,
                  socket_info=("localhost", 1234),
                  **kwargs
                 ):
         '''
         '''
-        Provider.__init__(self, name=name, **kwargs)
+        Provider.__init__(self, **kwargs)
         self.alock = threading.Lock()
         self._keep_polling = True
         self._poll_interval = 0.5
@@ -121,6 +120,7 @@ class PrologixSpimescape(Provider):
             tosend = command
         else:
             tosend = '++addr {}\r{}'.format(from_spime.addr, command)
+        logger.debug('sending: {}'.format(tosend))
         self.socket.send(tosend)
         data = self.socket.recv(1024)
         self.expecting = False
@@ -156,7 +156,7 @@ class GPIBInstrument(Provider):
         return self.provider.send(cmd+self._cmd_term, self)
 
 
-class SimpleGetSpime(Spime):
+class SimpleGetSpime(SimpleSCPIGetSpime):
     '''
     A generic Spime for SCPI commands which take no arguments (ie queries).
 
@@ -166,19 +166,16 @@ class SimpleGetSpime(Spime):
 
     If either assumption is wrong then you need a different Spime derived class
     '''
-    def __init__(self, name, base_str, **kwargs):
-        self.cmd_base = base_str
-        Spime.__init__(self, name, **kwargs)
-
     def on_get(self):
-        return self.provider.send(self.cmd_base)
+        return self.provider.send(self.cmd_base+'?')
 
 
 class MuxerGetSpime(SimpleGetSpime):
     def __init__(self, name, **kwargs):
         SimpleGetSpime.__init__(self, name=name, **kwargs)
         self.get_value = self.get_parsed_value
-
+    
+    @calibrate
     def get_parsed_value(self):
         raw_data = self.on_get()
         return raw_data.split()[0]
@@ -198,9 +195,9 @@ class SimpleGetSetSpime(Spime):
 
     If either of those assumptions is wrong then you want a different Spime derived class
     '''
-    def __init__(self, name, base_str, **kwargs):
+    def __init__(self, base_str, **kwargs):
         self.cmd_base = base_str
-        Spime.__init__(self, name, **kwargs)
+        Spime.__init__(self, **kwargs)
 
     def on_get(self):
         return self.provider.send(self.cmd_base + '?')
