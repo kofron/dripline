@@ -15,7 +15,7 @@ send_cmd "ABOR;*OPC?"
 #########################################
 #configure 4 wire channels (CONF:FRES AUTO,DEF(@[channels]))
 #cernox
-send_cmd "CONF:FRES AUTO,DEF,(@101,102,103,108);*OPC?"
+send_cmd "CONF:FRES AUTO,DEF,(@102,108);*OPC?"
 #linear encoder
 send_cmd "CONF:FRES AUTO,DEF,(@301);*OPC?"
 
@@ -36,6 +36,8 @@ send_cmd "CONF:VOLT:DC 0.1,(@106);*OPC?"
 #########################################
 #configure PT100 (CONF:TEMP RTD,85 (@[channels]))
 send_cmd "CONF:TEMP RTD,85,(@304,305,314,315);*OPC?"
+#configure PT100 4-wire
+send_cmd "CONF:TEMP FRTD,85,(@101,103);*OPC?"
 
 #########################################
 #setup the scan list <anything configured above must be added to the list here>
