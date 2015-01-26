@@ -14,9 +14,9 @@ send_cmd "ABOR;*OPC?"
 
 #########################################
 #configure 4 wire channels (CONF:FRES AUTO,DEF(@[channels]))
-#cernox
+#cernox amp_2 and cell
 send_cmd "CONF:FRES AUTO,DEF,(@102,108);*OPC?"
-#linear encoder
+#linear encoder 
 send_cmd "CONF:FRES AUTO,DEF,(@301);*OPC?"
 
 #########################################
@@ -27,17 +27,21 @@ send_cmd "CONF:FRES AUTO,DEF,(@301);*OPC?"
 
 #########################################
 #configure 10 V measurements (CONF:VOLT:DC 10,(@[channels]))
+# ion gague 1 and 2
 send_cmd "CONF:VOLT:DC 10,(@302,312);*OPC?"
 
 #########################################
 #configure mV measurements (CONF:VOLT:DC 0.1,(@[channels]))
+#hall probe voltage
 send_cmd "CONF:VOLT:DC 0.1,(@106);*OPC?"
 
 #########################################
 #configure PT100 (CONF:TEMP RTD,85 (@[channels]))
+# left and right, upper and lower gas lines
 send_cmd "CONF:TEMP RTD,85,(@304,305,314,315);*OPC?"
 send_cmd "UNIT:TEMP K;*OPC?"
 #configure PT100 4-wire
+# amp 1 temp and coldhead temp
 send_cmd "CONF:TEMP FRTD,85,(@101,103);*OPC?"
 send_cmd "UNIT:TEMP K;*OPC?"
 
