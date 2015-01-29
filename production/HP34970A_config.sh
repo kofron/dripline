@@ -40,10 +40,10 @@ send_cmd "CONF:VOLT:DC 0.1,(@106);*OPC?"
 # left and right, upper and lower gas lines
 #send_cmd "CONF:TEMP RTD,85,(@304,305,314,315);*OPC?"
 #send_cmd "UNIT:TEMP K;*OPC?"
-send_cmd "CONF:FRES AUTO,DEF,(@304,305,314,315);*OPC?"
+send_cmd "CONF:RES AUTO,DEF,(@304,305,314,315);*OPC?"
 #configure PT100 4-wire
 # coldhead temp
-#send_cmd "CONF:TEMP FRTD,85,(@101,103);*OPC?"
+#send_cmd "CONF:TEMP FRTD,85,(@,103);*OPC?"
 #send_cmd "UNIT:TEMP K;*OPC?"
 send_cmd "CONF:FRES AUTO,DEF,(@103);*OPC?"
 
