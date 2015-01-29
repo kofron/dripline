@@ -12,11 +12,11 @@ providers:
           - name: amp_1_temp
             module: MuxerGetSpime
             log_interval: 300
-            cal_str: 'cernox_calibration({}, 33122)'
+            cal_str: 'cernox_calibration({}, 87821)'
             ch_number: 101
           - name: amp_2_temp
             module: MuxerGetSpime
-            cal_str: 'cernox_calibration({}, 87821)'
+            cal_str: 'cernox_calibration({}, 01929)'
             log_interval: 300
             ch_number: 102
           - name: coldhead_temp
