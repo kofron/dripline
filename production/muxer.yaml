@@ -21,7 +21,7 @@ providers:
             ch_number: 102
           - name: coldhead_temp
             module: MuxerGetSpime
-            cal_str: "math.fabs({})"
+            cal_str: "pt100_calibration({})"
             log_interval: 300
             ch_number: 103
           - name: hall_probe_voltage
@@ -48,10 +48,12 @@ providers:
             module: MuxerGetSpime
             log_interval: 300
             ch_number: 304
+            cal_str: 'pt100_calibration({})'
           - name: gas_line_upper_left_ptemp
             module: MuxerGetSpime
             log_interval: 300
             ch_number: 305
+            cal_str: 'pt100_calibration({})'
           - name: ion_gauge_2
             module: MuxerGetSpime
             log_interval: 300
@@ -61,7 +63,9 @@ providers:
             module: MuxerGetSpime
             log_interval: 300
             ch_number: 314
+            cal_str: 'pt100_calibration({})'
           - name: gas_line_lower_left_ptemp
             module: MuxerGetSpime
             log_interval: 300
             ch_number: 315
+            cal_str: 'pt100_calibration({})'
