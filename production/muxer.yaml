@@ -12,61 +12,60 @@ providers:
           - name: amp_1_temp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@101)"
+            cal_str: 'cernox_calibration({}, 87821)'
             ch_number: 101
           - name: amp_2_temp
             module: MuxerGetSpime
+            cal_str: 'cernox_calibration({}, 1929)'
             log_interval: 300
-            #base_str: "DATA:LAST? (@102)"
             ch_number: 102
           - name: coldhead_temp
             module: MuxerGetSpime
-            cal_str: "math.fabs({})"
+            cal_str: "pt100_calibration({})"
             log_interval: 300
-            #base_str: "DATA:LAST? (@103)"
             ch_number: 103
           - name: hall_probe_voltage
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@106)"
             ch_number: 106
+            cal_str: "(0.9991/0.847)*(1000*math.fabs({})+0.007)"
           - name: cell_temp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@108)"
+            cal_str: 'cernox_calibration({}, 87820)'
             ch_number: 108
           - name: linear_encoder_voltage
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@301)"
             ch_number: 301
+            cal_str: "0.02460529*{}-29.12859597"
           - name: ion_gauge_1
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@302)"
             ch_number: 302
+            cal_str: "10**({}-10)"
           - name: gas_line_upper_right_ptemp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@304)"
             ch_number: 304
+            cal_str: 'pt100_calibration({})'
           - name: gas_line_upper_left_ptemp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@305)"
             ch_number: 305
+            cal_str: 'pt100_calibration({})'
           - name: ion_gauge_2
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@312)"
             ch_number: 312
+            cal_str: "10**({}-10)"
           - name: gas_line_lower_right_ptemp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@314)"
             ch_number: 314
+            cal_str: 'pt100_calibration({})'
           - name: gas_line_lower_left_ptemp
             module: MuxerGetSpime
             log_interval: 300
-            #base_str: "DATA:LAST? (@315)"
             ch_number: 315
+            cal_str: 'pt100_calibration({})'
