@@ -1,0 +1,66 @@
+#!/usr/bin/python
+
+'''
+Utility app for printing all of the messages through some exchange
+'''
+
+from __future__ import print_function
+
+import pika
+import argparse
+import msgpack
+
+from dripline.core import Message, DriplineParser
+
+
+def start_monitoring(broker='localhost', exchange='alerts', keys='#', **kwargs):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=broker))
+    channel = connection.channel()
+    #channel.exchange_declare(exchange='alerts', type='topic')
+    
+    result = channel.queue_declare(exclusive=True)
+    queue_name = result.method.queue
+    
+    for severity in keys:
+        channel.queue_bind(exchange=exchange,
+                           queue=queue_name,
+                           routing_key=severity,
+                          )
+    
+    print(' [*] Waiting for logs. To exit press CTRL+C')
+    
+    def callback(ch, method, properties, body):
+        message = Message.from_msgpack(body)
+        message.payload = msgpack.unpackb(message.payload)
+        print(" [x] {}:{}".format(method.routing_key, message,))
+    
+    channel.basic_consume(callback,
+                          queue=queue_name,
+                          no_ack=True)
+    
+    channel.start_consuming()
+
+if __name__ == '__main__':
+    parser = DriplineParser(
+                            description='Print messages from an exchange',
+                            amqp_broker=True,
+                           )
+    parser.add_argument('-e',
+                        '--exchange',
+                        metavar='exchange name',
+                        help='amqp name of the exchange to monitor',
+                        default='alerts',
+                       )
+    parser.add_argument('-k',
+                        '--keys',
+                        metavar='key',
+                        help='amqp binding keys to follow',
+                        default='#',
+                        nargs='*',
+                       )
+    
+    kwargs = parser.parse_args()
+    try:
+        start_monitoring(**vars(kwargs))
+    except KeyboardInterrupt:
+        print(' [*] exiting')

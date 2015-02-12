@@ -1,0 +1,67 @@
+#!/usr/bin/python
+""" dripline_agent
+Do simple stuff like gets and sets.
+"""
+import argparse
+import uuid
+
+from dripline.core import message, constants, DriplineParser, Connection, Message
+
+
+
+# TODO: this should be by introspection
+def verb_list():
+    """
+    A list of acceptable verb arguments.
+    """
+    return ['get', 'set', 'config', 'describe']
+
+
+def main(args):
+    request_verb = args.verb
+    conn = Connection(args.broker)
+
+    # TODO: this block makes me sad, a dict can do this in a way that is way more flexible
+    if request_verb == 'get':
+        request = message.RequestMessage(target=args.target,
+                                         msgop=constants.OP_SENSOR_GET,
+                                         payload=args.value)
+        #reply = node.send_sync(request)
+        reply = conn.send_request(args.target, request.to_msgpack())
+        result = Message.from_msgpack(reply)
+        print(args.target + ': ' + str(result.payload))
+    elif request_verb == 'set':
+        request = message.RequestMessage(target=args.target,
+                                         msgop=constants.OP_SENSOR_SET,
+                                         payload=args.value)
+        #reply = node.send_sync(request)
+        reply = conn.send_request(args.target, request.to_msgpack())
+        result = Message.from_msgpack(reply)
+        print(args.target + '->' + str(args.value) + ': ' + str(result.payload))
+    elif request_verb == 'config':
+        request = message.RequestMessage(target=args.target,
+                                         msgop=constants.OP_SENSOR_CONFIG,
+                                         payload=args.value)
+        #reply = node.send_sync(request)
+        reply = conn.send_request(args.target, request.to_msgpack())
+        result = Message.from_msgpack(reply)
+        print(args.target + '->' + str(args.value) + ': ' + str(result.payload))
+
+
+if __name__ == '__main__':
+    agent_doc = '''
+                dripline_agent provides basic a CLI to the dripline system.
+                '''
+    parser = DriplineParser(description=agent_doc,
+                            amqp_broker=True,
+                            config_file=True,
+                           )
+    parser.add_argument('verb', choices=verb_list())
+    parser.add_argument('target')
+    parser.add_argument('value', nargs='*')
+
+    args = parser.parse_args()
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        pass

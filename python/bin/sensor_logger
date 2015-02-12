@@ -1,0 +1,81 @@
+#!/usr/bin/python
+
+'''
+Utility app for printing all of the messages through some exchange
+'''
+
+from __future__ import print_function
+
+import sys
+import pika
+import argparse
+import msgpack
+
+#import sqlite3
+import sqlalchemy
+
+from dripline.core import AlertConsumer
+
+import logging
+from dripline.core import DriplineParser#status_logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+#logger.addHandler(status_logger.console_handler)
+
+
+def just_print(message):
+    logger.info('[{}] {}'.format(message['payload']['from'], message['payload']['value']))
+
+def start_monitoring(amqp='localhost', exchange='alerts', keys='#',
+                     user=None, passwd=None, sql_server=None, **kwargs):
+    logger.info('making connections')
+    consumer = AlertConsumer(broker_host=amqp, exchange='alerts', keys=['sensor_value'])
+
+    engine = sqlalchemy.create_engine('postgresql://{}:{}@{}/p8_sc_db'.format(user, passwd, sql_server))
+    meta = sqlalchemy.MetaData(engine)
+    num_table = sqlalchemy.Table("numeric_data", meta, autoload=True)
+    consumer.table = num_table
+
+    consumer.this_consume=consumer._postgres_consume
+    try:
+        logger.info("starting message consumption")
+        consumer.start()
+    except KeyboardInterrupt as err:
+        logger.info('exiting')
+        sys.exit()
+
+if __name__ == '__main__':
+    parser = DriplineParser(extra_logger=logger,
+                            amqp_broker=True,
+                           )
+    parser.add_argument('-e',
+                        '--exchange',
+                        help='name of the amqp exchange to monitor',
+                        default='alerts',
+                       )
+    parser.add_argument('-k',
+                        '--keys',
+                        metavar='BINDING_KEYS',
+                        help='amqp binding keys to follow',
+                        default='#',
+                        nargs='*',
+                       )
+    parser.add_argument('-u',
+                        '--user',
+                        help='username on posgres'
+                       )
+    parser.add_argument('-p',
+                        '--passwd',
+                        help="user's postgres password"
+                       )
+    parser.add_argument('-s',
+                        '--sql_server',
+                        metavar='POSTGRES_SERVER',
+                        help="fully qualified network path for postgres server"
+                       )
+    kwargs = parser.parse_args()
+#    kwargs = make_parser().parse_args()
+    try:
+        start_monitoring(**vars(kwargs))
+    except KeyboardInterrupt:
+        print(' [*] exiting')
