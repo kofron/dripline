@@ -56,6 +56,7 @@ class PrologixSpimescape(Provider):
             logger.warning('connection with info: {} refused'.format(self.socket_info))
             raise
         self.socket.settimeout(self.socket_timeout)
+        self.socket.send("++auto 1\r")
 
     @property
     def spimes(self):
@@ -101,11 +102,13 @@ class PrologixSpimescape(Provider):
             self.poll_thread.start()
         
     def _check_next_status(self):
-        device = self._device_cycle.next()
-        resp = self.send('*ESR?\n', from_spime=self._devices[device])
-        self._devices[device].status = int(resp)
-        if resp==1:
-            self._devices[device]['opc']=1
+        device_name = self._device_cycle.next()
+        device = self._devices[device_name]
+        resp = device._check_status()
+        #resp = self.send('*ESR?\n', from_spime=device)
+        device.status = resp
+        #if resp==1:
+        #    self._devices[device]['opc']=1
         self._queue_next_check(from_check=True)
 
     def send(self, command, from_spime=None):
@@ -117,12 +120,18 @@ class PrologixSpimescape(Provider):
             continue
         self.expecting = True
         if not from_spime:
-            tosend = command
+            logger.warning("no from provided")
+            tosend = command + '\r\n'
         else:
-            tosend = '++addr {}\r{}'.format(from_spime.addr, command)
+            tosend = '++addr {}\r{}\r\n'.format(from_spime.addr, command)
         logger.debug('sending: {}'.format(tosend))
         self.socket.send(tosend)
-        data = self.socket.recv(1024)
+        data = ""
+        try:
+            while True:
+                data += self.socket.recv(1024)
+        except socket.timeout:
+            pass
         self.expecting = False
         logger.debug('sync: {} -> {}'.format(repr(command), repr(data)))
         self.alock.release()
@@ -131,7 +140,8 @@ class PrologixSpimescape(Provider):
 
 class GPIBInstrument(Provider):
     '''
-    A Provider class intended for GPIB devices.
+    A Provider class intended for GPIB devices that implement the full
+    IEEE 488.2 (488.1 or 488 need to use some other class).
 
     It expects to have a set of Simple*Spime endpoints which return SCPI commands.
     The _cmd_term attribute is appended to those commands before being passed up to
@@ -147,6 +157,24 @@ class GPIBInstrument(Provider):
         self.provider = None
         self._cmd_term = '\n'
         self.endpoints = {}
+
+    def _check_status(self):
+        raw = self.provider.send('*ESR?', from_spime=self)
+        if raw:
+            data = int(raw)
+        else:
+            return "No response"
+        status = ""
+        if data & 0b00000100:
+            ";".join([status, "query error"])
+        if data & 0b00001000:
+            ";".join([status, "device error"])
+        if data & 0b00010000:
+            ";".join([status, "execution error"])
+        if data & 0b00100000:
+            ";".join([status, "command error"])
+        return status
+            
 
     def add_endpoint(self, spime):
         self.endpoints.update({spime.name:spime})
