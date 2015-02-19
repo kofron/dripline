@@ -43,7 +43,7 @@ providers:
             module: MuxerGetSpime
             log_interval: 0
             cal_str: "10**({}-6.0)"
-            ch_nmber: 115
+            ch_number: 115
           - name: linear_encoder_voltage
             module: MuxerGetSpime
             log_interval: 30
