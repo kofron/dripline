@@ -24,6 +24,11 @@ providers:
             cal_str: "pt100_calibration({})"
             log_interval: 30
             ch_number: 103
+          - name: bore_pressure
+            module: MuxerGetSpime
+            log_interval: 30
+            cal_str: "10**({}-6.0)"
+            ch_number: 105
           - name: hall_probe_voltage
             module: MuxerGetSpime
             log_interval: 30
@@ -34,6 +39,11 @@ providers:
             log_interval: 30
             cal_str: 'cernox_calibration({}, 87820)'
             ch_number: 108
+          - name: spare_micro_pirani
+            module: MuxerGetSpime
+            log_interval: 0
+            cal_str: "10**({}-6.0)"
+            ch_number: 115
           - name: linear_encoder_voltage
             module: MuxerGetSpime
             log_interval: 30

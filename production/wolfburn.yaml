@@ -1,0 +1,46 @@
+nodename: wolfburn
+broker: myrna.local
+providers:
+   - name: wolfburn_prologix
+     module: PrologixSpimescape
+     socket_info: ("wolfburn.local", 1234)
+     endpoints:
+        - name: bathtub_trap
+          module: GPIBInstrument
+          addr: 24
+          endpoints:
+            - name: current_limit_bath
+              module: SimpleGetSetSpime
+              base_str: "SOURCE:CURRENT:LEVEL"
+            - name: current_output_bath
+              module: SimpleGetSpime
+              base_str: "MEASURE:CURRENT?"
+            - name: current_output_status_bath
+              module: SimpleGetSetSpime
+              base_str: "OUTPUT:STATE"
+        - name: main_trap
+          module: GPIBInstrument
+          addr: 3
+          endpoints:
+            - name: current_limit_harmonic
+              module: SimpleGetSetSpime
+              base_str: "SOURCE:CURRENT:LEVEL"
+            - name: current_output_harmonic
+              module: SimpleGetSpime
+              base_str: "MEASURE:CURRENT?"
+            - name: current_output_status_harmonic
+              module: SimpleGetSetSpime
+              base_str: "OUTPUT:STATE"
+        - name: pulse_generator
+          module: GPIBInstrument
+          addr: 1
+          endpoints:
+            - name: lecroy_pulse_width
+              module: SimpleGetSetSpime
+              base_str: "A:WID"
+            - name: lecroy_id
+              module: SimpleGetSpime
+              base_str: "*IDN?"
+            - name: lecroy_ese
+              module: SimpleGetSpime
+              base_str: "*ESE?"
