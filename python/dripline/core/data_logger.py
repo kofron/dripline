@@ -50,7 +50,7 @@ class DataLogger(object):
             to_send_msgpack = msgpack.packb(to_send)
             self.store_value(to_send_msgpack, severity='sensor_value')
         except Exception as err:
-            logger.error('got a: {}'.format(err))
+            logger.error('got a: {}'.format(err.message))
             logger.error('error logging {} for {}'.format(val, self.name))
             logger.debug('traceback follows:\n{}'.format(traceback.format_exc()))
         if (self._log_interval <= 0) or (not self._is_logging):
@@ -74,6 +74,7 @@ class DataLogger(object):
         else:
             self._loop_process = threading.Timer(self._log_interval,
                                                  self._log_a_value, ())
+            logger.info("log loop started")
             self._loop_process.start()
 
     def _restart_loop(self):

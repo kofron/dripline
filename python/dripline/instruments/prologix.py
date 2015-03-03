@@ -73,7 +73,7 @@ class PrologixSpimescape(Provider):
     def devices(self, device_dict):
         self._devices = device_dict
         self._device_cycle = itertools.cycle(self._devices.keys())
-        self._queue_next_check()
+        #self._queue_next_check()
     def add_endpoint(self, spime):
         if spime.name in self.devices:
             logger.warning('spime "{}" already present'.format(spime.name))
@@ -203,17 +203,13 @@ class MuxerGetSpime(SimpleGetSpime):
         self.base_str = "DATA:LAST? (@{})"
         self.ch_number = ch_number
         SimpleGetSpime.__init__(self, base_str=self.base_str, **kwargs)
-        self.get_value = self.get_parsed_value
+        self.get_value = self.on_get
     
+    @calibrate
     def on_get(self):
         very_raw = self.provider.send(self.base_str.format(self.ch_number))
         return very_raw.split()[0]
     
-    @calibrate
-    def get_parsed_value(self):
-        parsed_data = self.on_get()
-        return parsed_data
-
 
 class SimpleGetSetSpime(Spime):
     '''

@@ -29,6 +29,8 @@ send_cmd "CONF:FRES AUTO,DEF,(@301);*OPC?"
 #configure 10 V measurements (CONF:VOLT:DC 10,(@[channels]))
 # ion gague 1 and 2
 send_cmd "CONF:VOLT:DC 10,(@302,312);*OPC?"
+# micro-pirani bore and deadleg
+send_cmd "CONF:VOLT:DC 10,(@105,115);*OPC?"
 
 #########################################
 #configure mV measurements (CONF:VOLT:DC 0.1,(@[channels]))
@@ -52,7 +54,7 @@ send_cmd "CONF:FRES AUTO,DEF,(@103);*OPC?"
 #setup the scan list <anything configured above must be added to the list here>
 #   (ROUT:SCAN (@[channels]))
 #send_cmd "ROUT:SCAN (@);*OPC?"
-send_cmd "ROUT:SCAN (@101,102,103,106,108,301,302,304,305,312,314,315);*OPC?"
+send_cmd "ROUT:SCAN (@101,102,103,105,106,108,115,301,302,304,305,312,314,315);*OPC?"
 
 #start scanning
 send_cmd "FORM:READ:CHAN ON;*OPC?"
