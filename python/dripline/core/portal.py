@@ -10,6 +10,7 @@ import uuid
 from .connection import Connection
 from .message import Message
 from .provider import Provider
+from .endpoint import Endpoint
 import logging
 
 __all__ = ['Portal']
@@ -47,10 +48,11 @@ class Portal(object):
     def _bind_endpoints(self, instance):
         '''
         '''
+        logger.info('now bindings for: {}'.format(instance.name))
         if isinstance(instance, Provider):
             for child in instance.endpoints.keys():
                 self._bind_endpoints(instance.endpoints[child])
-        else:
+        if isinstance(instance, Endpoint):
             logger.debug('creating binding for: {}'.format(instance.name))
             self.bind_endpoint(instance)
 
