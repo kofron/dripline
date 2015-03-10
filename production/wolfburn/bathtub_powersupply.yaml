@@ -1,0 +1,21 @@
+nodename: bathtub_powersupply
+broker: localhost
+providers:
+   - name: bathtub_ps_repeater
+     module: RepeaterProvider
+     repeat_target: wolfburn_repeater
+     broker: myrna.local
+     endpoints:
+        - name: bathtub_ps_instrument
+          module: GPIBInstrument
+          addr: 25
+          endpoints:
+            - name: current_limit_bathtub
+              module: SimpleGetSetSpime
+              base_str: "SOURCE:CURRENT:LEVEL"
+            - name: current_output_bathtub
+              module: SimpleGetSpime
+              base_str: "MEASURE:CURRENT?"
+            - name: current_output_status_bathtub
+              module: SimpleGetSetSpime
+              base_str: "OUTPUT:STATE"
