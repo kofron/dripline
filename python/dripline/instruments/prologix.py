@@ -171,7 +171,8 @@ class GPIBInstrument(Provider):
             
 
     def send(self, cmd):
-        return self.provider.send(cmd+self._cmd_term, self)
+        to_send = '++addr {}\r{}{}'.format(self.addr, cmd, self._cmd_term)
+        return self.provider.send(to_send)
 
 
 class SimpleGetSpime(SimpleSCPIGetSpime):
