@@ -48,7 +48,7 @@ providers:
             module: MuxerGetSpime
             log_interval: 30
             ch_number: 301
-            cal_str: "0.02460529*{}-29.12859597"
+            cal_str: "0.036490*{}-152.978934"
           - name: ion_gauge_1
             module: MuxerGetSpime
             log_interval: 30
