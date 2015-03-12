@@ -4,5 +4,5 @@ providers:
   - name: wolfburn_repeater
     module: EthernetRepeater
     socket_info: ("wolfburn.local", 1234)
-    command_terminator: "\r\n"
-    response_terminator: "\n"
+    command_terminator: "\r"
+    response_terminator: ""
