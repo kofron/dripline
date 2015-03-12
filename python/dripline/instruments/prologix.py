@@ -5,10 +5,11 @@
 from __future__ import absolute_import
 
 import itertools
-import threading
-import time
 import json
 import socket
+import threading
+import time
+import types
 
 from ..core import Spime, Provider, SimpleSCPIGetSpime, calibrate
 
@@ -36,7 +37,7 @@ class PrologixSpimescape(Provider):
         self._keep_polling = True
         self._poll_interval = 0.5
         self.socket_timeout = float(socket_timeout)
-        self.expecting = False
+        #self.expecting = False
         self.socket_info = socket_info
         self.poll_thread = threading.Timer([], {})
         self.socket = socket.socket()
@@ -106,29 +107,32 @@ class PrologixSpimescape(Provider):
         #    self._devices[device]['opc']=1
         self._queue_next_check(from_check=True)
 
-    def send(self, command):#, from_spime=None):
+    def send(self, commands):#, from_spime=None):
         '''
         that is, the call to the device blocks for a response
         '''
         self.alock.acquire()
-        while self.expecting == True:
-            continue
-        self.expecting = True
+        if isinstance(commands, types.Stringtype):
+            commands = [commands]
+        #while self.expecting == True:
+        #    continue
+        #self.expecting = True
         #if not from_spime:
         #    logger.warning("no from provided")
         #    tosend = command + '\r\n'
         #else:
-        tosend = '{}\r\n'.format(command)
-        logger.debug('sending: {}'.format(tosend))
-        self.socket.send(tosend)
         data = ""
-        try:
-            while True:
-                data += self.socket.recv(1024)
-        except socket.timeout:
-            pass
-        self.expecting = False
-        logger.debug('sync: {} -> {}'.format(repr(command), repr(data)))
+        for command in commands:
+            tosend = '{}\r\n'.format(command)
+            logger.debug('sending: {}'.format(tosend))
+            self.socket.send(tosend)
+            try:
+                while True:
+                    data += self.socket.recv(1024)
+            except socket.timeout:
+                pass
+        #self.expecting = False
+            logger.debug('sync: {} -> {}'.format(repr(command), repr(data)))
         self.alock.release()
         return data
 
@@ -146,8 +150,7 @@ class GPIBInstrument(Provider):
         Provider.__init__(self, name=name, **kwargs)
         #self.name = name
         self.addr = addr
-        self.queue = []
-        self.expecting = False
+        #self.expecting = False
         self.status = 0
         self.provider = None
         self._cmd_term = '\n'
@@ -171,8 +174,11 @@ class GPIBInstrument(Provider):
             
 
     def send(self, cmd):
-        to_send = '++addr {}\r{}{}'.format(self.addr, cmd, self._cmd_term)
-        return self.provider.send(to_send)
+        if isinstance(cmd, types.StringType):
+            cmd = [cmd]
+        to_send = ['++addr {}\r'.format(self.addr)] + cmd
+        result = self.provider.send(to_send)
+        return ';'.join(result.split(';')[1:])
 
 
 class SimpleGetSpime(SimpleSCPIGetSpime):
