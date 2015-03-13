@@ -7,7 +7,9 @@ import uuid
 
 from dripline.core import message, constants, DriplineParser, Connection, Message
 
-
+import logging
+logger = logging.getLogger('dripline_agent')
+logger.setLevel(logging.DEBUG)
 
 # TODO: this should be by introspection
 def verb_list():
@@ -23,33 +25,33 @@ def main(args):
 
     # TODO: this block makes me sad, a dict can do this in a way that is way more flexible
     if request_verb == 'get':
-        request = message.RequestMessage(target=args.target,
-                                         msgop=constants.OP_SENSOR_GET,
-                                         payload=args.value)
+        request = message.RequestMessage(msgop=constants.OP_GET,
+                                         payload=args.value,
+                                        )
         #reply = node.send_sync(request)
         reply = conn.send_request(args.target, request.to_msgpack())
         result = Message.from_msgpack(reply)
         print(args.target + ': ' + str(result.payload))
     elif request_verb == 'set':
-        request = message.RequestMessage(target=args.target,
-                                         msgop=constants.OP_SENSOR_SET,
-                                         payload=args.value)
+        request = message.RequestMessage(msgop=constants.OP_SET,
+                                         payload=args.value,
+                                        )
         #reply = node.send_sync(request)
         reply = conn.send_request(args.target, request.to_msgpack())
         result = Message.from_msgpack(reply)
         print(args.target + '->' + str(args.value) + ': ' + str(result.payload))
     elif request_verb == 'config':
-        request = message.RequestMessage(target=args.target,
-                                         msgop=constants.OP_SENSOR_CONFIG,
-                                         payload=args.value)
+        request = message.RequestMessage(msgop=constants.OP_CONFIG,
+                                         payload=args.value,
+                                        )
         #reply = node.send_sync(request)
         reply = conn.send_request(args.target, request.to_msgpack())
         result = Message.from_msgpack(reply)
         print(args.target + '->' + str(args.value) + ': ' + str(result.payload))
     elif request_verb == 'send':
-        request = message.RequestMessage(target=args.target,
-                                         msgop=constants.OP_PROVIDER_SEND,
-                                         payload=args.value)
+        request = message.RequestMessage(msgop=constants.OP_SEND,
+                                         payload=args.value,
+                                        )
         #reply = node.send_sync(request)
         reply = conn.send_request(args.target, request.to_msgpack())
         result = Message.from_msgpack(reply)
@@ -64,6 +66,7 @@ if __name__ == '__main__':
                             amqp_broker=True,
                             config_file=True,
                             tmux_support=True,
+                            extra_logger=logger,
                            )
     parser.add_argument('verb', choices=verb_list())
     parser.add_argument('target')

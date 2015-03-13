@@ -4,8 +4,10 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 from .message import Message, RequestMessage, ReplyMessage
 from . import constants
 
+import functools
 import math
 import traceback
+import types
 import pika
 
 __all__ = ['Endpoint', 'AutoReply', 'calibrate']
@@ -68,6 +70,7 @@ def pt100_calibration(resistance):
 
 
 def calibrate(fun):
+    @functools.wraps(fun)
     def wrapper(self):
         val_dict = {'value_raw':fun(self)}
         if not self._calibration_str is None:
@@ -85,36 +88,34 @@ def calibrate(fun):
 
 
 class Endpoint(object):
-    __metaclass__ = ABCMeta
 
-    def __init__(self, name, cal_str=None, **kwargs):
+    def __init__(self, name, cal_str=None, get_on_set=False, **kwargs):
         self.name = name
         self.provider = None
         self._calibration_str = cal_str
+
+        def raiser(self):
+            raise NotImplementedError
 
         method_dict = {}
         for key in dir(constants):
             if key.startswith('OP_'):
                 method_name = 'on_' + key.split('_')[-1].lower()
+                if not hasattr(self, method_name):
+                    setattr(self, method_name, types.MethodType(raiser, self, Endpoint))
                 method = getattr(self, method_name)
                 method_dict[getattr(constants, key)] = method
         self.methods = method_dict
 
-    # @abstractmethod
-    def on_get(self):
-        raise NotImplementedError
+        if get_on_set:
+            logger.info('should force get on set')
+            self.methods[constants.OP_SET] = self.__get_after_set
 
-    # @abstractmethod
-    def on_set(self, value):
-        raise NotImplementedError
-
-    # @abstractmethod
-    def on_config(self, attribute, value):
-        raise NotImplementedError
-
-    # @abstractmethod
-    def on_send(self, to_send):
-        raise NotImplementedError
+    def __get_after_set(self, value):
+        self.on_set(value)
+        result = self.on_get()
+        logger.info('got: {}'.format(result))
+        return result
 
     def _send_reply(self, channel, properties, reply):
         '''
@@ -175,7 +176,7 @@ class AutoReply(Endpoint):
 
     def handle_request(self, channel, method, properties, request):
         msg = Message.from_msgpack(request)
-        if msg.msgop == constants.OP_SENSOR_GET:
+        if msg.msgop == constants.OP_GET:
             result = self.on_get()
             self.send_reply(channel, properties, result)
             #channel.basic_ack(delivery_tag=method.delivery_tag)
