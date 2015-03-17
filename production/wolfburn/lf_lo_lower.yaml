@@ -1,0 +1,21 @@
+nodename: lf_lo_lower
+broker: localhost
+providers:
+   - name: lf_lo_lower_repeater
+     module: RepeaterProvider
+     repeat_target: wolfburn_repeater
+     broker: myrna.local
+     endpoints:
+        - name: lf_lo_lower_instrument
+          module: GPIBInstrument
+          addr: 19
+          endpoints:
+            - name: lf_lo_lower_output_status
+              module: SimpleGetSetSpime
+              base_str: "OUTP:STAT"
+            - name: lf_lo_lower_power
+              module: SimpleGetSetSpime
+              base_str: "POW:AMPL"
+            - name: lf_lo_lower_cw_freq
+              module: SimpleGetSetSpime
+              base_str: "FREQ:CW"
