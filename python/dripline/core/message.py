@@ -2,19 +2,24 @@
 Meta and derived classes for dripline messages
 '''
 
+
 from __future__ import absolute_import
+
+# standard libs
+from abc import ABCMeta
+from datetime import datetime
+import json
+
+# 3rd party libs
+import msgpack
+
+# internal imports
+from . import constants
 
 __all__ = ['ReplyMessage', 'RequestMessage', 'InfoMessage', 'AlertMessage',
            'Message']
 
-from abc import ABCMeta
-from datetime import datetime
-import msgpack
 import logging
-
-from . import constants
-
-
 logger = logging.getLogger(__name__)
 
 class Message(dict, object):
@@ -36,7 +41,6 @@ class Message(dict, object):
     @property
     def msgop(self):
         return self['msgop']
-
     @msgop.setter
     def msgop(self, value):
         self['msgop'] = value
@@ -44,7 +48,6 @@ class Message(dict, object):
     @property
     def timestamp(self):
         return self['timestamp']
-
     @timestamp.setter
     def timestamp(self, value):
         self['timestamp'] = value
@@ -52,7 +55,6 @@ class Message(dict, object):
     @property
     def payload(self):
         return self['payload']
-
     @payload.setter
     def payload(self, value):
         self['payload'] = value
@@ -60,7 +62,6 @@ class Message(dict, object):
     @property
     def exceptions(self):
         return self['exceptions']
-
     @exceptions.setter
     def exceptions(self, value):
         self['exceptions'] = value
@@ -68,7 +69,6 @@ class Message(dict, object):
     @property
     def msgtype(self):
         return None
-
     @msgtype.setter
     def msgtype(self, value):
         raise AttributeError('msgtype cannot be changed')
@@ -98,10 +98,38 @@ class Message(dict, object):
         message = cls.from_dict(message_dict)
         return message
 
+    @classmethod
+    def from_json(cls, msg):
+        message_dict = json.loads(msg)
+        message = cls.from_dict(message_dict)
+        return message
+
+    @classmethod
+    def from_encoded(cls, msg, encoding):
+        if encoding.endswith('json'):
+            return cls.from_json(msg)
+        elif encoding.endswith('msgpack'):
+            return cls.from_msgpack(msg)
+        else:
+            raise ValueError('encoding <{}> not recognized'.format(encoding))
+
     def to_msgpack(self):
         temp_dict = self.copy()
         temp_dict.update({'msgtype': self.msgtype})
         return msgpack.packb(temp_dict)
+
+    def to_json(self):
+        temp_dict = self.copy()
+        temp_dict.update({'msgtype': self.msgtype})
+        return json.dumps(temp_dict)
+
+    def to_encoding(self, encoding):
+        if encoding.endswith('json'):
+            return self.to_json()
+        elif encoding.endswith("msgpack"):
+            return self.to_msgpack()
+        else:
+            raise ValueError('encoding <{}> not recognized'.format(encoding))
 
 
 class ReplyMessage(Message):

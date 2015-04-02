@@ -5,13 +5,16 @@ A connection to the AMQP broker
 
 from __future__ import absolute_import
 
-import pika
+# standard libs
 import threading
 import traceback
 import uuid
 
-from .endpoint import Endpoint
-from .message import AlertMessage, ReplyMessage
+# 3rd party libs
+import pika
+
+# internal libs
+from .message import Message, AlertMessage, ReplyMessage
 
 __all__ = ['Connection']
 
@@ -29,6 +32,8 @@ class Connection(object):
         self.chan = self.conn.channel()
         self.chan.confirm_delivery()
         self.__alert_lock = threading.Lock()
+        self._response = None
+        self._response_encoding = None
 
         self._setup_amqp()
 
@@ -63,18 +68,26 @@ class Connection(object):
 
     def _on_response(self, channel, method, props, response):
         if self.corr_id == props.correlation_id:
-            self.response = response
+            self._response = response
+            self._response_encoding = props.content_encoding
 
     def start(self):
         while True:
             self.conn.process_data_events()
 
-    def send_request(self, target, request):
+    def send_request(self, target, request, decode=False):
         '''
         send a request to a specific consumer.
         '''
+        if isinstance(request, Message):
+            to_send = request.to_msgpack()
+            decode = True
+        else:
+            to_send = request
+
         self._ensure_connection()
-        self.response = None
+        self._response = None
+        self._response_encoding = None
         self.corr_id = str(uuid.uuid4())
         pr = self.chan.basic_publish(exchange='requests',
                                      routing_key=target,
@@ -85,14 +98,24 @@ class Connection(object):
                                        content_encoding='application/msgpack',
                                        correlation_id=self.corr_id,
                                      ),
-                                     body=request
+                                     body=to_send
                                     )
         logger.debug('publish success is: {}'.format(pr))
         if not pr:
-            self.response = ReplyMessage(exceptions='no such queue', payload='key: {} not matched'.format(target)).to_msgpack()
-        while self.response is None:
+            self._response = ReplyMessage(exceptions='no such queue', payload='key: {} not matched'.format(target)).to_msgpack()
+        while self._response is None:
             self.conn.process_data_events()
-        return self.response
+
+        if decode:
+            if self._response_encoding.endswith('json'):
+                to_return = Message.from_json(self._response)
+            elif self._response_encoding.endswith('msgpack'):
+                to_return = Message.from_msgpack(self._response)
+            else:
+                to_return = self._response
+        else:
+            to_return = self._response
+        return to_return
 
     def send_alert(self, alert, severity):
         '''
@@ -126,3 +149,29 @@ class Connection(object):
             raise
         finally:
             self.__alert_lock.release()
+
+    @staticmethod
+    def send_reply(chan, properties, reply):
+        '''
+        '''
+        if not isinstance(reply, ReplyMessage):
+            logger.warn('send_reply expects a dripline.core.ReplyMessage, packing reply as payload of such, fix your code')
+            reply = ReplyMessage(payload=reply)
+
+        body = reply.to_encoding(properties.content_encoding)
+        try:
+            pr = chan.basic_publish(exchange='requests',
+                                    immediate=True,
+                                    mandatory=True,
+                                    routing_key=properties.reply_to,
+                                    properties=pika.BasicProperties(
+                                       correlation_id=properties.correlation_id,
+                                       content_encoding=properties.content_encoding,
+                                    ),
+                                    body=body,
+                                   )
+        except KeyError as err:
+            if err.message == 'Basic.Ack':
+                logger.warning('pika screwed up... maybe')
+            else:
+                raise
