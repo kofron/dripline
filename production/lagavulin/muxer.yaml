@@ -1,9 +1,14 @@
 nodename: muxer
 broker: myrna.local
 providers:
-  - name: lagavulin_prologix
-    module: PrologixSpimescape
-    socket_info: ("lagavulin.local", 1234)
+  #- name: lagavulin_prologix
+  #  module: PrologixSpimescape
+  #  socket_info: ("lagavulin.local", 1234)
+  #  endpoints:
+  - name: muxer_repeater
+    module: RepeaterProvider
+    repeat_target: lagavulin_repeater
+    broker: myrna.local
     endpoints:
       - name: multiplexer
         module: GPIBInstrument
