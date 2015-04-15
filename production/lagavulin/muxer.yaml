@@ -49,7 +49,7 @@ providers:
             log_interval: 0
             cal_str: "10**({}-6.0)"
             ch_number: 115
-          - name: linear_encoder_voltage
+          - name: string_pot_resistance
             module: MuxerGetSpime
             log_interval: 60
             ch_number: 301
