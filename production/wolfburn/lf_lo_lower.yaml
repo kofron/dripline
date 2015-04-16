@@ -17,5 +17,7 @@ providers:
               module: SimpleGetSetSpime
               base_str: "POW:AMPL"
             - name: lf_lo_lower_cw_freq
+              log_on_set: True
+              get_on_set: True
               module: SimpleGetSetSpime
               base_str: "FREQ:CW"
