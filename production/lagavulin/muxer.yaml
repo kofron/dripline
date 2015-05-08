@@ -40,6 +40,11 @@ providers:
             log_interval: 60
             cal_str: 'cernox_calibration({}, 87820)'
             ch_number: 108
+          - name: terminator_temp
+            module: MuxerGetSpime
+            log_interval: 60
+            cal_str: 'pt100_calibration({})'
+            ch_number: 110
           - name: spare_micro_pirani
             module: MuxerGetSpime
             log_interval: 0
