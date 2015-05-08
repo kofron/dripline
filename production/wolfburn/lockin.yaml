@@ -4,7 +4,7 @@ providers:
   - name: lockin_repeater
     module: RepeaterProvider
     repeat_target: wolfburn_repeater
-    broker: myrna.local
+    broker: myrna.p8
     endpoints:
       - name: lockin_instrument
         module: DSPLockin7265

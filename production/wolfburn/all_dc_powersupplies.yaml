@@ -1,10 +1,10 @@
 nodename: all_dc_powersupplies
-broker: myrna.local
+broker: myrna.p8
 providers:
   - name: powersupply_repeater
     module: RepeaterProvider
     repeat_target: wolfburn_repeater
-    broker: myrna.local
+    broker: myrna.p8
     endpoints:
       - name: e3631a_gpib3
         module: GPIBInstrument
