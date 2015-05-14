@@ -1,7 +1,7 @@
 # This is easy enough to put into a dripline configuration, but for now I'll just do it here
 
 # First some variables for local config
-telnet_arg='lagavulin.local 1234'
+telnet_arg='lagavulin.p8 1234'
 
 send_cmd() {
     echo ""
@@ -47,14 +47,14 @@ send_cmd "CONF:RES AUTO,DEF,(@304,305,314,315);*OPC?"
 # coldhead temp
 #send_cmd "CONF:TEMP FRTD,85,(@,103);*OPC?"
 #send_cmd "UNIT:TEMP K;*OPC?"
-send_cmd "CONF:FRES AUTO,DEF,(@103);*OPC?"
+send_cmd "CONF:FRES AUTO,DEF,(@103,110);*OPC?"
 
 
 #########################################
 #setup the scan list <anything configured above must be added to the list here>
 #   (ROUT:SCAN (@[channels]))
 #send_cmd "ROUT:SCAN (@);*OPC?"
-send_cmd "ROUT:SCAN (@101,102,103,105,106,108,115,301,302,304,305,312,314,315);*OPC?"
+send_cmd "ROUT:SCAN (@101,102,103,105,106,108,110,115,301,302,304,305,312,314,315);*OPC?"
 
 #start scanning
 send_cmd "FORM:READ:CHAN ON;*OPC?"

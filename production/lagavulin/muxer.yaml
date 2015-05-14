@@ -1,14 +1,10 @@
 nodename: muxer
-broker: myrna.local
+broker: myrna.p8
 providers:
-  #- name: lagavulin_prologix
-  #  module: PrologixSpimescape
-  #  socket_info: ("lagavulin.local", 1234)
-  #  endpoints:
   - name: muxer_repeater
     module: RepeaterProvider
     repeat_target: lagavulin_repeater
-    broker: myrna.local
+    broker: myrna.p8
     endpoints:
       - name: multiplexer
         module: GPIBInstrument
@@ -44,6 +40,11 @@ providers:
             log_interval: 60
             cal_str: 'cernox_calibration({}, 87820)'
             ch_number: 108
+          - name: terminator_temp
+            module: MuxerGetSpime
+            log_interval: 60
+            cal_str: 'pt100_calibration({})'
+            ch_number: 110
           - name: spare_micro_pirani
             module: MuxerGetSpime
             log_interval: 0
