@@ -28,95 +28,79 @@ class Portal(object):
     def __init__(self, name, broker):
         self.name = name
         self.__request_in_lock = threading.Lock()
-        self.__request_out_lock = threading.Lock()
         self.__alert_out_lock = threading.Lock()
-        self.__reply_out_lock = threading.Lock()
 
+        self.providers = {}
+        self.endpoints = {}
         self._responses = {}
+        self.broker = broker
+        self.reconnect()
 
-        logger.info('connecting to broker {}'.format(broker))
+    def reconnect(self):
+        '''
+        '''
+        logger.info('connecting to broker {}'.format(self.broker))
         try:
-            self.conn = pika.BlockingConnection(pika.ConnectionParameters(broker))
+            self.conn = pika.BlockingConnection(pika.ConnectionParameters(self.broker))
             self.channel = self.conn.channel()
             self.reply_channel = self.conn.channel()
             self.channel.exchange_declare(exchange='requests', type='topic')
             self.channel.confirm_delivery()
-            self.queue_name = 'requests-{}'.format(self.name)
-            self.queue = self.channel.queue_declare(queue=self.queue_name,
+            queue_name = 'requests-{}'.format(self.name)
+            self.queue = self.channel.queue_declare(queue=queue_name,
                                                     exclusive=True,
                                                     auto_delete=True,
                                                    )
+            self.channel.basic_consume(self._handle_request,
+                                       queue=self.queue.method.queue,
+                                       no_ack=False,
+                                      )
             self.reply_queue = self.channel.queue_declare(queue='reply-{}'.format(self.name),
                                                           exclusive=True,
                                                           auto_delete=True,
                                                          )
+            self.channel.basic_consume(self._handle_reply,
+                                       queue=self.reply_queue.method.queue,
+                                       no_ack=False,
+                                      )
             self.channel.queue_bind(exchange='requests',
                                     queue=self.reply_queue.method.queue,
                                     routing_key=self.reply_queue.method.queue,
                                    )
+            self.create_bindings()
         except Exception as err:
             logger.error('connection to broker failed!!')
             logger.error('traceback:\n{}'.format(traceback.format_exc()))
             raise err
+        logger.info('connected')
 
-        self.providers = {}
-        self.endpoints = {}
 
-    def add_provider(self, provider):
+    def add_endpoint(self, endpoint):
         '''
         '''
-        if provider.name in self.providers:
-            raise ValueError('provider ({}) already present'.format(provider.name))
-        self.providers[provider.name] = provider
+        if endpoint.name in self.endpoints:
+            raise ValueError('endpoint ({}) already present'.format(endpoint.name))
+        self.endpoints[endpoint.name] = endpoint
 
     def create_bindings(self):
         '''
         '''
-        for provider in self.providers.keys():
-            self._bind_endpoints(self.providers[provider])
+        for endpoint in self.endpoints.keys():
+            self._bind_endpoint(self.endpoints[endpoint])
 
-    def _bind_endpoints(self, instance):
-        '''
-        '''
-        logger.info('now bindings for: {}'.format(instance.name))
-        if isinstance(instance, Provider):
-            for child in instance.endpoints.keys():
-                self._bind_endpoints(instance.endpoints[child])
-        if isinstance(instance, Endpoint):
-            self.bind_endpoint(instance)
-
-    def bind_endpoint(self, endpoint):
+    def _bind_endpoint(self, endpoint):
         """
         Bind an endpoint to the dripline node.  Once an endpoint is bound by
         name, it has an address and may be found on the dripline node by
         that name.
         """
-        self.endpoints[endpoint.name] = endpoint
-        self.bind(endpoint)
+        self.channel.queue_bind(exchange='requests',
+                                queue=self.queue.method.queue,
+                                routing_key=endpoint.name,
+                               )
         setattr(endpoint, 'store_value', self.send_alert)
         endpoint.report_log = self.send_alert
         endpoint.portal = self
-
-    def bind(self, endpoint):
-        """
-        Bind an arbitrary set of set/get/config functions to the
-        dripline node.  Note that currently this cannot be called
-        directly in a configuration file!  It is only used internally
-        by dripline.
-        """
-        self.channel.queue_bind(exchange='requests',
-                                queue=self.queue_name,
-                                routing_key=endpoint.name,
-                               )
-
-    @staticmethod
-    def __handle_request_test(channel, method, properties, request):
-        logger.warning('channel:\n{}'.format(channel))
-        logger.warning('method:\n{}'.format(method))
-        logger.warning('properties:\n{}'.format(properties))
-        logger.warning('request:\n{}'.format(request))
-        channel.basic_ack(delivery_tag=method.delivery_tag)
-        logger.warning('ack sent')
 
     def send_alert(self, alert, severity):
         '''
@@ -187,16 +171,25 @@ class Portal(object):
         Start the event loop for processing messages.
         """
         logger.info('starting event loop for node {}\n{}'.format(self.name,'-'*29))
-        self.channel.basic_consume(self._handle_request,
-                                   queue=self.queue_name,
-                                   no_ack=False,
-                                  )
-        self.channel.basic_consume(self._handle_reply,
-                                   queue=self.reply_queue.method.queue,
-                                   no_ack=False,
-                                  )
+#        self.channel.basic_consume(self._handle_request,
+#                                   queue=self.queue_name,
+#                                   no_ack=False,
+#                                  )
+#        self.channel.basic_consume(self._handle_reply,
+#                                   queue=self.reply_queue.method.queue,
+#                                   no_ack=False,
+#                                  )
         try:
-            self.channel.start_consuming()
+            while True:
+                try:
+                    logger.debug('starting new consume')
+                    self.channel.start_consuming()
+                except:
+                    self.reconnect()
+                    continue
+                logger.info('should break out now')
+                break
+                
         except KeyboardInterrupt:
             self.channel.stop_consuming()
             del(self.conn)
