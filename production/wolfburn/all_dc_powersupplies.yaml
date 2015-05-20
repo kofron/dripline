@@ -15,12 +15,16 @@ providers:
             set_str: 'APPL P6V,MAX,{}'
             get_str: 'APPL? P6V'
             cal_str: '{}.split(",")[1]'
+            get_on_set: True
+            log_on_set: True
           - name: current_output_harmonic
             module: SimpleGetSpime
             base_str: "INST:SEL P6V;\r\nMEASURE:CURRENT?"
           - name: current_output_status_e3631a_gpib3
             module: SimpleGetSetSpime
             base_str: "OUTPUT:STATE"
+            get_on_set: True
+            log_on_set: True
       - name: e3631a_gpib24
         module: GPIBInstrument
         addr: 24
@@ -30,6 +34,8 @@ providers:
             set_str: 'APPL P6V,MAX,{}'
             get_str: 'APPL? P6V'
             cal_str: '{}.split(",")[1]'
+            get_on_set: True
+            log_on_set: True
           - name: current_output_bathtub_top
             module: SimpleGetSpime
             base_str: "INST:SEL P6V;\r\nMEASURE:CURRENT?"
@@ -38,12 +44,16 @@ providers:
             set_str: 'APPL P25V,MAX,{}'
             get_str: 'APPL? P25V'
             cal_str: '{}.split(",")[1]'
+            get_on_set: True
+            log_on_set: True
           - name: current_output_heater
             module: SimpleGetSpime
             base_str: "INST:SEL P25V;\r\nMEASURE:CURRENT?"
           - name: current_output_status_e3631a_gpib24
             module: SimpleGetSetSpime
             base_str: "OUTPUT:STATE"
+            get_on_set: True
+            log_on_set: True
       - name: e3634a_gpib25
         module: GPIBInstrument
         addr: 25
@@ -51,9 +61,13 @@ providers:
           - name: current_limit_bathtub_bottom
             module: SimpleGetSetSpime
             base_str: "SOURCE:CURRENT:LEVEL"
+            get_on_set: True
+            log_on_set: True
           - name: current_output_bathtub_bottom
             module: SimpleGetSpime
             base_str: "MEASURE:CURRENT?"
           - name: current_output_status_e3634a_gpib25
             module: SimpleGetSetSpime
             base_str: "OUTPUT:STATE"
+            get_on_set: True
+            log_on_set: True
