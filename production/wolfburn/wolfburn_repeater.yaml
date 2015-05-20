@@ -3,6 +3,6 @@ broker: localhost
 providers:
   - name: wolfburn_repeater
     module: EthernetRepeater
-    socket_info: ("wolfburn.local", 1234)
+    socket_info: ("wolfburn.p8", 1234)
     command_terminator: "\r"
     response_terminator: ""

@@ -4,7 +4,7 @@ providers:
    - name: lf_lo_lower_repeater
      module: RepeaterProvider
      repeat_target: wolfburn_repeater
-     broker: myrna.local
+     broker: myrna.p8
      endpoints:
         - name: lf_lo_lower_instrument
           module: GPIBInstrument
