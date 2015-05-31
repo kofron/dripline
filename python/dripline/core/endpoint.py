@@ -13,9 +13,8 @@ import pika
 
 from .message import Message, RequestMessage, ReplyMessage
 from .connection import Connection
-from .exception import exception_map
+from . import exceptions
 from . import constants
-from .exception import *
 
 
 __all__ = ['Endpoint',
@@ -160,7 +159,7 @@ class Endpoint(object):
             result = endpoint_method(*these_args, **these_kwargs)
             if result is None:
                 result = "operation returned None"
-        except DriplineException as err:
+        except exceptions.DriplineException as err:
             logger.debug('got a dripine exception')
             retcode = err.retcode
             result = err.message
@@ -170,10 +169,8 @@ class Endpoint(object):
             result = err.message
         logger.debug('request method execution complete')
         reply = ReplyMessage(payload=result, retcode=retcode)
-        logger.debug('reply2')
         self.portal.send_reply(properties, reply)
         logger.debug('reply sent')
-        logger.debug('lock released')
 
     def on_config(self, attribute, value=None):
         '''
@@ -187,7 +184,7 @@ class Endpoint(object):
             else:
                 result = getattr(self, attribute)
         else:
-            raise DriplineValueError("No attribute: {}".format(attribute))
+            raise exceptions.DriplineValueError("No attribute: {}".format(attribute))
         return result
 
     def on_cmd(self, *args, **kwargs):  
