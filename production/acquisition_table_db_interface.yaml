@@ -14,7 +14,7 @@ providers:
     endpoints:
       - name: rsa_acquisition_table
         module: InsertDBEndpoint
-        table_name: acquisition_table
+        table_name: acquisition_list
         required_insert_names:
           - file_hash
           - file_name
@@ -23,7 +23,7 @@ providers:
           - file_format # note that a default value is gven below
           - creation_timestamp # this must be a valid timestamp with timezone (which must be utc)
         default_insert_values:
-          file_format: mat # this should correspond to a 2, at least in the test table where I just checked it
+          file_format: 2 # this should correspond to a 2, at least in the test table where I just checked it
       - name: pxie_acquisition_table
         module: InsertDBEndpoint
         table_name: acquisition_table
@@ -35,4 +35,4 @@ providers:
           - file_format # note that a default value is gven below
           - creation_timestamp # this must be a valid timestamp with timezone (which must be utc)
         default_insert_values:
-          file_format: egg3 # this should correspond to a 6, at least in the test table where I just checked it
+          file_format: 6 # this should correspond to a 6, at least in the test table where I just checked it
