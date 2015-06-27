@@ -1,10 +1,14 @@
-nodename: muxer
-broker: myrna.p8
+nodename: lagavulin
+broker: localhost
 providers:
-  - name: muxer_repeater
-    module: RepeaterProvider
-    repeat_target: lagavulin_repeater
-    broker: myrna.p8
+  - name: lagavulin_provider #muxer_repeater
+    #module: RepeaterProvider
+    #repeat_target: lagavulin_repeater
+    #broker: myrna.p8
+    module: EthernetRepeater
+    socket_info: ("lagavulin.p8", 1234)
+    command_terminator: "\r"
+    response_terminator: ""
     endpoints:
       - name: multiplexer
         module: GPIBInstrument
