@@ -18,7 +18,7 @@ except ImportError:
 
 # local imports
 from ..core import Provider, Endpoint
-from ..core.exception import *
+from ..core.exceptions import *
 
 import logging
 logger = logging.getLogger(__name__)
@@ -54,9 +54,13 @@ class RunDBInterface(Provider):
     def _insert_with_return(self, table_name, insert_kv_dict, return_col_names_list):
         try:
             ins = self.tables[table_name].insert().values(**insert_kv_dict)
-            ins = ins.returning(*[self.tables[table_name].c[col_name] for col_name in return_col_names_list])
+            if return_col_names_list:
+                ins = ins.returning(*[self.tables[table_name].c[col_name] for col_name in return_col_names_list])
             insert_result = ins.execute()
-            return_values = insert_result.first()
+            if return_col_names_list:
+                return_values = insert_result.first()
+            else:
+                return_values = []
         except Exception as err:
             if err.message.startswith('(psycopg2.IntegrityError)'):
                 raise DriplineDatabaseError(err.message)
@@ -71,7 +75,8 @@ class InsertDBEndpoint(Endpoint):
     '''
     A class for making calls to _insert_with_return
     '''
-    def __init__(self, table_name, required_insert_names, return_col_names,
+    def __init__(self, table_name, required_insert_names,
+                 return_col_names=[],
                  optional_insert_names=[],
                  default_insert_values={},
                  *args,
