@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from abc import ABCMeta, abstractproperty, abstractmethod
 
 import functools
+import inspect
 import math
 import threading
 import time
@@ -10,16 +11,17 @@ import traceback
 import types
 
 import pika
+import yaml
 
 from .message import Message, RequestMessage, ReplyMessage
 from .connection import Connection
-from .exception import exception_map
+from . import exceptions
 from . import constants
-from .exception import *
 
 
 __all__ = ['Endpoint',
            'calibrate',
+           #'fancy_init_doc',
           ]
 
 import logging
@@ -103,6 +105,33 @@ def calibrate(fun):
         return val_dict
     return wrapper
 
+#def fancy_init_doc(cls):
+#    params = {}
+#    for a_cls in inspect.getmro(cls):
+#        if a_cls == object:
+#            continue
+#        this_doc = a_cls.__init__.__func__.__doc__
+#        if this_doc is None:
+#            continue
+#        if len(this_doc.split('~Params')) != 3:
+#            continue
+#        params.update(yaml.load(this_doc.split('~Params')[1]))
+#    this_doc = cls.__init__.__doc__
+#    param_block = '\n'.join([' '*12 + '{}: {}'.format(k,v) for k,v in params.items()])
+#    if this_doc is None:
+#        this_doc = ''
+#    if len(this_doc.split("~Params")) != 3:
+#        this_doc = this_doc + '\n\n' + param_block
+#    else:
+#        doc_list = this_doc.split('~Params')
+#        this_doc = (doc_list[0] +
+#                    '~Params\n' + param_block + '\n' + ' '*8 + '~Params\n\n' +
+#                    doc_list[2].lstrip('\n')
+#                   )
+#    cls.__init__.__func__.__doc__ = this_doc
+#    return cls
+
+
 
 def _get_on_set(self, fun):
     #@functools.wraps(fun)
@@ -116,6 +145,13 @@ def _get_on_set(self, fun):
 class Endpoint(object):
 
     def __init__(self, name, cal_str=None, get_on_set=False, **kwargs):
+        '''
+        Keyword Args:
+            name (str): unique identifier across all dripline services (used to determine routing key)
+            cal_str (str): string use to process raw get result
+            get_on_set (bool): flag to toggle running 'on_get' after each 'on_set'
+
+        '''
         self.name = name
         self.provider = None
         self.portal = None
@@ -135,8 +171,6 @@ class Endpoint(object):
             self.on_set = _get_on_set(self, self.on_set)
 
     def handle_request(self, channel, method, properties, request):
-        '''
-        '''
         logger.debug('handling requst:{}'.format(request))
         msg = Message.from_msgpack(request)
         logger.debug('got a {} request: {}'.format(msg.msgop, msg.payload))
@@ -147,20 +181,19 @@ class Endpoint(object):
                 method_name = 'on_' + const_name.split('_')[-1].lower()
         endpoint_method = getattr(self, method_name)
         logger.debug('method is: {}'.format(endpoint_method))
-        if endpoint_method is None:
-            raise TypeError
 
         result = None
         retcode = None
         try:
             these_args = msg.payload['values']
             these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
-            #value = msg.payload['values']
             logger.debug('args are:\n{}'.format(these_args))
             result = endpoint_method(*these_args, **these_kwargs)
             if result is None:
                 result = "operation returned None"
-        except DriplineException as err:
+        except NotImplementedError as err:
+            logger.warning('method {} is not implemented'.format(method_name))
+        except exceptions.DriplineException as err:
             logger.debug('got a dripine exception')
             retcode = err.retcode
             result = err.message
@@ -170,10 +203,8 @@ class Endpoint(object):
             result = err.message
         logger.debug('request method execution complete')
         reply = ReplyMessage(payload=result, retcode=retcode)
-        logger.debug('reply2')
         self.portal.send_reply(properties, reply)
         logger.debug('reply sent')
-        logger.debug('lock released')
 
     def on_config(self, attribute, value=None):
         '''
@@ -187,12 +218,10 @@ class Endpoint(object):
             else:
                 result = getattr(self, attribute)
         else:
-            raise DriplineValueError("No attribute: {}".format(attribute))
+            raise exceptions.DriplineValueError("No attribute: {}".format(attribute))
         return result
 
     def on_cmd(self, *args, **kwargs):  
-        '''
-        '''
         logger.debug('args are: {}'.format(args))
         logger.debug('kwargs are: {}'.format(kwargs))
         try:

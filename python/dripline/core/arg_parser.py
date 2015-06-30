@@ -1,3 +1,8 @@
+'''
+A wrapper for argparse.ArgumentParser with some standardized arguments and behaviors
+
+.. todo:: does arg_parse belong in core?
+'''
 from __future__ import absolute_import
 
 import argparse
@@ -17,7 +22,7 @@ __all__ = ['DriplineParser']
 
 class TwitterHandler(logging.Handler):
     '''
-    A custom handler for sending tweets
+    A custom message handler for redirecting text to twitter
     '''
     def emit(self, record):
         try:
@@ -30,6 +35,26 @@ class TwitterHandler(logging.Handler):
             raise
         except:
             self.handleError(record)
+
+
+class SlackHandler(logging.Handler):
+    '''
+    A custom handler for sending messages to slack
+    '''
+    def __init__(self, *args, **kwargs):
+        logging.Handler.__init__(self, *args, **kwargs)
+        try:
+            import slackclient
+            import json
+            token = json.loads(open('/home/laroque/.project8_authentications.json').read())['slack']['token']
+            self.slackclient = slackclient.SlackClient(token)
+        except ImportError as err:
+            if 'slackclient' in err.message:
+                logger.warning('The slackclient package (available in pip) is required for using the slack handler')
+            raise
+
+    def emit(self, record):
+        self.slackclient.api_call('chat.postMessage', channel='#p8_alerts', text=record, username='driplineBot')
 
 
 class DotAccess(object):
@@ -51,6 +76,14 @@ class DriplineParser(argparse.ArgumentParser):
                  user_pass_support=False,
                  **kwargs):
         '''
+        Keyword Args:
+            extra_logger (logging.Logger): reference to a Logger instance, (handlers created will be connected to it)
+            amqp_broker (bool): enable a '-b' option for specifying the broker's network address
+            config_file (bool): enable a '-c' option for specifying an input configuration file
+            tmux_support (bool): enable a '-t' option to start the process in a tmux session rather than on the active shell
+            twitter_support (bool): enable a '-T' option to send a logger messages of critical or higher severity as tweets
+            user_pass_support (bool): enable '-u' and '-p' for user and password specification. **Note:** these options should be replaced with either reading the standard file ~/.project8_authentication.json, and/or prompting the user for values interactively
+
         '''
         self.extra_logger = extra_logger
         argparse.ArgumentParser.__init__(self, **kwargs)

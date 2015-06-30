@@ -2,10 +2,11 @@
 '''
 
 from __future__ import absolute_import
-import logging
+__docformat__ = 'reStructuredText'
 
 import abc
 import datetime
+import logging
 import threading
 import traceback
 import uuid
@@ -18,9 +19,26 @@ logger = logging.getLogger(__name__)
 
 
 class DataLogger(object):
+    '''
+    Base class for objects which need to call their own methods periodically.
+    '''
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, log_interval=0., max_interval=0, max_fractional_change=0, **kwargs):
+    def __init__(self,
+                 log_interval=0.,
+                 max_interval=0,
+                 max_fractional_change=0,
+                 alert_routing_key='sensor_value',
+                 **kwargs):
+        '''
+        Keyword Args:
+            log_interval (float): minimum time in seconds between sequential log events (note that this may or may not produce an actual log broadcast)
+            max_interval (float): If > 0, any log event exceding this number of seconds since the last broadcast will trigger a broadcast.
+            max_fractional_change (float): If > 0, any log event which produces a value which differs from the previous value by more than this amount (expressed as a fraction, ie 10% change is 0.1) will trigger a broadcast
+            alert_routing_key (str): routing key for the alert message send when broadcasting a logging event result. The default value of 'sensor_value' is valid for DataLoggers which represent physical quantities being stored to the slow controls database tables
+        
+        '''
+        self.alert_routing_key=alert_routing_key
         self._data_logger_lock = threading.Lock()
         self._log_interval = log_interval
         self._max_interval = max_interval
@@ -56,7 +74,7 @@ class DataLogger(object):
         if value < 0:
             raise ValueError('max log interval cannot be < 0')
         self._max_interval = value
-    
+
     @property
     def max_fractional_change(self):
         return self._max_fractional_change
@@ -68,7 +86,11 @@ class DataLogger(object):
         self._max_fractional_change = value
 
     def _conditionally_send(self, to_send):
-        this_value = float(to_send['values']['value_raw'])
+        this_value = None
+        try:
+            this_value = float(to_send['values']['value_raw'])
+        except TypeError:
+            pass
         if self._last_log_value is None:
             logger.debug("log b/c no last log")
         elif (datetime.datetime.utcnow() - self._last_log_time).seconds > self._max_interval:
@@ -78,7 +100,7 @@ class DataLogger(object):
         else:
             logger.debug('no log condition met, not logging')
             return
-        self.store_value(to_send, severity='sensor_value')
+        self.store_value(to_send, severity=self.alert_routing_key)
         self._last_log_time = datetime.datetime.utcnow()
         self._last_log_value = this_value
 

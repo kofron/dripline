@@ -1,11 +1,20 @@
 '''
-A connection to the AMQP broker
+A connection to the AMQP broker.
+
+This code violates DRY programming with the Portal class. A resolution would be
+very desirable, but is probably best achieved by having a version of this class
+which provides the existing interface of those to, to the AsynchronousConnection
+in pika. Portal could then have an instance of this class to interact with. That
+constitutes a non-trivial reworking of some of this code for future me (or someone).
 '''
 
 
 from __future__ import absolute_import
 
 # standard libs
+import json
+import multiprocessing
+import os
 import threading
 import traceback
 import uuid
@@ -15,6 +24,7 @@ import pika
 
 # internal libs
 from .message import Message, AlertMessage, ReplyMessage
+from ..core import exceptions
 
 __all__ = ['Connection']
 
@@ -26,11 +36,17 @@ class Connection(object):
     A simple API to the AMQP system
     '''
     def __init__(self, broker_host='localhost', queue_name=None):
+        '''
+        Keyword Args:
+            broker_host (str): network path for the amqp broker to connect to
+            queue_name (str|None): name of the queue to bind to for receiving replies
+        '''
         self._make_request_lock = threading.Lock()
         if queue_name is None:
             queue_name = "reply_queue-{}".format(uuid.uuid1().hex[:12])
         self.broker_host = broker_host
-        conn_params = pika.ConnectionParameters(broker_host)
+        credentials = pika.PlainCredentials(**json.loads(open(os.path.expanduser('~')+'/.project8_authentications.json').read())['amqp'])
+        conn_params = pika.ConnectionParameters(host=broker_host, credentials=credentials)
         self.conn = pika.BlockingConnection(conn_params)
         self.chan = self.conn.channel()
         self.chan.confirm_delivery()
@@ -87,7 +103,21 @@ class Connection(object):
             raise
         logger.critical("end of consume")
 
-    def send_request(self, target, request, decode=False):
+    def send_request(self, target, request, decode=False, timeout=10):
+        '''
+        '''
+        result_queue = multiprocessing.Queue()
+        process = multiprocessing.Process(target=self._send_request, kwargs={'result_queue':result_queue, 'target':target, 'request':request, 'decode':decode})
+        process.start()
+        process.join(timeout)
+        if process.is_alive():
+            process.terminate()
+            raise exceptions.DriplineTimeoutError("sending request timed out")
+        else:
+            result = result_queue.get()
+        return result
+        
+    def _send_request(self, result_queue, target, request, decode=False):
         '''
         send a request to a specific consumer.
         '''
@@ -120,10 +150,11 @@ class Connection(object):
             else:
                 raise
         if not pr:
-            logger.warning('pr is: {}'.format(pr))
+            #logger.warning('pr is: {}'.format(pr))
             self._response = ReplyMessage(retcode=102, payload={'ret_msg':'key <{}> not matched'.format(target)}).to_msgpack()
-            logger.warning('return code is hard coded, should not be')
+            #logger.warning('return code is hard coded, should not be')
             self._response_encoding = 'application/msgpack'
+            raise exceptions.DriplineAMQPRoutingKeyError('key <{}> not matched'.format(target))
         
         # consume until response
         self.chan.start_consuming()
@@ -142,6 +173,7 @@ class Connection(object):
         if to_return is None:
             logger.warning('to return is None')
         self._make_request_lock.release()
+        result_queue.put(to_return)
         return to_return
 
     def send_alert(self, alert, severity):

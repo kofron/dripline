@@ -17,8 +17,8 @@ except ImportError:
 ####### the above import really does go here, there should probably be some plugin infrastructure or something to deal with this as an optional feature, for now I'll import elsewhere
 
 # local imports
-from ..core import Provider, Endpoint
-from ..core.exception import *
+from ..core import Provider, Endpoint#, fancy_init_doc
+from ..core.exceptions import *
 
 import logging
 logger = logging.getLogger(__name__)
@@ -34,6 +34,13 @@ class RunDBInterface(Provider):
     
     def __init__(self, user, password, database_name, database_server, tables, *args, **kwargs):
         '''
+        ~Params
+            user (str): user name for connecting to database
+            password (str): password for connecting to database
+            database_name (str): name of the database to connect to
+            database_server (str): network resolvable hostname of database server
+            tables (list): list of names (str) of tables in the database
+        ~Params
         '''
         if isinstance(tables, types.StringType):
             tables = [tables]
@@ -54,9 +61,13 @@ class RunDBInterface(Provider):
     def _insert_with_return(self, table_name, insert_kv_dict, return_col_names_list):
         try:
             ins = self.tables[table_name].insert().values(**insert_kv_dict)
-            ins = ins.returning(*[self.tables[table_name].c[col_name] for col_name in return_col_names_list])
+            if return_col_names_list:
+                ins = ins.returning(*[self.tables[table_name].c[col_name] for col_name in return_col_names_list])
             insert_result = ins.execute()
-            return_values = insert_result.first()
+            if return_col_names_list:
+                return_values = insert_result.first()
+            else:
+                return_values = []
         except Exception as err:
             if err.message.startswith('(psycopg2.IntegrityError)'):
                 raise DriplineDatabaseError(err.message)
@@ -71,12 +82,20 @@ class InsertDBEndpoint(Endpoint):
     '''
     A class for making calls to _insert_with_return
     '''
-    def __init__(self, table_name, required_insert_names, return_col_names,
+    def __init__(self, table_name, required_insert_names,
+                 return_col_names=[],
                  optional_insert_names=[],
                  default_insert_values={},
                  *args,
                 **kwargs):
         '''
+        ~Params
+            table_name (str): name of the table to insert to
+            required_insert_names (list): list of names (str) of the table columns which must be included on every requested insert
+            return_col_names (list): list of names (str) of columns whose values should be returned on completion of the insert
+            optional_insert_names (list): list of names (str) of columns which the user may specify on an insert request, but which may be omitted
+            default_insert_values (dict): dictionary of {column_names: values} to serve as defaults when inserting, any values provided explicitly on the insert request will override these values
+        ~Params
         '''
         Endpoint.__init__(self, *args, **kwargs)
 
