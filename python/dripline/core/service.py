@@ -7,12 +7,13 @@ from __future__ import absolute_import
 
 import json
 import logging
+import multiprocessing
 import os
 import uuid
 
 import pika
 
-from .message import Message, RequestMessage
+from .message import Message, AlertMessage, RequestMessage, ReplyMessage
 from . import exceptions
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,8 @@ class Service(object):
 
         """
         if name is None:
-            name = 'unknown_service_'
-        self._name = name + str(uuid.uuid4())[1:12]
+            name = 'unknown_service_' + str(uuid.uuid4())[1:12]
+        self.name = name
         self._connection = None
         self._channel = None
         self._closing = False
@@ -199,7 +200,7 @@ class Service(object):
 
         """
         logger.info('Exchange declared')
-        self.setup_queue(self._name)
+        self.setup_queue(self.name)
 
     def setup_queue(self, queue_name):
         """Setup the queue on RabbitMQ by invoking the Queue.Declare RPC
@@ -228,8 +229,8 @@ class Service(object):
         """
         for key in self.keys:
             logger.info('Binding %s to %s with %s',
-                        self._exchange, self._name, key)
-            self._channel.queue_bind(self.on_bindok, self._name,
+                        self._exchange, self.name, key)
+            self._channel.queue_bind(self.on_bindok, self.name,
                                      self._exchange, key)
 
     def on_bindok(self, unused_frame):
@@ -256,7 +257,7 @@ class Service(object):
         logger.info('Issuing consumer related RPC commands')
         self.add_on_cancel_callback()
         self._consumer_tag = self._channel.basic_consume(self.on_message,
-                                                         self._name)
+                                                         self.name)
 
     def add_on_cancel_callback(self):
         """Add a callback that will be invoked if RabbitMQ cancels the consumer
@@ -374,16 +375,13 @@ class Service(object):
         logger.info('Closing connection')
         self._connection.close()
 
-    def send_request(self, target, request):
+    def send_message(self, target, message, return_queue=None, properties=None, exchange=None, return_connection=False):
         '''
-        It seems like there should be a way to do this with the existing SelectConnection.
-        The problem is that the message handler needs to send a request and then be called
-        not block the reply from being processed, and needs to get the reply from that processed response.
-        The non-blocking part seems tricky. I'm sure there exists a good solution for this,
-        maybe within asyncio and/or asyncore, but I don't know where it is. This seems to work.
         '''
-        if not isinstance(request, RequestMessage):
-            raise TypeError('request must be a RequestMessage')
+        if exchange is None:
+            exchange = self._exchange
+        if not isinstance(message, Message):
+            raise TypeError('message must be a dripline.core.Message')
         parameters = pika.ConnectionParameters(host=self._broker, credentials=self.__get_credentials())
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
@@ -391,7 +389,7 @@ class Service(object):
                                        exclusive=True,
                                        auto_delete=True,
                                       )
-        channel.queue_bind(exchange='requests',
+        channel.queue_bind(exchange=exchange,
                            queue=result.method.queue,
                            routing_key=result.method.queue,
                           )
@@ -400,21 +398,66 @@ class Service(object):
         self.__ret_val = None
         def on_response(ch, method, props, body):
             if correlation_id == props.correlation_id:
-                self.__ret_val = Message.from_encoded(body, props.content_encoding)
+                return_queue.put(Message.from_encoded(body, props.content_encoding))
 
         channel.basic_consume(on_response, no_ack=True, queue=result.method.queue)
 
-        properties = pika.BasicProperties(reply_to=result.method.queue,
-                                          content_encoding='application/msgpack',
-                                          correlation_id=correlation_id,
-                                          app_id='dripline.core.Service'
-                                         )
-        channel.basic_publish(exchange='requests',
+        if properties is None:
+            properties = pika.BasicProperties(reply_to=result.method.queue,
+                                              content_encoding='application/msgpack',
+                                              correlation_id=correlation_id,
+                                              app_id='dripline.core.Service'
+                                             )
+        channel.basic_publish(exchange=exchange,
                               routing_key=target,
-                              body=request.to_msgpack(),
+                              body=message.to_msgpack(),
                               properties=properties,
                              )
-        while self.__ret_val is None:
-            connection.process_data_events()
+        if not return_connection:
+            connection.close()
+            return
+        return connection
+
+    def send_request(self, target, request, timeout=10):
+        '''
+        It seems like there should be a way to do this with the existing SelectConnection.
+        The problem is that the message handler needs to send a request and then be called
+        not block the reply from being processed, and needs to get the reply from that processed response.
+        The non-blocking part seems tricky. I'm sure there exists a good solution for this,
+        maybe within asyncio and/or asyncore, but I don't know where it is. This seems to work.
+        '''
+        logger.info('sending a request')
+        logger.debug('request to <{}> is: {}'.format(target, request))
+        if not isinstance(request, RequestMessage):
+            raise TypeError('request must be a dripline.core.RequestMessage')
+        result_queue = multiprocessing.Queue()
+        connection = self.send_message(target, request, return_queue=result_queue, return_connection=True, exchange='requests')
+        self.__ret_val = None
+        def _get_result(result_queue):
+            while result_queue.empty():
+                connection.process_data_events()
+        process = multiprocessing.Process(target=_get_result, kwargs={'result_queue':result_queue})
+        process.start()
+        process.join(timeout)
+        if process.is_alive():
+            process.terminate()
+            raise exceptions.DriplineTimeoutError('request response timed out')
         connection.close()
-        return self.__ret_val
+        return result_queue.get()
+
+    def send_alert(self, alert, severity):
+        '''
+        '''
+        logger.info('sending an alert')
+        logger.debug('to {} sending {}'.format(severity,alert))
+        if not isinstance(alert, AlertMessage):
+            alert = AlertMessage(payload=alert)
+        self.send_message(target=severity, message=alert, exchange='alerts')
+
+    def send_reply(self, properties, reply):
+        '''
+        '''
+        logger.info("sending a reply")
+        if not isinstance(reply, Message):
+            reply = ReplyMessage(payload=reply)
+        self.send_message(target=properties.reply_to, message=reply, properties=properties)
