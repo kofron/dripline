@@ -8,7 +8,7 @@
 package main
 
 import (
-	"github.com/project8/dripline/dripline"
+	"github.com/project8/dripline/go/dripline"
 )
 
 
