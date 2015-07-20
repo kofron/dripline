@@ -24,11 +24,45 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 )
 
-// AmqpSender is a goroutine responsible for sending AMQP messages received on a channel
+type AmqpSender struct {
+	BrokerAddress string
+	sendQueue chan Message
+	stopQueue chan bool
+	DoneSignal chan bool
+}
+
+func StartSender(brokerAddress string) (sender *AmqpSender) {
+	sender = nil
+
+	var newSender = AmqpSender {
+		BrokerAddress: brokerAddress,
+	}
+
+	go runAmqpSender(newSender.BrokerAddress, newSender.sendQueue, newSender.stopQueue, newSender.DoneSignal)
+
+	isDone <-newSender.DoneSignal
+	if isDone {
+		Log.Critical("Sender did not start")
+		return
+	}
+
+	sender = &newSender
+	return
+}
+
+func (sender *AmqpSender) SendMessage(toSend Message) {
+	(&sender).sendQueue <- toSend
+}
+
+func (sender *AmqpSender) StopSender() {
+	(&sender).stopQueue <- true
+}
+
+// runAmqpSender is a goroutine responsible for sending AMQP messages received on a channel
 // Broker address format: amqp://[user:password]@(address)[:port]
 //    Required: address
 //    Optional: user/password, port
-func AmqpSender(brokerAddress string, exchange string, sendQueue <-chan Message, stopQueue <-chan bool, doneSignal chan<- bool) {
+func runAmqpSender(brokerAddress string, sendQueue <-chan Message, stopQueue <-chan bool, doneSignal chan<- bool) {
 	// Connect to the AMQP broker
 	// Deferred command: close the connection
 	connection, receiveErr := amqp.Dial(brokerAddress)
@@ -50,6 +84,7 @@ func AmqpSender(brokerAddress string, exchange string, sendQueue <-chan Message,
 	defer channel.Close()
 
 	Log.Info("AMQP sender started successfully")
+	doneSignal <- false
 
 amqpLoop:
 	for {
@@ -93,7 +128,7 @@ amqpLoop:
 			Log.Debug("Sending message to routing key <%s>", routingKey)
 
 			// Publish!
-			pubErr := channel.Publish(exchange, routingKey, false, false, amqpMessage)
+			pubErr := channel.Publish(message.exchange, routingKey, false, false, amqpMessage)
 			if pubErr != nil {
 				Log.Error("Error while sending message:\n\t%v", pubErr)
 			}

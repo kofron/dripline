@@ -37,6 +37,7 @@ type SenderInfo struct {
 }
 
 type Message struct {
+	exchange   string
     Target     []string
 	Encoding   string
 	CorrId     string
@@ -144,6 +145,7 @@ func PrepareSenderInfo(package_name, exe, version, commit, hostname, username st
 // The payload is not set here.
 func PrepareRequest(target []string, encoding string, msgOp MsgCodeT, senderInfo SenderInfo, replyChan chan message, replyReceiver *AmqpReceiver) (message Request) {
 	message = Request {
+		exchange:      "requests",
 		Target:        target,
 		Encoding:      encoding,
 		MsgType:       MTRequest,
@@ -160,6 +162,7 @@ func PrepareRequest(target []string, encoding string, msgOp MsgCodeT, senderInfo
 // The payload is not set here.
 func PrepareReply(target []string, encoding string, corrId string, retCode MsgCodeT, senderInfo SenderInfo) (message Reply) {
 	message = Reply {
+		exchange:   "",
 		Target:     target,
 		Encoding:   encoding,
 		CorrId:     corrId,
@@ -175,6 +178,7 @@ func PrepareReply(target []string, encoding string, corrId string, retCode MsgCo
 // The payload is not set here.
 func PrepareAlert(target []string, encoding string, corrId string, senderInfo SenderInfo) (message Alert) {
 	message = Alert {
+		exchange:   "alerts",
 		Target:     target,
 		Encoding:   encoding,
 		CorrId:     corrId,
@@ -189,6 +193,7 @@ func PrepareAlert(target []string, encoding string, corrId string, senderInfo Se
 // The payload is not set here.
 func PrepareAlert(target []string, encoding string, corrId string, senderInfo SenderInfo) (message Info) {
 	message = Info {
+		exchange:   "",
 		Target:     target,
 		Encoding:   encoding,
 		CorrId:     corrId,

@@ -5,7 +5,7 @@
 *
 * Two threads can be used for receiving and sending AMQP messages, respectively: AmqpReceiver and AmqpSender
  */
-
+/*
 package dripline
 
 import (
@@ -281,4 +281,4 @@ amqpLoop:
 		} // end select block
 	} // end for loop
 }
-
+*/
