@@ -5,9 +5,8 @@
 *
 * Two threads can be used for receiving and sending AMQP messages, respectively: AmqpReceiver and AmqpSender
  */
-/*
 package dripline
-
+/*
 import (
 	"errors"
 	"fmt"
@@ -22,11 +21,17 @@ import (
 	"github.com/ugorji/go/codec"
 	"github.com/kardianos/osext"
 	"code.google.com/p/go-uuid/uuid"
-	"github.com/spf13/viper"
-
-	"github.com/project8/hornet/gogitver"
 )
+*/
+type AmqpReceiver struct {
+	BrokerAddress string
+	sendQueue chan Message
+	stopQueue chan bool
+	DoneSignal chan bool
+}
 
+
+/*
 
 // AmqpReceiver is a goroutine for receiving and handling AMQP messages
 func AmqpReceiver(ctrlQueue chan ControlMessage, reqQueue chan ControlMessage, poolCount *sync.WaitGroup) {

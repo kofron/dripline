@@ -9,22 +9,11 @@
 package dripline
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/user"
-	"strings"
-	"sync"
 	"time"
 	"unsafe"
 
-	"github.com/streadway/amqp"
 	"github.com/ugorji/go/codec"
-	"github.com/kardianos/osext"
-	"code.google.com/p/go-uuid/uuid"
-	"github.com/spf13/viper"
-
-	"github.com/project8/hornet/gogitver"
 )
 
 type SenderInfo struct {
@@ -38,8 +27,9 @@ type SenderInfo struct {
 
 type Message struct {
 	exchange   string
-    Target     []string
+    Target     string
 	Encoding   string
+	ReplyTo    string
 	CorrId     string
 	MsgType    MsgCodeT
 	TimeStamp  string
@@ -50,7 +40,7 @@ type Message struct {
 type Request struct {
     Message
 	MsgOp         MsgCodeT
-	ReplyChan     chan Message
+	ReplyChan     chan Reply
 	ReplyReceiver *AmqpReceiver
 }
 
@@ -67,41 +57,47 @@ type Info struct {
     Message
 }
 
-func (message Message) messageBuffer() (buffer map[string]interface{}) {
+func (message *Message) messageBuffer() (buffer map[string]interface{}) {
 	var senderInfo = map[string]interface{} {
-		"package": p8Message.SenderInfo.Package,
-		"exe": p8Message.SenderInfo.Exe,
-		"version": p8Message.SenderInfo.Version,
-		"commit": p8Message.SenderInfo.Commit,
-		"hostname": p8Message.SenderInfo.Hostname,
-		"username": p8Message.SenderInfo.Username,
+		"package": (*message).SenderInfo.Package,
+		"exe": (*message).SenderInfo.Exe,
+		"version": (*message).SenderInfo.Version,
+		"commit": (*message).SenderInfo.Commit,
+		"hostname": (*message).SenderInfo.Hostname,
+		"username": (*message).SenderInfo.Username,
 	}
-	buffer["msgtype"] = p8Message.MsgType,
-	buffer["timestamp"] = p8Message.TimeStamp,
-	buffer["sender_info"] = senderInfo,
-	buffer["payload"] = p8Message.Payload
+	buffer = make(map[string]interface{})
+	buffer["msgtype"] = (*message).MsgType
+	buffer["timestamp"] = (*message).TimeStamp
+	buffer["sender_info"] = senderInfo
+	buffer["payload"] = (*message).Payload
+	return
 }
 
-func (message Request) Encode() (body []byte, e error) {
-	buffer := message.messageBuffer()
-	buffer["msgop"] = message.MsgOp
-	body, e = encodeBuffer(&buffer, message.Encoding)
+func (message *Request) Encode() (body []byte, e error) {
+	buffer := (*message).messageBuffer()
+	buffer["msgop"] = (*message).MsgOp
+	body, e = encodeBuffer(&buffer, (*message).Encoding)
+	return
 }
 
-func (message Reply) Encode() (body []byte, e error) {
-	buffer := message.messageBuffer()
-	buffer["retcode"] = message.RetCode
-	body, e = encodeBuffer(&buffer, message.Encoding)
+func (message *Reply) Encode() (body []byte, e error) {
+	buffer := (*message).messageBuffer()
+	buffer["retcode"] = (*message).RetCode
+	body, e = encodeBuffer(&buffer, (*message).Encoding)
+	return
 }
 
-func (message Alert) Encode() (body []byte, e error) {
-	buffer := message.messageBuffer()
-	body, e = encodeBuffer(&buffer, message.Encoding)
+func (message *Alert) Encode() (body []byte, e error) {
+	buffer := (*message).messageBuffer()
+	body, e = encodeBuffer(&buffer, (*message).Encoding)
+	return
 }
 
-func (message Info) Encode() (body []byte, e error) {
-	buffer := message.messageBuffer()
-	body, e = encodeBuffer(&buffer, message.Encoding)
+func (message *Info) Encode() (body []byte, e error) {
+	buffer := (*message).messageBuffer()
+	body, e = encodeBuffer(&buffer, (*message).Encoding)
+	return
 }
 
 func encodeBuffer(bufferPtr *map[string]interface{}, encoding string) (encoded []byte, e error) {
@@ -110,48 +106,51 @@ func encodeBuffer(bufferPtr *map[string]interface{}, encoding string) (encoded [
 	case "application/json":
 		//log.Printf("this will be a json message")
 		handle := new(codec.JsonHandle)
-		encoder := codec.NewEncoderBytes(&(message.Body), handle)
-		jsonErr := encoder.Encode(&body)
+		encoder := codec.NewEncoderBytes(&(encoded), handle)
+		jsonErr := encoder.Encode(bufferPtr)
 		if jsonErr != nil {
 			e = fmt.Errorf("Unable to decode JSON-encoded message: %v", jsonErr)
 		}
 	case "application/msgpack":
 		//log.Printf("this will be a msgpack message")
 		handle := new(codec.MsgpackHandle)
-		encoder := codec.NewEncoderBytes(&(message.Body), handle)
-		msgpackErr := encoder.Encode(&body)
+		encoder := codec.NewEncoderBytes(&(encoded), handle)
+		msgpackErr := encoder.Encode(bufferPtr)
 		if msgpackErr != nil {
 			e = fmt.Errorf("Unable to decode msgpack-encoded message: %v", msgpackErr)
 		}
 	default:
-		e = fmt.Errorf("Message content cannot be encoded with type <%s>", p8Message.Encoding)
+		e = fmt.Errorf("Message content cannot be encoded with type <%s>", encoding)
 	}
+	return
 }
 
 // PrepareSenderInfo sets up the fields in a SenderInfo object.
 func PrepareSenderInfo(package_name, exe, version, commit, hostname, username string) (info SenderInfo) {
 	info = SenderInfo {
-		Package  package_name,
-		Exe      exe,
-		Version  version,
-		Commit   commit,
-		Hostname hostname,
-		Username username,
+		Package:  package_name,
+		Exe:      exe,
+		Version:  version,
+		Commit:   commit,
+		Hostname: hostname,
+		Username: username,
 	}
 	return
 }
 
 // PrepareRequest sets up most of the fields in a Request object.
 // The payload is not set here.
-func PrepareRequest(target []string, encoding string, msgOp MsgCodeT, senderInfo SenderInfo, replyChan chan message, replyReceiver *AmqpReceiver) (message Request) {
+func PrepareRequest(target string, encoding string, msgOp MsgCodeT, senderInfo SenderInfo, replyChan chan Reply, replyReceiver *AmqpReceiver) (message Request) {
 	message = Request {
-		exchange:      "requests",
-		Target:        target,
-		Encoding:      encoding,
-		MsgType:       MTRequest,
+		Message:       Message {
+			exchange:      "requests",
+			Target:        target,
+			Encoding:      encoding,
+			MsgType:       MTRequest,
+			TimeStamp:     time.Now().UTC().Format(TimeFormat),
+			SenderInfo:    senderInfo,
+		},
 		MsgOp:         msgOp,
-		TimeStamp:     time.Now().UTC().Format(TimeFormat),
-		SenderInfo:    senderInfo,
 		ReplyChan:     replyChan,
 		ReplyReceiver: replyReceiver,
 	}
@@ -160,46 +159,50 @@ func PrepareRequest(target []string, encoding string, msgOp MsgCodeT, senderInfo
 
 // PrepareReply sets up most of the fields in a Reply object.
 // The payload is not set here.
-func PrepareReply(target []string, encoding string, corrId string, retCode MsgCodeT, senderInfo SenderInfo) (message Reply) {
+func PrepareReply(target string, encoding string, corrId string, retCode MsgCodeT, senderInfo SenderInfo) (message Reply) {
 	message = Reply {
-		exchange:   "",
-		Target:     target,
-		Encoding:   encoding,
-		CorrId:     corrId,
-		MsgType:    MTReply,
+		Message:     Message {
+			exchange:      "",
+			Target:        target,
+			Encoding:      encoding,
+			CorrId:        corrId,
+			MsgType:       MTReply,
+			TimeStamp:     time.Now().UTC().Format(TimeFormat),
+			SenderInfo:    senderInfo,
+		},
 		RetCode:    retCode,
-		TimeStamp:  time.Now().UTC().Format(TimeFormat),
-		SenderInfo: senderInfo
 	}
 	return
 }
 
 // PrepareAlert sets up most of the fields in a Alert object.
 // The payload is not set here.
-func PrepareAlert(target []string, encoding string, corrId string, senderInfo SenderInfo) (message Alert) {
+func PrepareAlert(target string, encoding string, senderInfo SenderInfo) (message Alert) {
 	message = Alert {
-		exchange:   "alerts",
-		Target:     target,
-		Encoding:   encoding,
-		CorrId:     corrId,
-		MsgType:    MTAlert,
-		TimeStamp:  time.Now().UTC().Format(TimeFormat),
-		SenderInfo: senderInfo
+		Message:  Message {
+			exchange:      "alerts",
+			Target:        target,
+			Encoding:      encoding,
+			MsgType:       MTAlert,
+			TimeStamp:     time.Now().UTC().Format(TimeFormat),
+			SenderInfo:    senderInfo,
+		},
 	}
 	return
 }
 
 // PrepareInfo sets up most of the fields in a Alert object.
 // The payload is not set here.
-func PrepareAlert(target []string, encoding string, corrId string, senderInfo SenderInfo) (message Info) {
+func PrepareInfo(target string, encoding string, corrId string, senderInfo SenderInfo) (message Info) {
 	message = Info {
-		exchange:   "",
-		Target:     target,
-		Encoding:   encoding,
-		CorrId:     corrId,
-		MsgType:    MTInfo,
-		TimeStamp:  time.Now().UTC().Format(TimeFormat),
-		SenderInfo: senderInfo
+		Message:  Message {
+			exchange:      "",
+			Target:        target,
+			Encoding:      encoding,
+			MsgType:       MTInfo,
+			TimeStamp:     time.Now().UTC().Format(TimeFormat),
+			SenderInfo:    senderInfo,
+		},
 	}
 	return
 }

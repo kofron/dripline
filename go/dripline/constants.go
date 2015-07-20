@@ -10,9 +10,6 @@ package dripline
 // Time format
 const TimeFormat = "2006-01-02T22:04:05Z"
 
-// Separator for the routing key/target parts
-const TargetSeparator = "."
-
 // Project 8 Wire Protocol Standards
 type MsgCodeT uint64
 
