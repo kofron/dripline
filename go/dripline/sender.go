@@ -69,7 +69,7 @@ func (sender *AmqpSender) SendInfo(toSend Info) {
 	return
 }
 
-func (sender *AmqpSender) StopSender() {
+func (sender *AmqpSender) Stop() {
 	(*sender).stopQueue <- true
 	return
 }
@@ -110,6 +110,8 @@ amqpLoop:
 			if stopSig == true {
 				Log.Info("AMQP sender stopping on interrupt.")
 				break amqpLoop
+			} else {
+				Log.Debug("Received on the stop queue, but it wasn't \"true\"")
 			}
 		case request := <-sender.sendRequestQueue:
 			Log.Debug("Sending a request")

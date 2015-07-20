@@ -43,10 +43,13 @@ func main() {
 
 	dripline.Log.Info("Request sent")
 
-	dripline.Log.Info("Waiting for reply; use ctrl-c to cancel")
-	reply := <-replyChan
+	//dripline.Log.Info("Waiting for reply; use ctrl-c to cancel")
+	//reply := <-replyChan
 
-	dripline.Log.Info("Reply received")
+	//dripline.Log.Info("Reply received")
+	time.Sleep(3*time.Second)
+	
+	(*sender).Stop()
 
 	dripline.Log.Info("Test complete")
 }
