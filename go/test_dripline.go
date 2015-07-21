@@ -47,9 +47,10 @@ func main() {
 	//reply := <-replyChan
 
 	//dripline.Log.Info("Reply received")
-	time.Sleep(3*time.Second)
-	
+
 	(*sender).Stop()
+
+	<-(*sender).DoneSignal
 
 	dripline.Log.Info("Test complete")
 }
