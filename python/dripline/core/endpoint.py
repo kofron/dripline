@@ -14,7 +14,6 @@ import pika
 import yaml
 
 from .message import Message, RequestMessage, ReplyMessage
-from .connection import Connection
 from . import exceptions
 from . import constants
 
@@ -189,6 +188,7 @@ class Endpoint(object):
             these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
             logger.debug('args are:\n{}'.format(these_args))
             result = endpoint_method(*these_args, **these_kwargs)
+            logger.debug('\n endpoint method returned \n')
             if result is None:
                 result = "operation returned None"
         except NotImplementedError as err:
