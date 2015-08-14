@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractproperty, abstractmethod
 import functools
 import inspect
 import math
-import threading
 import time
 import traceback
 import types
@@ -86,7 +85,8 @@ def calibrate(fun):
         val_dict = {'value_raw':fun(self)}
         if val_dict['value_raw'] is None:
             return None
-        if not self._calibration_str is None:
+        #if not self._calibration_str is None:
+        if isinstance(self._calibration_str, types.StringTypes):
             globals = {
                        "math": math,
                        "cernox_calibration": cernox_calibration,
@@ -101,6 +101,11 @@ def calibrate(fun):
                 cal = None
             if cal is not None:
                 val_dict['value_cal'] = cal
+        elif isinstance(self._calibration_str, dict):
+            if val_dict['value_raw'] in self._calibration_str:
+                val_dict['value_cal'] = self._calibration_str[val_dict['value_raw']]
+            else:
+                raise exceptions.DriplineValueError('raw value not in cal dict')
         return val_dict
     return wrapper
 
@@ -147,7 +152,7 @@ class Endpoint(object):
         '''
         Keyword Args:
             name (str): unique identifier across all dripline services (used to determine routing key)
-            cal_str (str): string use to process raw get result
+            cal_str (str||dict): string use to process raw get result (with .format(raw)) or a dict to use for the same purpose where raw must be a key
             get_on_set (bool): flag to toggle running 'on_get' after each 'on_set'
 
         '''
@@ -155,7 +160,6 @@ class Endpoint(object):
         self.provider = None
         self.portal = None
         self._calibration_str = cal_str
-        self.__request_lock = threading.Lock()
 
         def raiser(self, *args, **kwargs):
             raise exceptions.DriplineMethodNotSupportedError('requested method not supported by this endpoint')
@@ -190,17 +194,15 @@ class Endpoint(object):
             result = endpoint_method(*these_args, **these_kwargs)
             logger.debug('\n endpoint method returned \n')
             if result is None:
-                result = "operation returned None"
-        except NotImplementedError as err:
-            logger.warning('method {} is not implemented'.format(method_name))
+                result = "operation completed silently"
         except exceptions.DriplineException as err:
             logger.debug('got a dripine exception')
             retcode = err.retcode
-            result = err.message
+            result = str(err)
         except Exception as err:
-            logger.error('got an error: {}'.format(err.message))
+            logger.error('got an error: {}'.format(str(err)))
             logger.debug('traceback follows:\n{}'.format(traceback.format_exc()))
-            result = err.message
+            result = str(err)
             retcode = 999
         logger.debug('request method execution complete')
         reply = ReplyMessage(payload=result, retcode=retcode)
