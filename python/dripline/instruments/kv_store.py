@@ -72,11 +72,6 @@ class kv_store_key(Spime):
         Spime.__init__(self, **kwargs)
         self._value = initial_value
         self.get_value = self.on_get
-        self.store_value = self.report_log
-
-    @staticmethod
-    def report_log(value):  
-        logger.info("Should be logging value: {}\n".format(value))
 
     @calibrate([times2, times3])
     def on_get(self):

@@ -9,7 +9,7 @@ import functools
 import types
 
 from .exceptions import *
-from .endpoint import Endpoint, calibrate#, fancy_init_doc
+from .endpoint import Endpoint, calibrate
 from .data_logger import DataLogger
 
 __all__ = ['Spime',
@@ -38,12 +38,11 @@ def _log_on_set_decoration(self, fun):
         to_log = {'from': self.name,
                   'values': values,
                  }
-        self.report_log(alert=to_log, severity='sensor_value')
+        self.store_value(alert=to_log, severity=self.alert_routing_key)
         return result
     return wrapper
 
 
-#@fancy_init_doc
 class Spime(Endpoint, DataLogger):
     '''
     From wikipedia (paraphrased): *A spime is a neologism for a futuristic object, characteristic to the Internet of Things, that can be tracked through space and time throughout its lifetime. A Spime is essentially virtual master objects that can, at various times, have physical incarnations of itself.*
@@ -62,12 +61,11 @@ class Spime(Endpoint, DataLogger):
         See :class:`Endpoint <dripline.core.endpoint.Endpoint>` and :class:`DataLogger <dripline.core.data_logger.DataLogger>` for additional parameters
 
         '''
+        # Endpoint stuff
+        Endpoint.__init__(self, **kwargs)
         # DataLogger stuff
         DataLogger.__init__(self, **kwargs)
         self.get_value = self.on_get
-        self.store_value = self.report_log
-        # Endpoint stuff
-        Endpoint.__init__(self, **kwargs)
 
         self._log_on_set = log_on_set
         if log_on_set:
@@ -87,8 +85,8 @@ class Spime(Endpoint, DataLogger):
         
 
     @staticmethod
-    def report_log(alert, severity):
-        logger.info("Should be logging (value,severity): ({},{})".format(alert, severity))
+    def store_value(alert, severity):
+        logger.error("Should be logging (value,severity): ({},{})".format(alert, severity))
 
 
 #@fancy_init_doc
@@ -132,7 +130,6 @@ class SimpleSCPIGetSpime(SimpleSCPISpime):
         raise DriplineMethodNotSupportedError('setting not available for {}'.format(self.name))
 
 
-#@fancy_init_doc
 class SimpleSCPISetSpime(SimpleSCPISpime):
     '''
     Identical to SimpleSCPISpime, but with an explicit exception if on_get is attempted
@@ -145,7 +142,6 @@ class SimpleSCPISetSpime(SimpleSCPISpime):
     def on_get():
         raise DriplineMethodNotSupportedError('getting not available for {}'.format(self.name))
 
-#@fancy_init_doc
 class FormatSCPISpime(Spime):
     def __init__(self, get_str=None, set_str=None, set_value_map=None, set_value_lowercase=False, **kwargs):
         '''
