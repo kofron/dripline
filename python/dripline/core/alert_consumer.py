@@ -15,19 +15,20 @@ import pika
 # internal imports
 from .message import Message
 from .service import Service
+from .utilities import fancy_doc
 
 __all__ = ['AlertConsumer']
 
 logger = logging.getLogger(__name__)
 
 
+@fancy_doc
 class AlertConsumer(Service):
     def __init__(self, broker_host='localhost', exchange='alerts', keys=['#'], name=None, **kwargs): 
         '''
-        Keyword Args:
-            broker_host (str): network address of the amqp broker to connect to
-            exchange (str): AMQP exchange on the broker to which we will be binding
-            keys (list): list of strings, each string will be a routing key bound to the provided exchange.
+        broker_host (str): network address of the amqp broker to connect to
+        exchange (str): AMQP exchange on the broker to which we will be binding
+        keys (list): list of strings, each string will be a routing key bound to the provided exchange.
 
         '''
         logger.debug('AlertConsumer initializing')
@@ -93,8 +94,3 @@ class AlertConsumer(Service):
     def start(self):
         logger.debug("AlertConsmer consume starting")
         self.run()
-#        self.dripline_connection.chan.basic_consume(process_message,
-#                                                    queue=self.queue.method.queue,
-#                                                    no_ack=True
-#                                                   )
-#        self.dripline_connection.chan.start_consuming()
