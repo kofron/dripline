@@ -22,7 +22,7 @@ import msgpack
 # internal imports
 from . import constants
 from . import exceptions
-#from .utilities import fancy_doc
+from .utilities import fancy_doc
 from .. import __version__, __commit__
 
 import inspect
@@ -110,6 +110,13 @@ class Message(dict, object):
         self['retcode'] = value
 
     @property
+    def return_msg(self):
+        return self['return_msg']
+    @return_msg.setter
+    def return_msg(self, value):
+        self['return_msg'] = value
+
+    @property
     def msgtype(self):
         return None
     @msgtype.setter
@@ -189,28 +196,42 @@ class Message(dict, object):
             raise ValueError('encoding <{}> not recognized'.format(encoding))
 
 
-#@fancy_doc
+@fancy_doc
 class ReplyMessage(Message):
     '''
     Derrived class for Reply type messages
     '''
     def __init__(self,
                  retcode=None,
+                 return_msg=None,
                  **kwargs):
         '''
         retcode (int): indicates return value and/or error code (see exceptions)
+        return_msg (str): human-readable explanation of the return code
         '''
         if retcode is None:
             retcode = 0
+        if return_msg is None:
+            return_msg = ''
         self.retcode = retcode
+        self.return_msg = return_msg
         Message.__init__(self, **kwargs)
 
     @property
     def msgtype(self):
         return constants.T_REPLY
 
+    @property
+    def payload(self):
+        return self['payload']
+    @payload.setter
+    def payload(self, value):
+        if not isinstance(value, dict):
+            value = {'values': [value]}
+        self['payload'] = value
 
-#@fancy_doc
+
+@fancy_doc
 class RequestMessage(Message):
 
     def __init__(self, msgop, **kwargs):
@@ -225,14 +246,14 @@ class RequestMessage(Message):
         return constants.T_REQUEST
 
 
-#@fancy_doc
+@fancy_doc
 class InfoMessage(Message):
     @property
     def msgtype(self):
         return constants.T_INFO
 
 
-#@fancy_doc
+@fancy_doc
 class AlertMessage(Message):
     @property
     def msgtype(self):
