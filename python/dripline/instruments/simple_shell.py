@@ -60,10 +60,9 @@ class sensors_command_temp(Spime):
     This assumes that the "sensors" command is installed, which it probably isn't.
     '''
     def __init__(self, name, core=0):  # , on_get='sensors', on_set=None):
-        # DataLogger stuff
+        # Scheduler stuff
         super(sensors_command_temp, self).__init__()
         self.get_value = self.on_get
-        self.store_value = self.report_log
 
         # local stuff
         self.name = name
@@ -71,9 +70,6 @@ class sensors_command_temp(Spime):
         self._on_get = ['sensors']  # on_get
         self._on_set = None  # on_set
         self._core = core
-    @staticmethod
-    def report_log(value):
-        logger.info("\n\nShould be logging value: {}\n\n".format(value))
 
     def on_get(self):
         result = None
@@ -93,9 +89,3 @@ class sensors_command_temp(Spime):
             logger.info('set {} to {}'.format(attribute, value))
         else:
             raise AttributeError("No attribute: {}".format(attribute))
-
-    def provider(self):
-        return self._provider
-
-    def set_provider(self, provider):
-        self._provider = provider

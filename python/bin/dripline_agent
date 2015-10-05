@@ -63,7 +63,7 @@ def main(args):
     logger.debug('payload will be: {}'.format(payload))
     request = message.RequestMessage(msgop=msgop, payload=payload)
     try:
-        reply = conn.send_request(args.target, request)
+        reply = conn.send_request(args.target, request, timeout=args.timeout)
     except exceptions.DriplineException as dripline_error:
         logger.warning(dripline_error.message)
         return
@@ -76,6 +76,8 @@ def main(args):
     if not result.retcode == 0:
         color = '\033[91m'
     print('{color}{}(ret:{}): {}\033[0m'.format(print_prefix, result.retcode, result.payload, color=color))
+    if result.return_msg is not '':
+        logger.warning('return message: {}'.format(result.return_msg))
 
 
 if __name__ == '__main__':
@@ -92,6 +94,10 @@ if __name__ == '__main__':
     parser.add_argument('verb', choices=verb_list())
     parser.add_argument('target')
     parser.add_argument('values', nargs='*')
+    parser.add_argument('--timeout',
+                        default=10,
+                        type=float,
+                       )
 
     args = parser.parse_args()
     try:

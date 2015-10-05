@@ -18,14 +18,16 @@ from .endpoint import Endpoint
 from .message import Message, AlertMessage, RequestMessage
 from .provider import Provider
 from .service import Service
+from .utilities import fancy_doc
 
-__all__ = ['Portal']
+__all__ = ['Spimescape']
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class Portal(Service):
+@fancy_doc
+class Spimescape(Service):
     """
     Like a node, but pythonic
     """
@@ -57,7 +59,6 @@ class Portal(Service):
             raise ValueError('endpoint ({}) already present'.format(endpoint.name))
         self.endpoints[endpoint.name] = endpoint
         setattr(endpoint, 'store_value', self.send_alert)
-        setattr(endpoint, 'report_log', self.send_alert)
         setattr(endpoint, 'portal', self)
 
     def start_event_loop(self):
@@ -73,13 +74,10 @@ class Portal(Service):
             del(self.conn)
         logger.debug("loop ended")
 
-    def on_message(self, channel, method, header, body):
-        try:
-            logger.info('request received by {}'.format(self.name))
-            self.endpoints[method.routing_key].handle_request(channel, method, header, body)
-            logger.info('request processing complete\n{}'.format('-'*29))
-        finally:
-            self._channel.basic_ack(delivery_tag=method.delivery_tag)
+    def on_request_message(self, channel, method, header, body):
+        logger.info('request received by {}'.format(self.name))
+        self.endpoints[method.routing_key].handle_request(channel, method, header, body)
+        logger.info('request processing complete\n{}'.format('-'*29))
 
     def _handle_reply(self, channel, method, header, body):
         logger.info("got a reply")

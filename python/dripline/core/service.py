@@ -13,6 +13,7 @@ import uuid
 
 import pika
 
+from . import constants
 from .message import Message, AlertMessage, RequestMessage, ReplyMessage
 from . import exceptions
 
@@ -36,11 +37,11 @@ class Service(object):
     EXCHANGE_TYPE = 'topic'
 
     def __init__(self, amqp_url, exchange, keys, name=None):
-        """Create a new instance of the consumer class, passing in the AMQP
-        URL used to connect to RabbitMQ.
-
-        :param str amqp_url: The AMQP url to connect with
-
+        """
+        amqp_url (str): The AMQP url to connect with
+        exchange (str): Name of the AMQP exchange to connect to
+        keys (list|str): binding key or list of binding keys to use listen against
+        name (str|None): name for the amqp queue, automatically generated if None
         """
         if name is None:
             name = 'unknown_service_' + str(uuid.uuid4())[1:12]
@@ -299,18 +300,43 @@ class Service(object):
 
         """
         logger.info('received a message')
-        #try:
-        #    decoded = Message.from_encoded(body, properties.content_encoding)
-        #except exceptions.DriplineDecodingError as err:
-        #        pass
-        #logger.log(35, # NOTICE, between INFO and WARNING
-        #           'Received message #{}\napplication: {}\nrouting_key: {}\n{}'.format(basic_deliver.delivery_tag,
-        #                                                      properties.app_id,
-        #                                                      basic_deliver.routing_key,
-        #                                                      decoded or body,
-        #                                                     )
-        #          )
         self.acknowledge_message(basic_deliver.delivery_tag)
+        msg_type_handlers = {
+                             constants.T_REPLY: self.on_reply_message,
+                             constants.T_REQUEST: self.on_request_message,
+                             constants.T_INFO: self.on_info_message,
+                             constants.T_ALERT: self.on_alert_message,
+                            }
+        message = Message.from_encoded(body, properties.content_encoding)
+        try:
+            msg_type_handlers[message.msgtype](unused_channel, basic_deliver, properties, body)
+        except exceptions.DriplineMethodNotSupportedError:
+            self.on_any_message(unused_channel, basic_deliver, properties, body)
+
+    def on_request_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle request messages') 
+
+    def on_reply_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle reply messages')
+
+    def on_info_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle info messages')
+
+    def on_alert_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle alert messages') 
+
+    def on_any_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle generic messages') 
 
     def acknowledge_message(self, delivery_tag):
         """Acknowledge the message delivery from RabbitMQ by sending a

@@ -22,7 +22,7 @@ import msgpack
 # internal imports
 from . import constants
 from . import exceptions
-#from .utilities import fancy_doc
+from .utilities import fancy_doc
 from .. import __version__, __commit__
 
 import inspect
@@ -53,10 +53,9 @@ class Message(dict, object):
                  sender_info=None,
                  **kwargs):
         '''
-        ~Params
-            timestamp (str): string representation of datetime object, reflecting the creation time of this message. Note that if the default value of None is provided, the current time will be used.
-            payload (any): actual message content, usually a dict
-            sender_info (dict): several fields providing information about the system which originally generated a message.
+        timestamp (str): string representation of datetime object, reflecting the creation time of this message. Note that if the default value of None is provided, the current time will be used.
+        payload (any): actual message content, usually a dict
+        sender_info (dict): several fields providing information about the system which originally generated a message.
         '''
         for key,value in kwargs.items():
             logger.warning('got unexpected kwarg <{}> with value <{}>\nit will be dropped'.format(key, value))
@@ -109,6 +108,13 @@ class Message(dict, object):
     @retcode.setter
     def retcode(self, value):
         self['retcode'] = value
+
+    @property
+    def return_msg(self):
+        return self['return_msg']
+    @return_msg.setter
+    def return_msg(self, value):
+        self['return_msg'] = value
 
     @property
     def msgtype(self):
@@ -197,18 +203,32 @@ class ReplyMessage(Message):
     '''
     def __init__(self,
                  retcode=None,
+                 return_msg=None,
                  **kwargs):
         '''
         retcode (int): indicates return value and/or error code (see exceptions)
+        return_msg (str): human-readable explanation of the return code
         '''
         if retcode is None:
             retcode = 0
+        if return_msg is None:
+            return_msg = ''
         self.retcode = retcode
+        self.return_msg = return_msg
         Message.__init__(self, **kwargs)
 
     @property
     def msgtype(self):
         return constants.T_REPLY
+
+    @property
+    def payload(self):
+        return self['payload']
+    @payload.setter
+    def payload(self, value):
+        if not isinstance(value, dict):
+            value = {'values': [value]}
+        self['payload'] = value
 
 
 #@fancy_doc

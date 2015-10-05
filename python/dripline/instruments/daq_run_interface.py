@@ -8,7 +8,7 @@ import logging
 
 # internal imports
 from .. import core
-from .ethernet_scpi import EthernetSCPI
+from .ethernet_provider import EthernetProvider
 
 __all__ = []
 
@@ -92,6 +92,7 @@ class MantisAcquisitionInterface(DAQProvider, core.Spime):
 
     def start_run(self, run_name):
         super(MantisAcquisitionInterface, self).start_run(run_name)
+        self.on_get()
         self.logging_status = 'on'
 
     def on_get(self):
@@ -100,10 +101,12 @@ class MantisAcquisitionInterface(DAQProvider, core.Spime):
         '''
         if self.run_id is None:
             raise core.DriplineInternalError('run number is None, must request a run_id assignment prior to starting acquisition')
-        filepath = '{}/{}{:09d}_{:09d}.egg'.format(self.directory_path,
-                                         self.filename_prefix,
-                                         self.run_id,
-                                         self._acquisition_count)
+        filepath = '{}/{}{:09d}_{:09d}.egg'.format(
+                                        self.directory_path,
+                                        self.filename_prefix,
+                                        self.run_id,
+                                        self._acquisition_count
+                                                  )
         request = core.RequestMessage(payload={'values':[], 'file':filepath},
                                       msgop=core.OP_RUN,
                                      )
@@ -126,7 +129,7 @@ class MantisAcquisitionInterface(DAQProvider, core.Spime):
 
 
 __all__.append('RSAAcquisitionInterface')
-class RSAAcquisitionInterface(DAQProvider, EthernetSCPI):
+class RSAAcquisitionInterface(DAQProvider, EthernetProvider):
     '''
     A DAQProvider for interacting with the RSA
     '''
@@ -134,7 +137,7 @@ class RSAAcquisitionInterface(DAQProvider, EthernetSCPI):
                  max_nb_files=10000,
                  **kwargs):
         DAQProvider.__init__(self, **kwargs)
-        EthernetSCPI.__init__(self, **kwargs)
+        EthernetProvider.__init__(self, **kwargs)
         self.max_nb_files = max_nb_files
 
     def start_run(self, run_name):
