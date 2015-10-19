@@ -8,6 +8,7 @@ import math
 import time
 import traceback
 import types
+import uuid
 
 import pika
 import yaml
@@ -33,8 +34,7 @@ def calibrate(cal_functions=None):
     elif cal_functions is None:
         cal_functions = {}
     def calibration(fun):
-        @functools.wraps(fun)
-        def wrapper(self):
+        def wrapper(self, *args, **kwargs):
             val_dict = {'value_raw':fun(self)}
             logger.debug('attempting to calibrate')
             if val_dict['value_raw'] is None:
@@ -71,7 +71,7 @@ def calibrate(cal_functions=None):
 
 
 def _get_on_set(self, fun):
-    #@functools.wraps(fun)
+    @functools.wraps(fun)
     def wrapper(*args, **kwargs):
         fun(*args, **kwargs)
         result = self.on_get()
@@ -81,16 +81,19 @@ def _get_on_set(self, fun):
 
 class Endpoint(object):
 
-    def __init__(self, name, calibration=None, get_on_set=False, **kwargs):
+    def __init__(self, name=None, calibration=None, get_on_set=False, **kwargs):
         '''
         name (str): unique identifier across all dripline services (used to determine routing key)
         calibration (str||dict): string use to process raw get result (with .format(raw)) or a dict to use for the same purpose where raw must be a key
         get_on_set (bool): flag to toggle running 'on_get' after each 'on_set'
         '''
+        if name is None:
+            raise exceptions.DriplineValueError('Endpoint __init__ requres name not be None')
         self.name = name
         self.provider = None
         self.portal = None
         self._calibration = calibration
+        self.__lockout_key = None
 
         def raiser(self, *args, **kwargs):
             raise exceptions.DriplineMethodNotSupportedError('requested method not supported by this endpoint')
@@ -100,19 +103,62 @@ class Endpoint(object):
                 method_name = 'on_' + key.split('_')[-1].lower()
                 if not hasattr(self, method_name):
                     setattr(self, method_name, types.MethodType(raiser, self, Endpoint))
+                if not hasattr(self, '_'+method_name):
+                    setattr(self, '_'+method_name, getattr(self, method_name))
 
         if get_on_set:
             self.on_set = _get_on_set(self, self.on_set)
 
+    def _check_lockout_conditions(self, msg, these_args, these_kwargs):
+        operation_allowed = False
+        # execute because unlocked
+        if self.__lockout_key is None:
+            logger.debug('operation allowed because not locked')
+            operation_allowed = True
+        # execute because OP_GET is always allowed
+        elif msg.msgop == constants.OP_GET:
+            logger.debug('operation allowed because it is Get')
+            operation_allowed = True
+        # execute if lockout key is present and correct
+        elif msg.get('lockout_key', '').replace('-', '') == self.__lockout_key:
+            logger.debug('operation allowed because correct lockout key')
+            operation_allowed = True
+        # execute because is OP_COMD to unlock with force
+        elif msg.msgop == constants.OP_CMD:
+            if these_kwargs.get('routing_key_specifier') == 'unlock' or these_args[0:1] == ['unlock']:
+                if msg.payload.get('force', False):
+                    operation_allowed = True
+                    logger.debug('operation allowed because forcing unlock')
+                else:
+                    raise exceptions.DriplineAccessDenied('cannot unlock without valid lockout_key or force==True')
+        # reject because no acceptable conditions met
+        if not operation_allowed:
+            raise exceptions.DriplineAccessDenied('Endpoint <{}> is locked; lockout_key required'.format(self.name))
+
     def handle_request(self, channel, method, properties, request):
         logger.debug('handling requst:{}'.format(request))
-        msg = Message.from_msgpack(request)
-        logger.debug('got a {} request: {}'.format(msg.msgop, msg.payload))
 
+        routing_key_specifier = method.routing_key.replace(self.name, '', 1).lstrip('.')
+        logger.debug('routing key specifier is: {}'.format(routing_key_specifier))
+
+        msg = Message.from_encoded(request, properties.content_encoding)
+        logger.info('got a {} request: {}'.format(msg.msgop, msg.payload))
+        lockout_key = msg.get('lockout_key', None)
+
+        # construction action
+        these_args = []
+        if 'values' in msg.payload:
+            these_args = msg.payload['values']
+        these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
+        if routing_key_specifier:
+            these_kwargs.update({'routing_key_specifier':routing_key_specifier})
+        if lockout_key and msg.msgop == constants.OP_CMD:
+            these_kwargs.update({'lockout_key': lockout_key})
         method_name = ''
         for const_name in dir(constants):
             if getattr(constants, const_name) == msg.msgop:
-                method_name = 'on_' + const_name.split('_')[-1].lower()
+                method_name = '_on_' + const_name.split('_')[-1].lower()
+        logger.info('method_name is: {}'.format(method_name))
         endpoint_method = getattr(self, method_name)
         logger.debug('method is: {}'.format(endpoint_method))
 
@@ -120,15 +166,13 @@ class Endpoint(object):
         retcode = None
         return_msg = None
         try:
-            these_args = []
-            if 'values' in msg.payload:
-                these_args = msg.payload['values']
-            these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
+            self._check_lockout_conditions(msg, these_args, these_kwargs)
             logger.debug('args are:\n{}'.format(these_args))
+            logger.debug('kwargs are:\n{}'.format(these_kwargs))
             result = endpoint_method(*these_args, **these_kwargs)
             logger.debug('\n endpoint method returned \n')
-            if result is None:
-                result = "operation completed silently"
+            if result is None and return_msg is None:
+                return_msg = "operation completed silently"
         except exceptions.DriplineException as err:
             logger.debug('got a dripine exception')
             retcode = err.retcode
@@ -144,9 +188,47 @@ class Endpoint(object):
         self.portal.send_reply(properties, reply)
         logger.debug('reply sent')
 
+    def _on_get(self, *args, **kwargs):
+        '''
+        WARNING! you should *NOT* override this method 
+        '''
+        result = None
+        attribute = kwargs.get('routing_key_specifier', (args[0:1] or [False])[0])
+        if attribute:
+            if hasattr(self, attribute):
+                result = getattr(self, attribute)
+            else:
+                raise exceptions.DriplineValueError('{}({}) has no <{}> attribute'.format(self.name, self.__class__.__name__, attribute))
+        else:
+            result = self.on_get()
+        return result
+
+    def _on_set(self, *args, **kwargs):
+        '''
+        WARNING! you should *NOT* override this method
+        '''
+        result = None
+        value = args
+        attribute = kwargs.get('routing_key_specifier', (args[0:1] or [False])[0])
+        if value[0] == attribute:
+            value = value[1:len(value)]
+        logger.info('dealing with attribute: {}'.format(attribute))
+        logger.info('trying to set to: {}'. format(value[0]))
+        if attribute:
+            if hasattr(self, attribute):
+                setattr(self, attribute, value[0])
+                logger.info('set {} of {} to {}'.format(attribute, self.name, value[0]))
+            else:
+                raise exceptions.DriplineValueError('{}({}) has no <{}> attribute'.format(self.name, self.__class__.__name__, attribute))
+        else:
+            result = self.on_set(value)
+        return result
+
     def on_config(self, attribute, value=None):
         '''
         configure a property again
+
+        WARNING! if you override this method, you must ensure you deal with lockout properly
         '''
         result = None
         if hasattr(self, attribute):
@@ -160,14 +242,37 @@ class Endpoint(object):
         return result
 
     def on_cmd(self, *args, **kwargs):  
+        '''
+        WARNING! if you override this method, you must ensure you deal with lockout properly
+        '''
         logger.debug('args are: {}'.format(args))
         logger.debug('kwargs are: {}'.format(kwargs))
-        try:
-            method = getattr(self, args[0])
-        except:
-            raise
-        try:
-            result = method(*args[1:], **kwargs)
-        except:
-            raise
+        method_name = None
+        if kwargs.get('routing_key_specifier'):
+            method_name = kwargs['routing_key_specifier']
+        else:
+            method_name = args[0:1][0]
+            args = args[1:len(args)]
+        if method_name != 'lock' and 'lockout_key' in kwargs:
+            kwargs.pop('lockout_key')
+        result = getattr(self, method_name)(*args, **kwargs)
         return result
+
+    def ping(self, *args, **kwargs):
+        '''
+        ignore all details and respond with an empty message
+        '''
+        return None
+
+    def lock(self, lockout_key=None, *args, **kwargs):
+        logger.debug('locking <{}>'.format(self.name))
+        if lockout_key is None:
+            lockout_key = uuid.uuid4().get_hex()
+        lockout_key = lockout_key.replace('-', '')
+        self.__lockout_key = lockout_key
+        return {'key': self.__lockout_key}
+
+    def unlock(self, *args, **kwargs):
+        logger.debug('unlocking <{}>'.format(self.name))
+        self.__lockout_key = None
+        raise exceptions.DriplineWarning('unlocked')
