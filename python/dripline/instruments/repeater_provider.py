@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 import types
 
-from ..core import Provider, Connection, message, constants, exception_map
+from ..core import Provider, message, constants, exceptions, exception_map
 
 
 import logging
@@ -24,9 +24,7 @@ class RepeaterProvider(Provider):
         self._broker_info = broker
 
     def send_request(self, target, request):
-        _conn = Connection(self._broker_info)
-        result = _conn.send_request(self._repeat_target, request, decode=True)
-        del(_conn)
+        result = self.portal.send_request(self._repeat_target, request)
         if not 'retcode' in result:
             raise core.exceptions.DriplineInternalError('no return code in reply')
         if not result.retcode == 0:
@@ -42,7 +40,7 @@ class RepeaterProvider(Provider):
         request = message.RequestMessage(msgop=constants.OP_SEND,
                                          payload=to_send,
                                         )
-        return self.send_request(self._repeat_target, request)
+        return self.send_request(self._repeat_target, request)['values']
 
     def on_get(self):
         payload = {'values':[]}

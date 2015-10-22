@@ -13,14 +13,16 @@ import uuid
 
 import pika
 
+from . import constants
 from .message import Message, AlertMessage, RequestMessage, ReplyMessage
 from . import exceptions
+from .provider import Provider
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['Service']
 
-class Service(object):
+class Service(Provider):
     """This is an example consumer that will handle unexpected interactions
     with RabbitMQ such as channel and connection closures.
 
@@ -35,23 +37,32 @@ class Service(object):
     """
     EXCHANGE_TYPE = 'topic'
 
-    def __init__(self, amqp_url, exchange, keys, name=None):
-        """Create a new instance of the consumer class, passing in the AMQP
-        URL used to connect to RabbitMQ.
-
-        :param str amqp_url: The AMQP url to connect with
-
+    def __init__(self, broker=None, exchange=None, keys=None, **kwargs):
         """
-        if name is None:
-            name = 'unknown_service_' + str(uuid.uuid4())[1:12]
-        self.name = name
+        amqp_url (str): The AMQP url to connect with
+        exchange (str): Name of the AMQP exchange to connect to
+        keys (list|str): binding key or list of binding keys to use listen against
+        name (str|None): name for the amqp queue, automatically generated if None (this behavior supplements the Endpoint arg of the same name)
+        """
+        self._broker = broker
+        if exchange is None:
+            raise exceptions.DriplineValueError('<exchange> is required to __init__ a Service instance')
+        else:
+            self._exchange = exchange
+        if keys is None:
+            raise exceptions.DriplineValueError('<keys> is required to __init__ a Service instance')
+        else:
+            self.keys = keys
+        if 'name' not in kwargs:
+            kwargs['name'] = None
+        if kwargs['name'] is None:
+            kwargs['name'] = 'unknown_service_' + str(uuid.uuid4())[1:12]
+        Provider.__init__(self, **kwargs)
+        self.name = kwargs['name']
         self._connection = None
         self._channel = None
         self._closing = False
         self._consumer_tag = None
-        self._broker = amqp_url
-        self._exchange = exchange
-        self.keys = keys
 
     def __get_credentials(self):
         '''
@@ -73,7 +84,7 @@ class Service(object):
         :rtype: pika.SelectConnection
 
         """
-        logger.info('Connecting to %s', self._broker)
+        logger.debug('Connecting to {}'.format(self._broker))
         return pika.SelectConnection(pika.ConnectionParameters(host=self._broker, credentials=self.__get_credentials()),
                                      self.on_connection_open,
                                      stop_ioloop_on_close=False)
@@ -86,7 +97,7 @@ class Service(object):
         :type unused_connection: pika.SelectConnection
 
         """
-        logger.info('Connection opened')
+        logger.debug('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
 
@@ -95,7 +106,7 @@ class Service(object):
         when RabbitMQ closes the connection to the publisher unexpectedly.
 
         """
-        logger.info('Adding connection close callback')
+        logger.debug('Adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
@@ -138,7 +149,7 @@ class Service(object):
         on_channel_open callback will be invoked by pika.
 
         """
-        logger.info('Creating a new channel')
+        logger.debug('Creating a new channel')
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
@@ -150,17 +161,19 @@ class Service(object):
         :param pika.channel.Channel channel: The channel object
 
         """
-        logger.info('Channel opened')
+        logger.debug('Channel opened')
         self._channel = channel
+        self._channel.confirm_delivery()
         self.add_on_channel_close_callback()
-        self.setup_exchange(self._exchange)
+        self.setup_exchange('requests')
+        self.setup_exchange('alerts')
 
     def add_on_channel_close_callback(self):
         """This method tells pika to call the on_channel_closed method if
         RabbitMQ unexpectedly closes the channel.
 
         """
-        logger.info('Adding channel close callback')
+        logger.debug('Adding channel close callback')
         self._channel.add_on_close_callback(self.on_channel_closed)
 
     def on_channel_closed(self, channel, reply_code, reply_text):
@@ -187,7 +200,7 @@ class Service(object):
         :param str|unicode exchange_name: The name of the exchange to declare
 
         """
-        logger.info('Declaring exchange %s', exchange_name)
+        logger.debug('Declaring exchange {}'.format(exchange_name))
         self._channel.exchange_declare(self.on_exchange_declareok,
                                        exchange_name,
                                        self.EXCHANGE_TYPE)
@@ -199,7 +212,7 @@ class Service(object):
         :param pika.Frame.Method unused_frame: Exchange.DeclareOk response frame
 
         """
-        logger.info('Exchange declared')
+        logger.debug('Exchange declared')
         self.setup_queue(self.name)
 
     def setup_queue(self, queue_name):
@@ -210,7 +223,7 @@ class Service(object):
         :param str|unicode queue_name: The name of the queue to declare.
 
         """
-        logger.info('Declaring queue %s', queue_name)
+        logger.debug('Declaring queue {}'.format(queue_name))
         self._channel.queue_declare(self.on_queue_declareok,
                                     queue_name,
                                     exclusive=True,
@@ -228,8 +241,9 @@ class Service(object):
 
         """
         for key in self.keys:
-            logger.info('Binding %s to %s with %s',
-                        self._exchange, self.name, key)
+            logger.debug('Binding {} to {} with {}'.format(
+                         self._exchange, self.name, key)
+                        )
             self._channel.queue_bind(self.on_bindok, self.name,
                                      self._exchange, key)
 
@@ -241,7 +255,7 @@ class Service(object):
         :param pika.frame.Method unused_frame: The Queue.BindOk response frame
 
         """
-        logger.info('Queue bound')
+        logger.debug('Queue bound')
         self.start_consuming()
 
     def start_consuming(self):
@@ -254,7 +268,7 @@ class Service(object):
         will invoke when a message is fully received.
 
         """
-        logger.info('Issuing consumer related RPC commands')
+        logger.debug('Issuing consumer related RPC commands')
         self.add_on_cancel_callback()
         self._consumer_tag = self._channel.basic_consume(self.on_message,
                                                          self.name)
@@ -265,7 +279,7 @@ class Service(object):
         on_consumer_cancelled will be invoked by pika.
 
         """
-        logger.info('Adding consumer cancellation callback')
+        logger.debug('Adding consumer cancellation callback')
         self._channel.add_on_cancel_callback(self.on_consumer_cancelled)
 
     def on_consumer_cancelled(self, method_frame):
@@ -275,8 +289,9 @@ class Service(object):
         :param pika.frame.Method method_frame: The Basic.Cancel frame
 
         """
-        logger.info('Consumer was cancelled remotely, shutting down: %r',
-                    method_frame)
+        logger.debug('Consumer was cancelled remotely, shutting down: {}'.format(
+                     method_frame)
+                    )
         if self._channel:
             self._channel.close()
 
@@ -294,17 +309,45 @@ class Service(object):
         :param str|unicode body: The message body
 
         """
-        try:
-            decoded = Message.from_encoded(body, properties.content_encoding)
-        except exceptions.DriplineDecodingError as err:
-                pass
-        logger.log(35, # NOTICE, between INFO and WARNING
-                   'Received message # {} from {}: {}'.format(basic_deliver.delivery_tag,
-                                                              properties.app_id,
-                                                              decoded or body,
-                                                             )
-                  )
+        logger.info('received a message')
         self.acknowledge_message(basic_deliver.delivery_tag)
+        msg_type_handlers = {
+                             constants.T_REPLY: self.on_reply_message,
+                             constants.T_REQUEST: self.on_request_message,
+                             constants.T_INFO: self.on_info_message,
+                             constants.T_ALERT: self.on_alert_message,
+                            }
+        message = Message.from_encoded(body, properties.content_encoding)
+        try:
+            msg_type_handlers[message.msgtype](unused_channel, basic_deliver, properties, body)
+        except exceptions.DriplineMethodNotSupportedError:
+            self.on_any_message(unused_channel, basic_deliver, properties, body)
+        logger.info('Ready for next message\n{}'.format('-'*29))
+
+    def on_request_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle request messages') 
+
+    def on_reply_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle reply messages')
+
+    def on_info_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle info messages')
+
+    def on_alert_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle alert messages') 
+
+    def on_any_message(*args, **kwargs):
+        '''
+        '''
+        raise exceptions.DriplineMethodNotSupportedError('base service does not handle generic messages') 
 
     def acknowledge_message(self, delivery_tag):
         """Acknowledge the message delivery from RabbitMQ by sending a
@@ -313,7 +356,7 @@ class Service(object):
         :param int delivery_tag: The delivery tag from the Basic.Deliver frame
 
         """
-        logger.info('Acknowledging message %s', delivery_tag)
+        logger.debug('Acknowledging message {}'.format(delivery_tag))
         self._channel.basic_ack(delivery_tag)
 
     def stop_consuming(self):
@@ -322,7 +365,7 @@ class Service(object):
 
         """
         if self._channel:
-            logger.info('Sending a Basic.Cancel RPC command to RabbitMQ')
+            logger.debug('Sending a Basic.Cancel RPC command to RabbitMQ')
             self._channel.basic_cancel(self.on_cancelok, self._consumer_tag)
 
     def on_cancelok(self, unused_frame):
@@ -334,7 +377,7 @@ class Service(object):
         :param pika.frame.Method unused_frame: The Basic.CancelOk frame
 
         """
-        logger.info('RabbitMQ acknowledged the cancellation of the consumer')
+        logger.debug('RabbitMQ acknowledged the cancellation of the consumer')
         self.close_channel()
 
     def close_channel(self):
@@ -342,8 +385,19 @@ class Service(object):
         Channel.Close RPC command.
 
         """
-        logger.info('Closing the channel')
+        logger.debug('Closing the channel')
         self._channel.close()
+
+    def start_event_loop(self):
+        '''Call self.run with controlled stop
+        '''
+        logger.info('starting event loop for node {}\n{}.'.format(self.name,'-'*29))
+
+        try:
+            self.run()
+        except KeyboardInterrupt:
+            self.stop()
+        logger.debug('loop ended')
 
     def run(self):
         """Run the example consumer by connecting to RabbitMQ and then
@@ -364,18 +418,18 @@ class Service(object):
         the IOLoop will be buffered but not processed.
 
         """
-        logger.info('Stopping')
+        logger.debug('Stopping')
         self._closing = True
         self.stop_consuming()
         self._connection.ioloop.start()
-        logger.info('Stopped')
+        logger.debug('Stopped')
 
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""
-        logger.info('Closing connection')
+        logger.debug('Closing connection')
         self._connection.close()
 
-    def send_message(self, target, message, return_queue=None, properties=None, exchange=None, return_connection=False):
+    def send_message(self, target, message, return_queue=None, properties=None, exchange=None, return_connection=False, ensure_delivery=True):
         '''
         '''
         if exchange is None:
@@ -385,6 +439,7 @@ class Service(object):
         parameters = pika.ConnectionParameters(host=self._broker, credentials=self.__get_credentials())
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
+        channel.confirm_delivery()
         result = channel.queue_declare(queue='request_reply'+str(uuid.uuid4()),
                                        exclusive=True,
                                        auto_delete=True,
@@ -408,11 +463,20 @@ class Service(object):
                                               correlation_id=correlation_id,
                                               app_id='dripline.core.Service'
                                              )
-        channel.basic_publish(exchange=exchange,
-                              routing_key=target,
-                              body=message.to_msgpack(),
-                              properties=properties,
-                             )
+        publish_success = channel.basic_publish(exchange=exchange,
+                                                routing_key=target,
+                                                body=message.to_msgpack(),
+                                                properties=properties,
+                                                mandatory=True,
+                                               )
+        if not publish_success and ensure_delivery:
+            if return_queue is not None:
+                return_queue.put(ReplyMessage(retcode=exceptions.DriplineAMQPRoutingKeyError.retcode,
+                                              payload='message not deliverable'
+                                             )
+                            )
+            else:
+                raise exceptions.DriplineAMQPRoutingKeyError('not able to publish to: {}'.format(target))
         if not return_connection:
             connection.close()
             return
@@ -452,7 +516,7 @@ class Service(object):
         logger.debug('to {} sending {}'.format(severity,alert))
         if not isinstance(alert, AlertMessage):
             alert = AlertMessage(payload=alert)
-        self.send_message(target=severity, message=alert, exchange='alerts')
+        self.send_message(target=severity, message=alert, exchange='alerts', ensure_delivery=False)
 
     def send_reply(self, properties, reply):
         '''
@@ -460,4 +524,4 @@ class Service(object):
         logger.info("sending a reply")
         if not isinstance(reply, Message):
             reply = ReplyMessage(payload=reply)
-        self.send_message(target=properties.reply_to, message=reply, properties=properties)
+        self.send_message(target=properties.reply_to, message=reply, properties=properties, ensure_delivery=False)

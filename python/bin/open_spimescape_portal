@@ -14,20 +14,30 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def open_spimescape_portal(nodename, broker, **kwargs):
+def open_spimescape_portal(**kwargs):
     '''
     '''
     # create the portal:
-    portal = dripline.core.Portal(nodename, broker)
-    logger.info('starting {}'.format(nodename))
+    module = None
+    if 'module' not in kwargs:
+        module = dripline.core.Service
+    else:
+        module = kwargs.pop('module')
+        if hasattr(dripline.instruments, module):
+            module = getattr(dripline.instruments, module)
+        elif hasattr(dripline.core, module):
+            module = getattr(dripline.core, module)
+        else:
+            raise NameError('no module "{}" in dripline.core or dripline.instruments'.format(module))
+    these_endpoints = kwargs.pop('endpoints', [])
+    service = module(**kwargs)
+    logger.info('starting {}'.format(service.name))
     ##### need to fix the node class here...
-    for provider in kwargs['providers']:
-        portal.add_endpoint(create_child(portal, provider))
+    for provider in these_endpoints:
+        service.add_endpoint(create_child(service, provider))
     logger.info('spimescapes created and populated')
-    #logger.info('creating bindings')
-    #portal.create_bindings()
-    logger.info('starting consumption')
-    portal.start_event_loop()
+    logger.info('Configuration of {} complete, starting consumption'.format(service.name))
+    service.start_event_loop()
 
 def create_child(portal, conf_dict):
     module = conf_dict.pop('module')
@@ -53,8 +63,14 @@ if __name__ == '__main__':
                                           config_file=True,
                                           tmux_support=True,
                                           twitter_support=True,
-                                          user_pass_support=True,
+                                          slack_support=True,
                                          )
+    parser.add_argument('-k', '--keys',
+                        metavar='BINDING_KEYS',
+                        help='amqp binding keys to match against',
+                        default='#',
+                        nargs='*',
+                       )
     
     args = parser.parse_args()
     logger.info('args parsed, reading config')

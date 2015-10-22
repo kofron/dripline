@@ -6,15 +6,17 @@ import threading
 import types
 
 from ..core import Provider, Endpoint
+from ..core.utilities import fancy_doc
 
 import logging
 logger = logging.getLogger(__name__)
 
-__all__ = ['EthernetSCPI',
-           'EthernetRepeater',
-          ]
+__all__ = []
 
-class EthernetSCPI(Provider):
+
+__all__.append('EthernetProvider')
+@fancy_doc
+class EthernetProvider(Provider):
     def __init__(self,
                  socket_timeout=1.0,
                  socket_info=("localhost",1234),
@@ -23,12 +25,15 @@ class EthernetSCPI(Provider):
                  **kwargs
                  ):
         '''
+        socket_timeout (float): time in seconds for the socket to timeout
+        socket_info (tuple): (<network_address_as_str>, <port_as_int>)
+        response_terminator (str||None): string to rstrip() from responses
+        command_terminator (str||None): string to append to commands
         '''
         Provider.__init__(self, **kwargs)
         self.alock = threading.Lock()
         self.socket_timeout = float(socket_timeout)
         self.socket_info = socket_info
-        self.poll_thread = threading.Timer([],{})
         self.socket = socket.socket()
         self.response_terminator = response_terminator
         self.command_terminator = command_terminator
@@ -57,18 +62,20 @@ class EthernetSCPI(Provider):
         '''
         if isinstance(commands, types.StringType):
             commands = [commands]
-        self.alock.acquire()
-        
         all_data = []
-        for command in commands:
-            logger.debug('sending: {}'.format(repr(command)))
-            if self.command_terminator is not None:
-                command += self.command_terminator
-            self.socket.send(command)
-            data = self.get()
-            logger.debug('sync: {} -> {}'.format(repr(command),repr(data)))
-            all_data.append(data)
-        self.alock.release()
+        self.alock.acquire()
+        try:
+            
+            for command in commands:
+                logger.debug('sending: {}'.format(repr(command)))
+                if self.command_terminator is not None:
+                    command += self.command_terminator
+                self.socket.send(command)
+                data = self.get()
+                logger.debug('sync: {} -> {}'.format(repr(command),repr(data)))
+                all_data.append(data)
+        finally:
+            self.alock.release()
         return ';'.join(all_data)
 
     def get(self):
@@ -87,16 +94,3 @@ class EthernetSCPI(Provider):
     @property
     def spimes(self):
         return self.endpoints
-
-
-class EthernetRepeater(EthernetSCPI, Endpoint):
-    '''
-    '''
-
-    def __init__(self, **kwargs):
-        Endpoint.__init__(self, **kwargs)
-        EthernetSCPI.__init__(self, **kwargs)
-
-    def on_send(self, *to_send):
-        result = self.send(to_send)
-        return result

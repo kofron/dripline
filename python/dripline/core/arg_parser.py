@@ -10,7 +10,8 @@ import os
 import subprocess
 import sys
 
-from ..core import constants
+from .constants import TIME_FORMAT
+from .status_logger import SlackHandler, TwitterHandler
 from .. import __version__
 
 import logging
@@ -18,43 +19,6 @@ logger = logging.getLogger('dripline')
 logger.setLevel(logging.DEBUG)
 
 __all__ = ['DriplineParser']
-
-
-class TwitterHandler(logging.Handler):
-    '''
-    A custom message handler for redirecting text to twitter
-    '''
-    def emit(self, record):
-        try:
-            import TwitterAPI, yaml, os
-            auth_kwargs = yaml.load(open(os.path.expanduser('~/.twitter_authentication.yaml')))
-            api = TwitterAPI.TwitterAPI(**auth_kwargs)
-            tweet_text = '{} #SCAlert'.format(self.format(record)[:100])
-            api.request('statuses/update', {'status': tweet_text})
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except:
-            self.handleError(record)
-
-
-class SlackHandler(logging.Handler):
-    '''
-    A custom handler for sending messages to slack
-    '''
-    def __init__(self, *args, **kwargs):
-        logging.Handler.__init__(self, *args, **kwargs)
-        try:
-            import slackclient
-            import json
-            token = json.loads(open('/home/laroque/.project8_authentications.json').read())['slack']['token']
-            self.slackclient = slackclient.SlackClient(token)
-        except ImportError as err:
-            if 'slackclient' in err.message:
-                logger.warning('The slackclient package (available in pip) is required for using the slack handler')
-            raise
-
-    def emit(self, record):
-        self.slackclient.api_call('chat.postMessage', channel='#p8_alerts', text=record, username='driplineBot')
 
 
 class DotAccess(object):
@@ -73,7 +37,7 @@ class DriplineParser(argparse.ArgumentParser):
                  config_file=False,
                  tmux_support=False,
                  twitter_support=False,
-                 user_pass_support=False,
+                 slack_support=False,
                  **kwargs):
         '''
         Keyword Args:
@@ -82,11 +46,11 @@ class DriplineParser(argparse.ArgumentParser):
             config_file (bool): enable a '-c' option for specifying an input configuration file
             tmux_support (bool): enable a '-t' option to start the process in a tmux session rather than on the active shell
             twitter_support (bool): enable a '-T' option to send a logger messages of critical or higher severity as tweets
-            user_pass_support (bool): enable '-u' and '-p' for user and password specification. **Note:** these options should be replaced with either reading the standard file ~/.project8_authentication.json, and/or prompting the user for values interactively
+            slack_support (bool): enable a '-S' option to send log messages to slack channels
 
         '''
         self.extra_logger = extra_logger
-        argparse.ArgumentParser.__init__(self, **kwargs)
+        argparse.ArgumentParser.__init__(self, formatter_class=argparse.ArgumentDefaultsHelpFormatter, **kwargs)
         self.add_argument('-v',
                           '--verbose',
                           default=0,
@@ -113,8 +77,10 @@ class DriplineParser(argparse.ArgumentParser):
         if amqp_broker:
             self.add_argument('-b',
                               '--broker',
-                              help='network path for the AMQP broker',
-                              default='localhost',
+                              help='network path for the AMQP broker, if not provided (and if a config file is provided) use the value from the config file; if the option is present with no argument then "localhost" is used',
+                              default=None,
+                              nargs='?',
+                              const='localhost',
                              )
         if config_file:
             self.add_argument('-c',
@@ -134,19 +100,16 @@ class DriplineParser(argparse.ArgumentParser):
                               '--twitter',
                               help='enable sending critical messages as tweets',
                               nargs='?',
-                              default=False,
-                              const=True,
+                              default=False, # value if option not given
+                              const=True, # value if option given with no argument
                              )
-        if user_pass_support:
-            self.add_argument('-u',
-                              '--user',
-                              help='substitue user lines in config file',
-                              default=None,
-                             )
-            self.add_argument('-p',
-                              '--password',
-                              help='substitue password lines in config file',
-                              default=None,
+        if slack_support:
+            self.add_argument('-S',
+                              '--slack',
+                              help='enable sending critical messages as slack messages to #p8_alerts',
+                              nargs='?',
+                              default=False, # value if option not given
+                              const=True, # value if option given with no argument
                              )
 
     def __set_format(self):
@@ -155,13 +118,13 @@ class DriplineParser(argparse.ArgumentParser):
             import colorlog
             self.fmt = colorlog.ColoredFormatter(
                     base_format.format('%(log_color)s', '%(purple)s'),
-                    datefmt = constants.TIME_FORMAT[:-1],
+                    datefmt = TIME_FORMAT[:-1],
                     reset=True,
                     )
         except ImportError:
             self.fmt = logging.Formatter(
                     base_format.format(' ', ''),
-                    constants.TIME_FORMAT[:-1]
+                    TIME_FORMAT[:-1]
                     )
         self._handlers[0].setFormatter(self.fmt)
 
@@ -211,53 +174,48 @@ class DriplineParser(argparse.ArgumentParser):
 
     def __process_twitter(self):
         twitter_handler = TwitterHandler()
-        twitter_handler.setLevel(logging.CRITICAL)
-        logger.addHandler(twitter_handler)
+        self.__add_critical_handler(twitter_handler)
+
+    def __process_slack(self):
+        slack_handler = SlackHandler()
+        self.__add_critical_handler(slack_handler)
+
+    def __add_critical_handler(self, a_handler):
+        a_handler.setLevel(logging.CRITICAL)
+        logger.addHandler(a_handler)
         if hasattr(self, 'extra_logger'):
-            self.extra_logger.addHandler(twitter_handler)
-        self._handlers.append(twitter_handler)
+            self.extra_logger.addHandler(a_handler)
+        self._handlers.append(a_handler)
 
     def parse_args(self):
         '''
         '''
         # first, parse the args
-        args = argparse.ArgumentParser.parse_args(self)
-        args_dict = vars(args)
+        these_args = argparse.ArgumentParser.parse_args(self)
+        args_dict = vars(these_args)
 
         # add args specified in a config file if there is one
-        if 'config' in args:
-            if args.config is not None:
+        if 'config' in these_args:
+            if these_args.config is not None:
                 try:
-                    file_str = open(args.config).read()
+                    file_str = open(these_args.config).read()
                     import yaml
-                    if 'user' in args:
-                        if args.user is not None:
-                            logger.info('updating user')
-                            import re
-                            reg_ex = r'([ ]*[-]? user:[ ]*)([\S]*)(.*)'
-                            new_user = r'\1{}\3'.format(args.user)
-                            file_str = re.sub(reg_ex, new_user, file_str)
-                    if 'password' in args:
-                        if args.password is not None:
-                            logger.info("updating password")
-                            import re
-                            reg_ex = r'([ ]*[-]? password:[ ]*)([\S]*)(.*)'
-                            new_pass = r'\1{}\3'.format(args.password)
-                            file_str = re.sub(reg_ex, new_pass, file_str)
                     conf_file = yaml.load(file_str)
+                    if 'broker' in args_dict and 'broker' in conf_file:
+                        if args_dict['broker'] is None:
+                            args_dict['broker'] = conf_file['broker']
                     conf_file.update(args_dict)
-                    print('config file is: {}'.format(conf_file))
                     args_dict['config'] = conf_file
-                    args = DotAccess(args_dict)
+                    these_args = DotAccess(args_dict)
                 except:
                     print("parsing of config failed")
                     raise
 
         # setup loggers and handlers
-        log_level = max(0, 30-args.verbose*10)
+        log_level = max(0, 25-these_args.verbose*10)
         self._handlers[0].setLevel(log_level)
-        if not args.logfile is None:
-            _file_handler = logging.FileHandler(args.logfile)
+        if not these_args.logfile is None:
+            _file_handler = logging.FileHandler(these_args.logfile)
             _file_handler.setFormatter(self.fmt)
             _file_handler.setLevel(log_level)
             logger.addHandler(_file_handler)
@@ -266,12 +224,18 @@ class DriplineParser(argparse.ArgumentParser):
             self._handlers.append(_file_handler)
 
         # take care of tmux if needed
-        if hasattr(args, 'tmux'):
-            if not args.tmux is None:
-                self.__process_tmux(args)
+        if hasattr(these_args, 'tmux'):
+            if not these_args.tmux is None:
+                self.__process_tmux(these_args)
 
         # and add twitter to the log handling if enabled
-        if hasattr(args, 'twitter'):
-            if args.twitter:
+        if hasattr(these_args, 'twitter'):
+            if these_args.twitter:
                 self.__process_twitter()
-        return args
+
+        # and add slack to the log handling if enabled
+        if hasattr(these_args, 'slack'):
+            if these_args.slack:
+                self.__process_slack()
+        
+        return these_args

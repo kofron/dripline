@@ -6,13 +6,13 @@ from setuptools.command.test import test as TestCommand
 
 verstr = "none"
 try:
-    #verstr = open("VERSION").read().strip().replace(' ', '.')
     import subprocess
     verstr = subprocess.check_output(['git','describe','--long']).decode('utf-8').strip()
 except EnvironmentError:
     pass
-except:
-    raise RuntimeError("unable to find version")
+except Exception as err:
+    print(err)
+    verstr = 'v0.0.0-???'
 
 
 class PyTest(TestCommand):
@@ -36,17 +36,25 @@ class PyTest(TestCommand):
         errno = pytest.main(self.pytest_args)
         sys.exit(errno)
 
+extras_require={
+    'doc': ['sphinx', 'sphinx_rtd_theme', 'sphinxcontrib-programoutput'],
+    'database': ['cython', 'psycopg2', 'sqlalchemy'], #this may also require system packages
+    'slack': ['slackclient'],
+    'dpph': ['numpy'],
+    'other': ['colorlog', 'ipython', 'ipdb'],
+}
+everything = set()
+for deps in extras_require.values():
+    everything.update(deps)
+extras_require['all'] = everything
+
 setup(
     name='dripline',
     version=verstr,
     packages=['dripline','dripline/core','dripline/instruments'],
     scripts=glob('bin/*'),
     install_requires=['pika>=0.9.8', 'PyYAML', 'msgpack-python'],
-    extras_require={
-        'doc': ['sphinx', 'sphinx_rtd_theme', 'sphinxcontrib-programoutput'],# sphinx-argparse
-        'database': ['sqlalchemy', 'psycopg2'],
-        'other': ['colorlog', 'ipython', 'ipdb'],
-    },
+    extras_require=extras_require,#{
     url='http://www.github.com/project8/dripline',
     tests_require=['pytest'],
     cmdclass={'test': PyTest}

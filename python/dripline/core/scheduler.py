@@ -7,18 +7,17 @@ __docformat__ = 'reStructuredText'
 import abc
 import datetime
 import logging
-import threading
 import traceback
 import uuid
 
 from .endpoint import Endpoint
 
-__all__ = ['DataLogger',
-          ]
+__all__ = []
 logger = logging.getLogger(__name__)
 
 
-class DataLogger(object):
+__all__.append('Scheduler')
+class Scheduler(object):
     '''
     Base class for objects which need to call their own methods periodically.
     '''
@@ -31,20 +30,18 @@ class DataLogger(object):
                  alert_routing_key='sensor_value',
                  **kwargs):
         '''
-        Keyword Args:
-            log_interval (float): minimum time in seconds between sequential log events (note that this may or may not produce an actual log broadcast)
-            max_interval (float): If > 0, any log event exceding this number of seconds since the last broadcast will trigger a broadcast.
-            max_fractional_change (float): If > 0, any log event which produces a value which differs from the previous value by more than this amount (expressed as a fraction, ie 10% change is 0.1) will trigger a broadcast
-            alert_routing_key (str): routing key for the alert message send when broadcasting a logging event result. The default value of 'sensor_value' is valid for DataLoggers which represent physical quantities being stored to the slow controls database tables
+        log_interval (float): minimum time in seconds between sequential log events (note that this may or may not produce an actual log broadcast)
+        max_interval (float): If > 0, any log event exceding this number of seconds since the last broadcast will trigger a broadcast.
+        max_fractional_change (float): If > 0, any log event which produces a value which differs from the previous value by more than this amount (expressed as a fraction, ie 10% change is 0.1) will trigger a broadcast
+        alert_routing_key (str): routing key for the alert message send when broadcasting a logging event result. The default value of 'sensor_value' is valid for DataLoggers which represent physical quantities being stored to the slow controls database tables
         
         '''
-        self.alert_routing_key=alert_routing_key
-        self._data_logger_lock = threading.Lock()
+        self.alert_routing_key=alert_routing_key + '.' + self.name
         self._log_interval = log_interval
         self._max_interval = max_interval
         self._max_fractional_change = max_fractional_change
         self._is_logging = False
-        self._loop_process = threading.Timer([], {})
+        self._timeout_handle = None
 
         self._last_log_time = None
         self._last_log_value = None
@@ -52,7 +49,7 @@ class DataLogger(object):
     def get_value(self):
         raise NotImplementedError('get value in derrived class')
 
-    def store_value(self, severity='sensor_value', value=None):
+    def store_value(self, severity=None, value=None):
         raise NotImplementedError('store value in derrived class')
 
     @property
@@ -86,9 +83,12 @@ class DataLogger(object):
         self._max_fractional_change = value
 
     def _conditionally_send(self, to_send):
+        '''
+        consider sending value, but only if a send condition is met
+        '''
         this_value = None
         try:
-            this_value = float(to_send['values']['value_raw'])
+            this_value = float(to_send['value_raw'])
         except TypeError:
             pass
         if self._last_log_value is None:
@@ -105,57 +105,41 @@ class DataLogger(object):
         self._last_log_value = this_value
 
     def _log_a_value(self):
-        self._data_logger_lock.acquire()
         try:
-            val = self.get_value()
-            if val is None:
-                raise UserWarning
+            to_send = self.get_value()
+            if to_send is None:
                 logger.warning('get returned None')
                 if hasattr(self, 'name'):
                     logger.warning('for: {}'.format(self.name))
-            to_send = {'from':self.name,
-                       'values':val,
-                      }
             self._conditionally_send(to_send)
         except UserWarning:
             logger.warning('get returned None')
             if hasattr(self, 'name'):
                 logger.warning('for: {}'.format(self.name))
         except Exception as err:
-            logger.error('got a: {}'.format(err.message))
+            logger.error('got a: {}'.format(str(err)))
             logger.error('traceback follows:\n{}'.format(traceback.format_exc()))
-        finally:
-            self._data_logger_lock.release()
         logger.info('value sent')
         if (self._log_interval <= 0) or (not self._is_logging):
             return
-        self._loop_process = threading.Timer(self._log_interval, self._log_a_value, ())
-        self._loop_process.name = 'logger_{}_{}'.format(self.name, uuid.uuid1().hex[:16])
-        self._loop_process.start()
+        self._timeout_handle = self.portal._connection.add_timeout(self._log_interval, self._log_a_value)
 
     def _stop_loop(self):
-        self._data_logger_lock.acquire()
         try:
             self._is_logging = False
-            if self._loop_process.is_alive():
-                self._loop_process.cancel()
-            else:
-                raise Warning("loop process not running")
+            self.portal._connection.remove_timeout(self._timeout_handle)
         except Warning:
             pass
         except:
             logger.error('something went wrong stopping')
             raise
-        finally:
-            self._data_logger_lock.release()
 
     def _start_loop(self):
         self._is_logging = True
-        if self._loop_process.is_alive():
-            raise Warning("loop process already started")
-        elif self._log_interval <= 0:
+        if self._log_interval <= 0:
             raise Warning("log interval must be > 0")
         else:
+            self.portal._connection.remove_timeout(self._timeout_handle)
             self._log_a_value()
             logger.info("log loop started")
 
@@ -168,10 +152,7 @@ class DataLogger(object):
 
     @property
     def logging_status(self):
-        translator = {True: 'running',
-                      False: 'stopped'
-                     }
-        return translator[self._loop_process.is_alive()]
+        return self._is_logging
     @logging_status.setter
     def logging_status(self, value):
         logger.info('setting logging state to: {}'.format(value))

@@ -11,6 +11,9 @@ __all__ = [
 
 class DriplineException(Exception):
     retcode = None
+    def __init__(self, msg, result=None):
+        super(DriplineException, self).__init__(msg)
+        self.result = result
 __all__.append('DriplineException')
 
 
@@ -83,6 +86,18 @@ class DriplineTimeoutError(DriplineError):
     retcode = 305
 __all__.append('DriplineTimeoutError')
 
+
+class DriplineMethodNotSupportedError(DriplineError):
+    retcode = 306
+__all__.append('DriplineMethodNotSupportedError')
+
+class DriplineAccessDenied(DriplineError):
+    retcode = 307
+__all__.append('DriplineAccessDenied')
+
+class DriplineInvalidKey(DriplineError):
+    retcode = 308
+__all__.append('DriplineInvalidKey')
 
 class DriplineDatabaseError(DriplineError):
     retcode = 400

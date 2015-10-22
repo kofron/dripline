@@ -7,6 +7,8 @@ Note: services using this module will require sqlalchemy (and assuming we're sti
 from __future__ import absolute_import
 
 # std libraries
+import json
+import os
 import types
 
 # 3rd party libraries
@@ -32,11 +34,9 @@ class RunDBInterface(Provider):
     A not-so-flexible provider for getting run_id values.
     '''
     
-    def __init__(self, user, password, database_name, database_server, tables, *args, **kwargs):
+    def __init__(self, database_name, database_server, tables, *args, **kwargs):
         '''
         ~Params
-            user (str): user name for connecting to database
-            password (str): password for connecting to database
             database_name (str): name of the database to connect to
             database_server (str): network resolvable hostname of database server
             tables (list): list of names (str) of tables in the database
@@ -47,12 +47,17 @@ class RunDBInterface(Provider):
         Provider.__init__(self, *args, **kwargs)
 
         self.tables = {}
-        self.connect_to_db(user, password, database_server, database_name, tables)
+        self.connect_to_db(database_server, database_name, tables)
 
-    def connect_to_db(self, user, password, database_server, database_name, table_names):
+    def connect_to_db(self, database_server, database_name, table_names):
         '''
         '''
-        engine_str = 'postgresql://{}:{}@{}/{}'.format(user, password, database_server, database_name)
+        credentials = json.loads(open(os.path.expanduser('~')+'/.project8_authentications.json').read())['postgresql']
+        engine_str = 'postgresql://{}:{}@{}/{}'.format(credentials['username'],
+                                                       credentials['password'],
+                                                       database_server,
+                                                       database_name
+                                                      )
         engine = sqlalchemy.create_engine(engine_str)
         meta = sqlalchemy.MetaData(engine)
         for table in table_names:
@@ -69,8 +74,8 @@ class RunDBInterface(Provider):
             else:
                 return_values = []
         except Exception as err:
-            if err.message.startswith('(psycopg2.IntegrityError)'):
-                raise DriplineDatabaseError(err.message)
+            if str(err).startswith('(psycopg2.IntegrityError)'):
+                raise DriplineDatabaseError(str(err))
             else:
                 logger.warning('unknown error while working with sql')
                 raise
@@ -113,7 +118,8 @@ class InsertDBEndpoint(Endpoint):
         # make sure that all provided insert values are expected
         for col in kwargs.keys():
             if (not col in self._required_insert_names) and (not col in self._optional_insert_names):
-                raise DriplineDatabaseError('not allowed to insert into: {}'.format(col))
+                #raise DriplineDatabaseError('not allowed to insert into: {}'.format(col))
+                kwargs.pop(col)
         # make sure that all required columns are present
         for col in self._required_insert_names:
             if not col in kwargs.keys():

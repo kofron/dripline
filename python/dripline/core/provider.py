@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 
-from .endpoint import Endpoint#, fancy_init_doc
+from .endpoint import Endpoint
 from .spime import Spime
+from .utilities import fancy_doc
 
 import logging
 logger = logging.getLogger(__name__)
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['Provider']
 
 
-#@fancy_init_doc
+@fancy_doc
 class Provider(Endpoint):
     '''
     Abstraction/interpretation layer for grouping endpoints and/or representing an instrument.
@@ -26,6 +27,9 @@ class Provider(Endpoint):
             return
         self._endpoints.update({endpoint.name:endpoint})
         endpoint.provider = self
+
+    def on_send(self, *commands):
+        return self.send(list(commands))
 
     @property
     def endpoint_names(self):
@@ -58,7 +62,7 @@ class Provider(Endpoint):
                 try:
                     results.append((name, setattr(endpoint, 'logging_status', value)))
                 except Warning as err:
-                    logger.warning('got warning: {}'.format(err.message))
+                    logger.warning('got warning: {}'.format(str(err)))
         return results
 
     @property

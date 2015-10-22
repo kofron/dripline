@@ -6,15 +6,17 @@ The core namespace contains the layers of abstraction over AMQP.
 
 from __future__ import absolute_import
 
-from .alert_consumer import *
 from .arg_parser import *
-from .connection import *
 from .constants import *
-from .data_logger import *
+from .scheduler import *
 from .endpoint import *
 from .exceptions import *
+from .gogol import *
+from .interface import *
 from .message import *
-from .portal import *
 from .provider import *
 from .service import *
 from .spime import *
+from .spimescape import *
+from .status_logger import *
+from .utilities import *
