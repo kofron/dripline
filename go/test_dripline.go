@@ -8,49 +8,95 @@
 package main
 
 import (
+ 	"flag"
+ 	"os"
  	"time"
+
 	"github.com/project8/dripline/go/dripline"
+	"github.com/project8/swarm/Go/logging"
 )
 
 
 func main() {
-	dripline.InitializeLogging()
+	logging.InitializeLogging()
+	logging.ConfigureLogging("DEBUG")
 
-	// Create the sender object, and connect to the broker
-	var sender *(dripline.AmqpSender) = dripline.StartSender("amqp://nsoblath:wantmoelectrons@higgsino.physics.ucsb.edu")
-	if (sender == nil) {
-		dripline.Log.Critical("Sender did not start")
-		return
+	// user needs help
+	var needHelp bool
+
+	// RabbitMQ broker user and password
+	var user, password string
+
+	// set up flag to point at conf, parse arguments and then verify
+	flag.BoolVar(&needHelp, "help", false, "Display this dialog")
+	flag.StringVar(&user, "user", "", "RabbitMQ broker user")
+	flag.StringVar(&password, "pword", "", "RabbitMQ broker password")
+	flag.StringVar(&broker, "broker", "", "RabbitMQ broker")
+	flag.Parse()
+
+	if needHelp {
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	dripline.Log.Info("Sender started")
+	url := "amqp://" + user + ":" + password + "@" + broker
 
-	// Create a SenderInfo struct; in real applications it's useful to make a "master" copy of this.
-	senderInfo := dripline.PrepareSenderInfo("dripline", "dripline_test", "0.0", "abcdefg", "localhost", "me")
+	// Bob will be receiving a message from Alice.
+	// Start a goroutine to handle and reply to that message
+	go func(){
+		bob := dripline.StartService(url, "dt_bob")
+		if (bob == nil) {
+			logging.Log.Critical("Bob did not start")
+			return
+		}
+		logging.Log.Info("Bob has started")
 
-	// Create a channel on which we'll expect to receive a reply
-	replyChan := make(chan dripline.Reply, 1)
+		// Expect to receive a request from Alice
+		if subscribeErr := bob.SubscribeToRequests("dt_bob"); subscribeErr != nil {
+			logging.Log.Critical("Bob could not subscribe to requests: %v", subscribeErr)
+			return
+		}
 
-	// Create the request object
-	request := dripline.PrepareRequest("dripline_test", "application/json", dripline.MOCommand, senderInfo, replyChan, nil)
+		request := <- bob.Receiver.RequestChan
+		logging.Log.Info("Bob has received a request: %v", request)
 
-	dripline.Log.Info("Request ready")
+		senderInfo := dripline.PrepareSenderInfo("dripline", "dripline_test", "0.0", "abcdefg", "localhost", "Bob")
+		reply := dripline.PrepareReplyToRequest(request, dripline.RCSuccess, "Received message!", senderInfo)
+		if sendErr := bob.SendReply(reply); sendErr != nil {
+			logging.Log.Critical("Bob could not send the reply: %v", sendErr)
+			return
+		}
+		logging.Log.Info("Bob has sent the reply")
+		time.Sleep(5 * time.Second) // pause to make sure the reply gets sent
 
-	time.Sleep(1*time.Second)
+		bob.Stop()
+		logging.Log.Info("Bob has stopped")
+	}()
 
-	// Send the request
-	(*sender).SendRequest(request)
+	// pause to make sure Bob is ready
+	time.Sleep(5 * time.Second)
 
-	dripline.Log.Info("Request sent")
+	alice := dripline.StartService(url, "")
+	if (alice == nil) {
+		logging.Log.Critical("Alice did not start")
+		return
+	}
+	logging.Log.Info("Alice has started")
 
-	//dripline.Log.Info("Waiting for reply; use ctrl-c to cancel")
-	//reply := <-replyChan
+	// Alice sends a request to Bob
+	senderInfo := dripline.PrepareSenderInfo("dripline", "dripline_test", "0.0", "abcdefg", "localhost", "Alice")
+	request := dripline.PrepareRequest("dt_bob", "application/json", dripline.MOCommand, senderInfo)
+	replyChan, sendErr := alice.SendRequest(request)
+	if sendErr != nil {
+		logging.Log.Critical("Alice could not send the request: %v", sendErr)
+		return
+	}
+	logging.Log.Info("Alice has sent the request")
 
-	//dripline.Log.Info("Reply received")
+	logging.Log.Info("Alice is awaiting the reply from Bob")
+	reply := <- replyChan
+	logging.Log.Info("Alice has received a reply: %v", reply)
 
-	(*sender).Stop()
-
-	<-(*sender).DoneSignal
-
-	dripline.Log.Info("Test complete")
+	alice.Stop()
+	logging.Log.Info("Alice has stopped")
 }
