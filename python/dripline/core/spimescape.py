@@ -31,19 +31,20 @@ class Spimescape(Service):
     """
     Like a node, but pythonic
     """
-    def __init__(self, name, broker, **kwargs):
+    def __init__(self, exchange=None, **kwargs):
         '''
-        Args:
-            name (str): name for the portal instance, represents an AMQP binding key
-            broker (str): as always, the network resolvable path to the AMQP broker
         '''
-        Service.__init__(self, amqp_url=broker, exchange='requests', keys=[], name=name)
+        if exchange is None:
+            exchange = 'requests'
+        kwargs['exchange'] = exchange
+
+        Service.__init__(self, **kwargs)
         
         self._responses = {}
 
     @property
     def keys(self):
-        return self.endpoints.keys()
+        return [key+'.#' for key in self.endpoints.keys()]
     @keys.setter
     def keys(self, value):
         logger.debug('cannot set keys, use self.endpoints')
@@ -60,7 +61,7 @@ class Spimescape(Service):
 
     def on_request_message(self, channel, method, header, body):
         logger.info('request received by {}'.format(self.name))
-        self.endpoints[method.routing_key].handle_request(channel, method, header, body)
+        self.endpoints[method.routing_key.split('.')[0]].handle_request(channel, method, header, body)
         logger.info('request processing complete\n{}')
 
     def _handle_reply(self, channel, method, header, body):

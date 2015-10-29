@@ -38,10 +38,6 @@ class PyTest(TestCommand):
 
 extras_require={
     'doc': ['sphinx', 'sphinx_rtd_theme', 'sphinxcontrib-programoutput'],
-    'database': ['sqlalchemy', 'psycopg2'],
-    # a note about dpph, I'm purging scipy; I've found that if we need to use it,
-    # it is more reliable to also have cython as a dependency
-    'dpph': ['numpy'],
     'other': ['colorlog', 'ipython', 'ipdb'],
 }
 everything = set()
@@ -52,10 +48,9 @@ extras_require['all'] = everything
 setup(
     name='dripline',
     version=verstr,
-    packages=['dripline','dripline/core','dripline/instruments'],
-    scripts=glob('bin/*'),
-    install_requires=['pika>=0.9.8', 'PyYAML', 'msgpack-python'],
-    extras_require=extras_require,#{
+    packages=['dripline','dripline/core'],
+    install_requires=['pika>=0.9.8,<0.10', 'PyYAML', 'msgpack-python'],
+    extras_require=extras_require,
     url='http://www.github.com/project8/dripline',
     tests_require=['pytest'],
     cmdclass={'test': PyTest}
