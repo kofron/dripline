@@ -31,5 +31,23 @@ const (
 
 const (
 	RCSuccess MsgCodeT = 0
+	RCWarnNoAction  MsgCodeT = 1
+	RCErrAMQP       MsgCodeT = 100
+	RCErrAMQPConn   MsgCodeT = 101
+	RCErrAMQPRK     MsgCodeT = 102
+	RCErrHW         MsgCodeT = 200
+	RCErrHWConn     MsgCodeT = 201
+	RCErrHWNoResp   MsgCodeT = 202
+	RCErrDrip       MsgCodeT = 300
+	RCErrDripNoEnc  MsgCodeT = 301
+	RCErrDripDecFail MsgCodeT = 302
+	RCErrDripPayload MsgCodeT = 303
+	RCErrDripValue   MsgCodeT = 304
+	RCErrDripTimeout MsgCodeT = 305
+	RCErrDripMethod  MsgCodeT = 306
+	RCErrDripAccDen  MsgCodeT = 307
+	RCErrDripInvKey  MsgCodeT = 308
+	RCErrDB          MsgCodeT = 400
+	RCErrUnhandled   MsgCodeT = 999
 )
 
