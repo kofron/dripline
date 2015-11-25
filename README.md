@@ -2,10 +2,13 @@
 #####*Slow controls for medium scale physics experiments.*
 
 
-While primarily developed and implemented in python 2.7.x, dripline is really a messaging standard and is intended to be usable in whatever language you like.
-Similarly, dripline is implemented and tested exclusively using RabbitMQ 2.8.x on Debian 7.7.
+Fundamentally, dripline defines a messaging wireprotocol, as well as conventions for using that protocol including standard behavoirs and reserved names/values.
+Within this Repo there are subdirectories for implementing libraries in various languages. Any actual slow control system or component would be developed based on those.
 
-The erlang subdirectory is for the now deprecated dripline 0.x and has only a 'spiritual' connection to dripline 1.x (in the python subdirectory).
+
+Dripline is developed and tested primarily using RabbitMQ 3.3.x on Debian 8.1
+
+
 
 ###Getting help
 Code documentation is produced using sphinx via reStructuredText which is distributed with the source. A [rendered](http://www.project8.org/dripline) version is hosted using github pages and the project8.org domain.
