@@ -37,13 +37,22 @@ class Service(Provider):
     """
     EXCHANGE_TYPE = 'topic'
 
-    def __init__(self, amqp_url, exchange, keys, **kwargs):
+    def __init__(self, broker=None, exchange=None, keys=None, **kwargs):
         """
         amqp_url (str): The AMQP url to connect with
         exchange (str): Name of the AMQP exchange to connect to
         keys (list|str): binding key or list of binding keys to use listen against
         name (str|None): name for the amqp queue, automatically generated if None (this behavior supplements the Endpoint arg of the same name)
         """
+        self._broker = broker
+        if exchange is None:
+            raise exceptions.DriplineValueError('<exchange> is required to __init__ a Service instance')
+        else:
+            self._exchange = exchange
+        if keys is None:
+            raise exceptions.DriplineValueError('<keys> is required to __init__ a Service instance')
+        else:
+            self.keys = keys
         if 'name' not in kwargs:
             kwargs['name'] = None
         if kwargs['name'] is None:
@@ -54,9 +63,6 @@ class Service(Provider):
         self._channel = None
         self._closing = False
         self._consumer_tag = None
-        self._broker = amqp_url
-        self._exchange = exchange
-        self.keys = keys
 
     def __get_credentials(self):
         '''
@@ -431,7 +437,11 @@ class Service(Provider):
         if not isinstance(message, Message):
             raise TypeError('message must be a dripline.core.Message')
         parameters = pika.ConnectionParameters(host=self._broker, credentials=self.__get_credentials())
-        connection = pika.BlockingConnection(parameters)
+        try:
+            connection = pika.BlockingConnection(parameters)
+        except pika.exceptions.AMQPConnectionError:
+            raise exceptions.DriplineAMQPConnectionError('unable to connect to broker: {}'.format(self._broker))
+            
         channel = connection.channel()
         channel.confirm_delivery()
         result = channel.queue_declare(queue='request_reply'+str(uuid.uuid4()),
@@ -453,13 +463,14 @@ class Service(Provider):
 
         if properties is None:
             properties = pika.BasicProperties(reply_to=result.method.queue,
-                                              content_encoding='application/msgpack',
+                                              content_encoding='application/json',
+                                              #content_encoding='application/msgpack',
                                               correlation_id=correlation_id,
                                               app_id='dripline.core.Service'
                                              )
         publish_success = channel.basic_publish(exchange=exchange,
                                                 routing_key=target,
-                                                body=message.to_msgpack(),
+                                                body=message.to_encoding(properties.content_encoding),
                                                 properties=properties,
                                                 mandatory=True,
                                                )
