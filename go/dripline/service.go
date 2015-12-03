@@ -164,11 +164,18 @@ func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply,
 			logging.Log.Error("An error occurred while decoding a message: \n\t%v", decodeErr)
 			return
 		}
+		logging.Log.Warning("from in reply func, queue name: %s", queueName)
 
+		if _, err := service.channel.QueueDelete(queueName, false, false, false); err != nil {
+			logging.Log.Error("Error while deleting reply queue:\n\t%v", err)
+			return
+		}
+/*
 		if err := service.DeleteQueue(queueName); err != nil {
 			logging.Log.Error("Error while deleting reply queue:\n\t%v", err)
 			return
 		}
+*/		
 		return
 	}()
 
@@ -271,6 +278,7 @@ func (service *AmqpService) SubscribeToInfos(routingKey string) (e error) {
 
 // DeleteQueue allows the user to delete a particular queue
 func (service* AmqpService) DeleteQueue(queueName string) (error) {
+	logging.Log.Warning("In DeleteQueue; requested deletion: %s", queueName)
 	_, err := service.channel.QueueDelete(queueName, false, false, false)
 	return err
 }
@@ -316,73 +324,93 @@ func runAmqpService(service *AmqpService) {
 	service.Connected = true
 	logging.Log.Debug("Connected to AMQP broker (%s)", service.BrokerAddress)
 
-	// Create the channel object that represents the connection to the broker
-	// Deferred command: close the channel
-	channel, chanErr := connection.Channel()
-	if chanErr != nil {
-		logging.Log.Critical("Unable to get the AMQP channel:\n\t%v", chanErr.Error())
-		service.DoneSignal <- true
-		return
-	}
-	defer channel.Close()
-	logging.Log.Debug("Channel with AMQP broker established")
-	service.channel = channel
+	// Monitor for connection closing
+	connCloseChan := make(chan *amqp.Error, 10)
+	connection.NotifyClose(connCloseChan)
 
+	// We'll use these to monitor for channel cancelation and closing
+	channelCancelChan := make(chan string, 10)
+	channelCloseChan := make(chan *amqp.Error, 10)
 
-	// Setup to Receive
+	// We wrap all of the channel declaration stuff in a closure function.
+	// This will allow us to re-open the channel again later if it gets canceled.
 
-	if service.Receiver.QueueName != "" {
-		if _, queueDeclErr := service.channel.QueueDeclare(service.Receiver.QueueName, false, true, true, false, nil); queueDeclErr != nil {
-			logging.Log.Critical(queueDeclErr.Error())
+	channelSetupFunc := func() {
+
+		// Create the channel object that represents the connection to the broker
+		// Deferred command: close the channel
+		channel, chanErr := connection.Channel()
+		if chanErr != nil {
+			logging.Log.Critical("Unable to get the AMQP channel:\n\t%v", chanErr.Error())
 			service.DoneSignal <- true
 			return
 		}
-		defer func() {
-			if _, err := service.channel.QueueDelete(service.Receiver.QueueName, false, false, false); err != nil {
-				logging.Log.Error("Error while deleting queue:\n\t%v", err)
+		logging.Log.Debug("Channel with AMQP broker established")
+		service.channel = channel
+
+
+		// Setup to Receive
+
+		if service.Receiver.QueueName != "" {
+			if _, queueDeclErr := service.channel.QueueDeclare(service.Receiver.QueueName, false, true, true, false, nil); queueDeclErr != nil {
+				logging.Log.Critical(queueDeclErr.Error())
+				service.DoneSignal <- true
+				return
 			}
-		}()
-		logging.Log.Debug("Queue declared: %s", service.Receiver.QueueName)
+			logging.Log.Debug("Queue declared: %s", service.Receiver.QueueName)
 
-		// Try to begin consuming, which will only actually happen if there are already subscriptions
-		service.beginConsuming()
+			// Try to begin consuming, which will only actually happen if there are already subscriptions
+			service.beginConsuming()
 
-		logging.Log.Info("AMQP service ready to receive messages")
-	}
-
-	// Setup to send messages
-
-	if service.Sender.RequestExchangeName != "" {
-		exchangeErr := service.channel.ExchangeDeclare(service.Sender.RequestExchangeName, "topic", false, false, false, false, nil)
-		if exchangeErr != nil {
-			logging.Log.Critical("Unable to declare the requests exchange (%s)", service.Sender.RequestExchangeName)
-			service.DoneSignal <- true
-			return
+			logging.Log.Info("AMQP service ready to receive messages")
 		}
-		logging.Log.Debug("Requests exchange is ready")
-	}
 
-	if service.Sender.AlertExchangeName != "" {
-		exchangeErr := service.channel.ExchangeDeclare(service.Sender.AlertExchangeName, "topic", false, false, false, false, nil)
-		if exchangeErr != nil {
-			logging.Log.Critical("Unable to declare the alerts exchange (%s)", service.Sender.AlertExchangeName)
-			service.DoneSignal <- true
-			return
+		// Setup to send messages
+
+		if service.Sender.RequestExchangeName != "" {
+			exchangeErr := service.channel.ExchangeDeclare(service.Sender.RequestExchangeName, "topic", false, false, false, false, nil)
+			if exchangeErr != nil {
+				logging.Log.Critical("Unable to declare the requests exchange (%s)", service.Sender.RequestExchangeName)
+				service.DoneSignal <- true
+				return
+			}
+			logging.Log.Debug("Requests exchange is ready")
 		}
-		logging.Log.Debug("Alerts exchange is ready")
-	}
 
-	if service.Sender.InfoExchangeName != "" {
-		exchangeErr := service.channel.ExchangeDeclare(service.Sender.InfoExchangeName, "topic", false, false, false, false, nil)
-		if exchangeErr != nil {
-			logging.Log.Critical("Unable to declare the infos exchange (%s)", service.Sender.InfoExchangeName)
-			service.DoneSignal <- true
-			return
+		if service.Sender.AlertExchangeName != "" {
+			exchangeErr := service.channel.ExchangeDeclare(service.Sender.AlertExchangeName, "topic", false, false, false, false, nil)
+			if exchangeErr != nil {
+				logging.Log.Critical("Unable to declare the alerts exchange (%s)", service.Sender.AlertExchangeName)
+				service.DoneSignal <- true
+				return
+			}
+			logging.Log.Debug("Alerts exchange is ready")
 		}
-		logging.Log.Debug("Infos exchange is ready")
-	}
 
-	logging.Log.Info("AMQP service ready to send messages")
+		if service.Sender.InfoExchangeName != "" {
+			exchangeErr := service.channel.ExchangeDeclare(service.Sender.InfoExchangeName, "topic", false, false, false, false, nil)
+			if exchangeErr != nil {
+				logging.Log.Critical("Unable to declare the infos exchange (%s)", service.Sender.InfoExchangeName)
+				service.DoneSignal <- true
+				return
+			}
+			logging.Log.Debug("Infos exchange is ready")
+		}
+
+		service.channel.NotifyCancel(channelCancelChan)
+		service.channel.NotifyClose(channelCloseChan)
+
+		logging.Log.Info("AMQP service ready to send messages")
+	}
+	// Call the connection setup function now
+	channelSetupFunc()
+
+	defer service.channel.Close()
+	defer func() {
+		if _, err := service.channel.QueueDelete(service.Receiver.QueueName, false, false, false); err != nil {
+			logging.Log.Error("Error while deleting queue:\n\t%v", err)
+		}
+	}()
 
 	logging.Log.Notice("AMQP service started successfully")
 	service.DoneSignal <- false
@@ -404,6 +432,33 @@ amqpLoop:
 				logging.Log.Debug("Received on the stop queue, but it wasn't \"true\"")
 				continue amqpLoop
 			}
+		case connectionClosed, chanOpen := <-connCloseChan:
+			if ! chanOpen {
+				logging.Log.Error("Connection-close channel is closed")
+				break amqpLoop
+			}
+
+			logging.Log.Warning("AMQP connection was closed: %v", (*connectionClosed).Reason)
+			break amqpLoop
+		case channelCanceled, chanOpen := <-channelCancelChan:
+			if ! chanOpen {
+				logging.Log.Error("Channel-cancel channel is closed")
+				break amqpLoop
+			}
+
+			// If the channel was canceled, we probably want to re-open it
+			logging.Log.Warning("AMQP channel was canceled: %s", channelCanceled)
+			logging.Log.Info("Attempting to re-open the channel")
+			channelSetupFunc()
+			break amqpLoop
+		case channelClosed, chanOpen := <-channelCloseChan:
+			if ! chanOpen {
+				logging.Log.Error("Channel-close channel is closed")
+				break amqpLoop
+			}
+
+			logging.Log.Warning("AMQP channel was closed: %v", (*channelClosed).Reason)
+			break amqpLoop
 		case request, chanOpen := <-service.Sender.requestChan:
 			if ! chanOpen {
 				logging.Log.Error("Outgoing request channel is closed")
@@ -417,7 +472,7 @@ amqpLoop:
 				logging.Log.Error("An error occurred while encoding a request message: \n\t%v", encErr)
 				continue amqpLoop
 			}
-			(&request).send(channel, body)
+			(&request).send(service.channel, body)
 		case reply, chanOpen := <-service.Sender.replyChan:
 			if ! chanOpen {
 				logging.Log.Error("Outgoing reply channel is closed")
@@ -431,7 +486,7 @@ amqpLoop:
 				logging.Log.Error("An error occurred while encoding a reply message: \n\t%v", encErr)
 				continue amqpLoop
 			}
-			(&reply).send(channel, body)
+			(&reply).send(service.channel, body)
 		case alert, chanOpen := <-service.Sender.alertChan:
 			if ! chanOpen {
 				logging.Log.Error("Outgoing alert channel is closed")
@@ -445,7 +500,7 @@ amqpLoop:
 				logging.Log.Error("An error occurred while encoding an alert message: \n\t%v", encErr)
 				continue amqpLoop
 			}
-			(&alert).send(channel, body)
+			(&alert).send(service.channel, body)
 		case info, chanOpen := <-service.Sender.infoChan:
 			if ! chanOpen {
 				logging.Log.Error("Outgoing info channel is closed")
@@ -459,7 +514,7 @@ amqpLoop:
 				logging.Log.Error("An error occurred while encoding an info message: \n\t%v", encErr)
 				continue amqpLoop
 			}
-			(&info).send(channel, body)
+			(&info).send(service.channel, body)
 		// process any AMQP messages that are received
 		case amqpMessage, chanOpen := <-service.Receiver.messageQueue:
 			if ! chanOpen {
