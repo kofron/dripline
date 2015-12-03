@@ -105,12 +105,13 @@ func StartService(brokerAddress, queueName string) (service *AmqpService) {
 	return
 }
 
+
 //******************************
 //*** Send-Message Functions ***
 //******************************
 
 // SendRequest sends a Request message.  It creates a reply queue, begins consuming on it, and returns the channel on which the client can wait for the Reply message.
-func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply, e error) {
+func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply, queueName string, e error) {
 	logging.Log.Debug("Submitting request to send")
 	queue, declareErr := service.channel.QueueDeclare("", false, true, true, false, nil)
 	if declareErr != nil {
@@ -118,8 +119,9 @@ func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply,
 		e = declareErr
 		return
 	}
+	queueName = queue.Name
 
-	toSend.ReplyTo = queue.Name
+	toSend.ReplyTo = queueName
 	bindErr := service.channel.QueueBind(queue.Name, queue.Name, service.Sender.RequestExchangeName, false, nil)
 	if bindErr != nil {
 		logging.Log.Error("Unable to bind the reply queue <%s>:\n\t%v", queue.Name, bindErr)
@@ -127,7 +129,7 @@ func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply,
 		return
 	}
 
-	messageQueue, consumeErr := service.channel.Consume(queue.Name, "", false, true, true, false, nil)
+	messageQueue, consumeErr := service.channel.Consume(queueName, "", false, true, true, false, nil)
 	if consumeErr != nil {
 		logging.Log.Error("Unable start consuming from reply queue <%s>:\n\t%v", queue.Name, consumeErr.Error())
 		e = consumeErr
@@ -163,7 +165,7 @@ func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply,
 			return
 		}
 
-		if _, err := service.channel.QueueDelete(queue.Name, false, false, false); err != nil {
+		if err := service.DeleteQueue(queueName); err != nil {
 			logging.Log.Error("Error while deleting reply queue:\n\t%v", err)
 			return
 		}
@@ -260,6 +262,17 @@ func (service *AmqpService) SubscribeToInfos(routingKey string) (e error) {
 	service.beginConsuming()
 	logging.Log.Debug("Subscription established: ex(%s) @ rk(%s) --> q(%s)", service.Sender.InfoExchangeName, routingKey, service.Receiver.QueueName)
 	return
+}
+
+
+//***********************
+//*** Other Functions ***
+//***********************
+
+// DeleteQueue allows the user to delete a particular queue
+func (service* AmqpService) DeleteQueue(queueName string) (error) {
+	_, err := service.channel.QueueDelete(queueName, false, false, false)
+	return err
 }
 
 
@@ -378,7 +391,12 @@ amqpLoop:
 	for {
 		select {
 		// the control messages can stop execution
-		case stopSig := <-service.stopQueue:
+		case stopSig, chanOpen := <-service.stopQueue:
+			if ! chanOpen {
+				logging.Log.Error("Control queue is closed")
+				break amqpLoop
+			}
+
 			if stopSig == true {
 				logging.Log.Info("AMQP service stopping on interrupt.")
 				break amqpLoop
@@ -386,7 +404,12 @@ amqpLoop:
 				logging.Log.Debug("Received on the stop queue, but it wasn't \"true\"")
 				continue amqpLoop
 			}
-		case request := <-service.Sender.requestChan:
+		case request, chanOpen := <-service.Sender.requestChan:
+			if ! chanOpen {
+				logging.Log.Error("Outgoing request channel is closed")
+				break amqpLoop
+			}
+
 			logging.Log.Debug("Sending a request")
 			// encode the message
 			body, encErr := (&request).Encode()
@@ -395,7 +418,12 @@ amqpLoop:
 				continue amqpLoop
 			}
 			(&request).send(channel, body)
-		case reply := <-service.Sender.replyChan:
+		case reply, chanOpen := <-service.Sender.replyChan:
+			if ! chanOpen {
+				logging.Log.Error("Outgoing reply channel is closed")
+				break amqpLoop
+			}
+
 			logging.Log.Debug("Sending a reply")
 			// encode the message
 			body, encErr := (&reply).Encode()
@@ -404,7 +432,12 @@ amqpLoop:
 				continue amqpLoop
 			}
 			(&reply).send(channel, body)
-		case alert := <-service.Sender.alertChan:
+		case alert, chanOpen := <-service.Sender.alertChan:
+			if ! chanOpen {
+				logging.Log.Error("Outgoing alert channel is closed")
+				break amqpLoop
+			}
+
 			logging.Log.Debug("Sending a alert")
 			// encode the message
 			body, encErr := (&alert).Encode()
@@ -413,7 +446,12 @@ amqpLoop:
 				continue amqpLoop
 			}
 			(&alert).send(channel, body)
-		case info := <-service.Sender.infoChan:
+		case info, chanOpen := <-service.Sender.infoChan:
+			if ! chanOpen {
+				logging.Log.Error("Outgoing info channel is closed")
+				break amqpLoop
+			}
+
 			logging.Log.Debug("Sending a info")
 			// encode the message
 			body, encErr := (&info).Encode()
@@ -423,7 +461,12 @@ amqpLoop:
 			}
 			(&info).send(channel, body)
 		// process any AMQP messages that are received
-		case amqpMessage := <-service.Receiver.messageQueue:
+		case amqpMessage, chanOpen := <-service.Receiver.messageQueue:
+			if ! chanOpen {
+				logging.Log.Error("Incoming message channel is closed")
+				break amqpLoop
+			}
+
 			// Send an acknowledgement to the broker
 			amqpMessage.Ack(false)
 
