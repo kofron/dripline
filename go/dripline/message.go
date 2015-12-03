@@ -17,6 +17,7 @@ import (
 	"github.com/ugorji/go/codec"
 
 	"github.com/project8/swarm/Go/logging"
+	"github.com/project8/swarm/Go/utility"
 )
 
 type SenderInfo struct {
@@ -107,22 +108,23 @@ func (message *Info) Encode() (body []byte, e error) {
 	return
 }
 
-func encodeBuffer(buffer *map[string]interface{}, encoding string) (encoded []byte, e error) {
-	encoded = make([]byte, 0, unsafe.Sizeof(*buffer))
+func encodeBuffer(bufferPtr *map[string]interface{}, encoding string) (encoded []byte, e error) {
 	switch encoding {
 	case "application/json":
 		//log.Printf("this will be a json message")
-		handle := new(codec.JsonHandle)
-		encoder := codec.NewEncoderBytes(&(encoded), handle)
-		jsonErr := encoder.Encode(buffer)
-		if jsonErr != nil {
-			e = fmt.Errorf("Unable to encode JSON-encoded message: %v", jsonErr)
+		encoded, e = utility.IfcToJSON(*bufferPtr)
+		//handle := new(codec.JsonHandle)
+		//encoder := codec.NewEncoderBytes(&(encoded), handle)
+		//jsonErr := encoder.Encode(buffer)
+		if e != nil {
+			e = fmt.Errorf("Unable to encode JSON-encoded message: %v", e)
 		}
 	case "application/msgpack":
 		//log.Printf("this will be a msgpack message")
+		encoded = make([]byte, 0, unsafe.Sizeof(*bufferPtr))
 		handle := new(codec.MsgpackHandle)
 		encoder := codec.NewEncoderBytes(&(encoded), handle)
-		msgpackErr := encoder.Encode(buffer)
+		msgpackErr := encoder.Encode(*bufferPtr)
 		if msgpackErr != nil {
 			e = fmt.Errorf("Unable to encode msgpack-encoded message: %v", msgpackErr)
 		}
@@ -236,12 +238,12 @@ func decodeBuffer(encoded []byte, encoding string) (buffer map[string]interface{
 	switch encoding {
 	case "application/json":
 		//log.Printf("this is a json message")
-		handle := new(codec.JsonHandle)
-		decoder := codec.NewDecoderBytes(encoded, handle)
-		jsonErr := decoder.Decode(&buffer)
-		if jsonErr != nil {
-			logging.Log.Error("Unable to decode JSON-encoded message:\n\t%v", jsonErr)
-			e = jsonErr
+		buffer, e = utility.JSONToIfc(encoded)
+		//handle := new(codec.JsonHandle)
+		//decoder := codec.NewDecoderBytes(encoded, handle)
+		//jsonErr := decoder.Decode(&buffer)
+		if e != nil {
+			logging.Log.Error("Unable to decode JSON-encoded message:\n\t%v", e)
 		}
 	case "application/msgpack":
 		//log.Printf("this is a msgpack message")
