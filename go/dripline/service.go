@@ -8,8 +8,12 @@ package dripline
 
 import (
 	"fmt"
+	"os"
+	"os/user"
+	"time"
 
 	"github.com/streadway/amqp"
+	"github.com/kardianos/osext"
 	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/project8/swarm/Go/logging"
@@ -45,8 +49,11 @@ type AmqpService struct {
 	Receiver          AmqpReceiver
 	Sender            AmqpSender
 	channel           *amqp.Channel
+	connection        *amqp.Connection
 	stopQueue         chan bool
+	senderInfo        SenderInfo
 }
+
 
 //*******************************
 //*** Start-Service Functions ***
@@ -111,71 +118,101 @@ func StartService(brokerAddress, queueName string) (service *AmqpService) {
 //******************************
 
 // SendRequest sends a Request message.  It creates a reply queue, begins consuming on it, and returns the channel on which the client can wait for the Reply message.
-func (service *AmqpService) SendRequest(toSend Request) (replyChan <-chan Reply, queueName string, e error) {
+// The request will timeout after a duration of replyTimeout.  Supply a non-positive duration to run with no timeout.
+func (service *AmqpService) SendRequest(toSend Request, replyTimeout time.Duration) (replyChan <-chan Reply, e error) {
 	logging.Log.Debug("Submitting request to send")
-	queue, declareErr := service.channel.QueueDeclare("", false, true, true, false, nil)
+
+	// First we create a new channel, create the reply queue on that channel, and start consuming
+	replyChannel, chanErr := service.connection.Channel()
+	if chanErr != nil {
+		logging.Log.Critical("Unable to get the reply channel:\n\t%v", chanErr.Error())
+		service.DoneSignal <- true
+		return
+	}
+	logging.Log.Debug("Channel with AMQP broker established")
+
+	replyQueue, declareErr := replyChannel.QueueDeclare("", false, true, true, false, nil)
 	if declareErr != nil {
 		logging.Log.Error("Unable to declare the reply queue: %v", declareErr)
 		e = declareErr
 		return
 	}
-	queueName = queue.Name
+	queueName := replyQueue.Name
 
 	toSend.ReplyTo = queueName
-	bindErr := service.channel.QueueBind(queue.Name, queue.Name, service.Sender.RequestExchangeName, false, nil)
+	bindErr := replyChannel.QueueBind(queueName, queueName, service.Sender.RequestExchangeName, false, nil)
 	if bindErr != nil {
-		logging.Log.Error("Unable to bind the reply queue <%s>:\n\t%v", queue.Name, bindErr)
+		logging.Log.Error("Unable to bind the reply queue <%s>:\n\t%v", queueName, bindErr)
 		e = bindErr
 		return
 	}
 
-	messageQueue, consumeErr := service.channel.Consume(queueName, "", false, true, true, false, nil)
+	amqpReplyChan, consumeErr := replyChannel.Consume(queueName, "", false, true, true, false, nil)
 	if consumeErr != nil {
-		logging.Log.Error("Unable start consuming from reply queue <%s>:\n\t%v", queue.Name, consumeErr.Error())
+		logging.Log.Error("Unable start consuming from reply queue <%s>:\n\t%v", queueName, consumeErr.Error())
 		e = consumeErr
 		return
 	}
 
+	// Send the request
 	service.Sender.requestChan <- toSend
 	logging.Log.Debug("Request sent")
 
 	replyChanFull := make(chan Reply, 1)
 
+	// In a concurrent function, we'll wait to receive the reply
+	// After the reply is received (or the receive timed out), the reply channel will be closed, which should clean up everything nicely
 	go func() {
-		amqpMessage := <-messageQueue
-		// Send an acknowledgement to the broker
-		amqpMessage.Ack(false)
+		var amqpMessage amqp.Delivery
+		messageReceived := false
 
-		decodeErr := DecodeAndHandle(&amqpMessage,
-			func(request Request){
-				logging.Log.Error("Unexpected request received while waiting for a reply")
-			},
-			func(reply Reply){
-				replyChanFull <- reply
-			},
-			func(alert Alert){
-				logging.Log.Error("Unexpected alert received while waiting for a reply")
-			},
-			func(info Info){
-				logging.Log.Error("Unexpected info received while waiting for a reply")
-			},
-		)
-		if decodeErr != nil {
-			logging.Log.Error("An error occurred while decoding a message: \n\t%v", decodeErr)
-			return
+		if replyTimeout <= 0 {
+			// Wait for a message with no timeout
+			amqpMessage = <-amqpReplyChan
+			messageReceived = true
+		} else {
+			// Wait for message with a timeout
+			select {
+			case amqpMessage = <-amqpReplyChan:
+				messageReceived = true
+				break
+			case <-time.After(replyTimeout):
+				logging.Log.Warning("Timed out waiting for reply")
+				replyChanFull <- PrepareReplyToRequest(toSend, RCErrDripTimeout, "Timeout while waiting for reply", service.senderInfo)
+				break
+			}
 		}
-		logging.Log.Warning("from in reply func, queue name: %s", queueName)
 
-		if _, err := service.channel.QueueDelete(queueName, false, false, false); err != nil {
-			logging.Log.Error("Error while deleting reply queue:\n\t%v", err)
-			return
+		if messageReceived {
+			// Send an acknowledgement to the broker
+			amqpMessage.Ack(false)
+
+			// Decode and handle the message -- only replies are expected
+			decodeErr := DecodeAndHandle(&amqpMessage,
+				func(request Request){
+					logging.Log.Error("Unexpected request received while waiting for a reply")
+				},
+				func(reply Reply){
+					replyChanFull <- reply
+				},
+				func(alert Alert){
+					logging.Log.Error("Unexpected alert received while waiting for a reply")
+				},
+				func(info Info){
+					logging.Log.Error("Unexpected info received while waiting for a reply")
+				},
+			)
+			if decodeErr != nil {
+				logging.Log.Error("An error occurred while decoding a message: \n\t%v", decodeErr)
+				return
+			}
 		}
-/*
-		if err := service.DeleteQueue(queueName); err != nil {
-			logging.Log.Error("Error while deleting reply queue:\n\t%v", err)
-			return
+
+		logging.Log.Debug("Closing the reply channel")
+		if err := replyChannel.Close(); err != nil {
+			logging.Log.Error("Error while closing reply queue:\n\t%v", err)
 		}
-*/		
+
 		return
 	}()
 
@@ -272,21 +309,33 @@ func (service *AmqpService) SubscribeToInfos(routingKey string) (e error) {
 }
 
 
-//***********************
-//*** Other Functions ***
-//***********************
-
-// DeleteQueue allows the user to delete a particular queue
-func (service* AmqpService) DeleteQueue(queueName string) (error) {
-	logging.Log.Warning("In DeleteQueue; requested deletion: %s", queueName)
-	_, err := service.channel.QueueDelete(queueName, false, false, false)
-	return err
-}
-
-
 //*************************
 //*** Private Functions ***
 //*************************
+
+func (service *AmqpService) fillDriplineSenderInfo() (e error) {
+	service.senderInfo.Package = "dripline"
+	service.senderInfo.Exe, e = osext.Executable()
+	if e != nil {
+		return
+	}
+
+	//service.senderInfo.Version = gogitver.Tag()
+	//service.senderInfo.Commit = gogitver.Git()
+
+	service.senderInfo.Hostname, e = os.Hostname()
+	if e != nil {
+		return
+	}
+
+	user, userErr := user.Current()
+	e = userErr
+	if e != nil {
+		return
+	}
+	service.senderInfo.Username = user.Username
+	return
+}
 
 func (service *AmqpService) beginConsuming() {
 	// Start consuming messages on the queue if there are subscriptions
@@ -312,6 +361,10 @@ func (service *AmqpService) beginConsuming() {
 //    Required: address
 //    Optional: user/password, port
 func runAmqpService(service *AmqpService) {
+	if siErr := service.fillDriplineSenderInfo(); siErr != nil {
+		logging.Log.Warning("Unable to properly fill dripline sender info")
+	}
+
 	// Connect to the AMQP broker
 	// Deferred command: close the connection
 	connection, receiveErr := amqp.Dial(service.BrokerAddress)
@@ -321,6 +374,7 @@ func runAmqpService(service *AmqpService) {
 		return
 	}
 	defer connection.Close()
+	service.connection = connection
 	service.Connected = true
 	logging.Log.Debug("Connected to AMQP broker (%s)", service.BrokerAddress)
 
