@@ -1,0 +1,24 @@
+name: mantis_service
+module: Spimescape
+broker: localhost
+endpoints:
+  - name: mantis_interface
+    module: MantisAcquisitionInterface
+    debug_mode_without_database: True
+    daq_name: 'Test'
+    run_table_endpoint: run_table
+    directory_path: /data/tmp
+    filename_prefix: rid
+    log_interval: 5
+    mantis_queue: mantis
+    ensure_sets:
+        peaches: 1.1
+#    ensure_locked:
+#      - peaches
+#      - chips
+    metadata_gets:
+        peaches: value_raw
+        chips: value_cal
+        waffles: value_cal
+    lf_lo_endpoint_name: waffles
+    metadata_target: 'metadata'

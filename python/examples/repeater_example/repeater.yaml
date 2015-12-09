@@ -1,0 +1,7 @@
+nodename: store_repeater
+broker: localhost
+providers:
+  - name: peach
+    module: RepeaterProvider
+    repeat_target: peaches
+    broker: myrna.p8
