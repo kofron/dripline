@@ -35,7 +35,10 @@ def calibrate(cal_functions=None):
         cal_functions = {}
     def calibration(fun):
         def wrapper(self, *args, **kwargs):
-            val_dict = {'value_raw':fun(self)}
+            very_raw = fun(self)
+            if isinstance(very_raw, list):
+                very_raw = very_raw[0]
+            val_dict = {'value_raw':very_raw}
             logger.debug('attempting to calibrate')
             if val_dict['value_raw'] is None:
                 return None
@@ -139,36 +142,36 @@ class Endpoint(object):
     def handle_request(self, channel, method, properties, request):
         logger.debug('handling requst:{}'.format(request))
 
-        routing_key_specifier = method.routing_key.replace(self.name, '', 1).lstrip('.')
-        logger.debug('routing key specifier is: {}'.format(routing_key_specifier))
-
-        msg = Message.from_encoded(request, properties.content_encoding)
-        if msg.payload is None:
-            msg.payload = {}
-        logger.info('got a {} request: {}'.format(msg.msgop, msg.payload))
-        lockout_key = msg.get('lockout_key', None)
-
-        # construction action
-        these_args = []
-        if 'values' in msg.payload:
-            these_args = msg.payload['values']
-        these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
-        if routing_key_specifier:
-            these_kwargs.update({'routing_key_specifier':routing_key_specifier})
-        if lockout_key and msg.msgop == constants.OP_CMD:
-            these_kwargs.update({'lockout_key': lockout_key})
-        method_name = ''
-        for const_name in dir(constants):
-            if getattr(constants, const_name) == msg.msgop:
-                method_name = '_on_' + const_name.split('_')[-1].lower()
-        logger.info('method_name is: {}'.format(method_name))
-        endpoint_method = getattr(self, method_name)
-        logger.debug('method is: {}'.format(endpoint_method))
-
         result = None
         retcode = None
         return_msg = None
         try:
+            routing_key_specifier = method.routing_key.replace(self.name, '', 1).lstrip('.')
+            logger.debug('routing key specifier is: {}'.format(routing_key_specifier))
+
+            msg = Message.from_encoded(request, properties.content_encoding)
+            if msg.payload is None:
+                msg.payload = {}
+            logger.info('got a {} request: {}'.format(msg.msgop, msg.payload))
+            lockout_key = msg.get('lockout_key', None)
+
+            # construction action
+            these_args = []
+            if 'values' in msg.payload:
+                these_args = msg.payload['values']
+            these_kwargs = {k:v for k,v in msg.payload.items() if k!='values'}
+            if routing_key_specifier:
+                these_kwargs.update({'routing_key_specifier':routing_key_specifier})
+            if lockout_key and msg.msgop == constants.OP_CMD:
+                these_kwargs.update({'lockout_key': lockout_key})
+            method_name = ''
+            for const_name in dir(constants):
+                if getattr(constants, const_name) == msg.msgop:
+                    method_name = '_on_' + const_name.split('_')[-1].lower()
+            logger.info('method_name is: {}'.format(method_name))
+            endpoint_method = getattr(self, method_name)
+            logger.debug('method is: {}'.format(endpoint_method))
+
             self._check_lockout_conditions(msg, these_args, these_kwargs)
             logger.debug('args are:\n{}'.format(these_args))
             logger.debug('kwargs are:\n{}'.format(these_kwargs))
@@ -183,7 +186,7 @@ class Endpoint(object):
             return_msg = str(err)
         except Exception as err:
             logger.error('got an error: {}'.format(str(err)))
-            logger.debug('traceback follows:\n{}'.format(traceback.format_exc()))
+            logger.error('traceback follows:\n{}'.format(traceback.format_exc()))
             return_msg = str(err)
             retcode = 999
         logger.debug('request method execution complete')
@@ -210,10 +213,8 @@ class Endpoint(object):
         '''
         WARNING! you should *NOT* override this method
         '''
-        logger.warning('args/kwargs\n{}\n{}'.format(args, kwargs))
         result = None
         value = args
-        logger.warning('value here is {}'.format(value))
         attribute = ''
         if 'routing_key_specifier' in kwargs:
             attribute = kwargs['routing_key_specifier'].replace('-','_')
