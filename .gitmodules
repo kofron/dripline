@@ -1,3 +1,6 @@
 [submodule "cpp/scarab"]
 	path = cpp/scarab
 	url = https://github.com/project8/scarab
+[submodule "cpp/SimpleAmqpClient"]
+	path = cpp/SimpleAmqpClient
+	url = https://github.com/project8/SimpleAmqpClient
