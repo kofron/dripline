@@ -16,7 +16,7 @@ set( dripline_SOURCES
 
 ##########
 
-pbuilder_library( _dripline dripline_SOURCES "" )
+#pbuilder_library( _dripline dripline_SOURCES "" )
 
 pbuilder_install_headers( ${dripline_HEADERS} )
 
