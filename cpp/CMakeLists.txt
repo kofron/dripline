@@ -8,15 +8,11 @@ cmake_minimum_required (VERSION 3.0)
 cmake_policy( SET CMP0048 NEW ) # version in project()
 project( dripline VERSION 0.1.0 )
 
-list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/drosophila/cmake )
+list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/scarab/cmake )
 
 include( PackageBuilder )
 
 pbuilder_prepare_project()
-
-set( CMAKE_MACOSX_RPATH TRUE )
-
-set (BUILD_SHARED_LIBS ON)
 
 
 ####################
@@ -33,9 +29,10 @@ set (BUILD_SHARED_LIBS ON)
 # dripline dependencies #
 #########################
 
-add_subdirectory( drosophila )
-pbuilder_add_submodule_libraries( ${Drosophila_LIBRARIES} )
-include_directories( ${Drosophila_DEP_INCLUDE_DIRS} )
+pbuilder_add_submodule( Scarab scarab/library )
+#add_subdirectory( drosophila )
+#pbuilder_add_submodule_libraries( ${Drosophila_LIBRARIES} )
+#include_directories( ${Drosophila_DEP_INCLUDE_DIRS} )
 
 
 
