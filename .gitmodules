@@ -1,0 +1,3 @@
+[submodule "cpp/scarab"]
+	path = cpp/scarab
+	url = https://github.com/project8/scarab
