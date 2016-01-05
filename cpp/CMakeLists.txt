@@ -19,9 +19,6 @@ pbuilder_prepare_project()
 # dripline options #
 ####################
 
-#set( Drosophila_BUILD_CODEC_JSON CACHE BOOL "Flag to enable building the JSON codec" )
-
-#set( Drosophila_BUILD_CODEC_MSGPACK CACHE BOOL "Flag to enable building the msgpack codec" )
 
 
 
@@ -29,11 +26,33 @@ pbuilder_prepare_project()
 # dripline dependencies #
 #########################
 
-pbuilder_add_submodule( Scarab scarab/library )
-#add_subdirectory( drosophila )
-#pbuilder_add_submodule_libraries( ${Drosophila_LIBRARIES} )
-#include_directories( ${Drosophila_DEP_INCLUDE_DIRS} )
+########
+# Scarab
+########
 
+pbuilder_add_submodule( Scarab scarab/library )
+
+
+########
+# Boost
+########
+
+# Boost (1.46 required for filesystem version 3)
+find_package( Boost 1.46.0 REQUIRED )
+# make sure dynamic linking is assumed for all boost libraries
+add_definitions( -DBOOST_ALL_DYN_LINK )
+include_directories( ${Boost_INCLUDE_DIRS} )
+# No compiled libraries are currently required
+#pbuilder_add_ext_libraries( ${Boost_LIBRARIES} )
+
+
+##################
+# SimpleAmqpClient
+##################
+
+pbuilder_add_submodule( SimpleAmqpClient SimpleAmqpClient )
+set( Scarab_BUILD_CODEC_JSON TRUE CACHE BOOL "" FORCE )
+set( Scarab_BUILD_CODEC_MSGPACK TRUE CACHE BOOL "" FORCE )
 
 
 ##################

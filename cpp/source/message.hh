@@ -5,24 +5,28 @@
  *      Author: nsoblath
  */
 
-#ifndef MT_MESSAGE_HH_
-#define MT_MESSAGE_HH_
+#ifndef DRIPLINE_MESSAGE_HH_
+#define DRIPLINE_MESSAGE_HH_
 
-#include "mt_amqp.hh"
-#include "mt_constants.hh"
-#include "mt_param.hh"
-#include "mt_uuid.hh"
+#include "scarab_api.hh"
+#include "param.hh"
+
+#include "amqp.hh"
+#include "uuid.hh"
 
 #include <string>
 
-namespace mantis
+using scarab::param_node;
+using scarab::param_value;
+
+namespace dripline
 {
 
     //***********
     // Message
     //***********
 
-    class MANTIS_API message
+    class SCARAB_API message
     {
         public:
             enum encoding
@@ -129,7 +133,7 @@ namespace mantis
 
     class msg_reply;
 
-    class MANTIS_API msg_request : public message
+    class SCARAB_API msg_request : public message
     {
         public:
             msg_request();
@@ -182,7 +186,7 @@ namespace mantis
     // Reply
     //*********
 
-    class MANTIS_API msg_reply : public message
+    class SCARAB_API msg_reply : public message
     {
         public:
             msg_reply();
@@ -225,7 +229,7 @@ namespace mantis
     // Alert
     //*********
 
-    class MANTIS_API msg_alert : public message
+    class SCARAB_API msg_alert : public message
     {
         public:
             msg_alert();
@@ -257,7 +261,7 @@ namespace mantis
     // Info
     //********
 
-    class MANTIS_API msg_info : public message
+    class SCARAB_API msg_info : public message
     {
         public:
             msg_info();
@@ -689,6 +693,6 @@ namespace mantis
 
 
 
-} /* namespace mantis */
+} /* namespace dripline */
 
-#endif /* MT_MESSAGE_HH_ */
+#endif /* DRIPLINE_MESSAGE_HH_ */

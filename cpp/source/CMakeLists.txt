@@ -7,16 +7,20 @@
 set( dir ${CMAKE_CURRENT_SOURCE_DIR} )
 
 set( dripline_HEADERS
+    ${dir}/amqp.hh
+    ${dir}/dripline_constants.hh
     ${dir}/message.hh
+    ${dir}/uuid.hh
 )
 
 set( dripline_SOURCES
     ${dir}/message.cc
+    ${dir}/uuid.cc
 )
 
 ##########
 
-#pbuilder_library( _dripline dripline_SOURCES "" )
+pbuilder_library( _dripline dripline_SOURCES "" )
 
 pbuilder_install_headers( ${dripline_HEADERS} )
 
