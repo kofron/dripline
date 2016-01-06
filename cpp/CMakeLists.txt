@@ -30,20 +30,11 @@ pbuilder_prepare_project()
 # Scarab
 ########
 
+# set authentication build to TRUE
+# this will require Boost 1.46 or better
+set( Scarab_BUILD_AUTHENTICATION TRUE CACHE BOOL "" FORCE )
+
 pbuilder_add_submodule( Scarab scarab/library )
-
-
-########
-# Boost
-########
-
-# Boost (1.46 required for filesystem version 3)
-find_package( Boost 1.46.0 REQUIRED )
-# make sure dynamic linking is assumed for all boost libraries
-add_definitions( -DBOOST_ALL_DYN_LINK )
-include_directories( ${Boost_INCLUDE_DIRS} )
-# No compiled libraries are currently required
-#pbuilder_add_ext_libraries( ${Boost_LIBRARIES} )
 
 
 ##################
