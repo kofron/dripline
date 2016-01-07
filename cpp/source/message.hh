@@ -14,6 +14,10 @@
 #include "amqp.hh"
 #include "uuid.hh"
 
+#include <memory>
+using std::shared_ptr;
+using std::make_shared;
+
 #include <string>
 
 using scarab::param_node;
@@ -21,6 +25,17 @@ using scarab::param_value;
 
 namespace dripline
 {
+    class message;
+    class msg_request;
+    class msg_reply;
+    class msg_info;
+    class msg_alert;
+
+    typedef shared_ptr< message > message_ptr_t;
+    typedef shared_ptr< msg_request > request_ptr_t;
+    typedef shared_ptr< msg_reply > reply_ptr_t;
+    typedef shared_ptr< msg_info > info_ptr_t;
+    typedef shared_ptr< msg_alert > alert_ptr_t;
 
     //***********
     // Message
@@ -29,10 +44,10 @@ namespace dripline
     class SCARAB_API message
     {
         public:
-            enum encoding
+            enum class encoding
             {
-                k_json,
-                k_msgpack
+                json,
+                msgpack
             };
 
        public:
@@ -46,7 +61,7 @@ namespace dripline
 
         public:
             /// from AMQP to message object
-            static message* process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name );
+            static message_ptr_t process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name );
 
             /// from message object to AMQP
             virtual bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag ) = 0;
@@ -131,22 +146,20 @@ namespace dripline
     // Request
     //***********
 
-    class msg_reply;
-
     class SCARAB_API msg_request : public message
     {
         public:
             msg_request();
             virtual ~msg_request();
 
-            static msg_request* create( param_node* a_payload, unsigned a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static request_ptr_t create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
             bool is_alert() const;
             bool is_info() const;
 
-            msg_reply* reply( unsigned a_ret_code, const std::string& a_ret_msg ) const;
+            reply_ptr_t reply( retcode_t a_ret_code, const std::string& a_ret_msg ) const;
 
         public:
             bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag );
@@ -156,8 +169,8 @@ namespace dripline
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            unsigned get_message_type() const;
-            static unsigned message_type();
+            msg_t get_message_type() const;
+            static msg_t message_type();
 
             void set_reply_to( const std::string& a_rt );
             const std::string& get_reply_to() const;
@@ -168,17 +181,17 @@ namespace dripline
             void set_lockout_key_valid( bool a_flag );
             bool get_lockout_key_valid() const;
 
-            void set_message_op( unsigned a_op );
-            unsigned get_message_op() const;
+            void set_message_op( op_t a_op );
+            op_t get_message_op() const;
 
         private:
             std::string f_reply_to;
             uuid_t f_lockout_key;
             bool f_lockout_key_valid;
 
-            static unsigned f_message_type;
+            static msg_t f_message_type;
 
-            unsigned f_message_op;
+            op_t f_message_op;
     };
 
 
@@ -192,7 +205,8 @@ namespace dripline
             msg_reply();
             virtual ~msg_reply();
 
-            static msg_reply* create( unsigned a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static reply_ptr_t create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static reply_ptr_t create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
@@ -207,19 +221,19 @@ namespace dripline
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            unsigned get_message_type() const;
-            static unsigned message_type();
+            msg_t get_message_type() const;
+            static msg_t message_type();
 
-            void set_return_code( unsigned a_retcode );
-            unsigned get_return_code() const;
+            void set_return_code( retcode_t a_retcode );
+            retcode_t get_return_code() const;
 
             void set_return_message( const std::string& a_ret_msg );
             const std::string& get_return_message() const;
 
         private:
-            static unsigned f_message_type;
+            static msg_t f_message_type;
 
-            unsigned f_return_code;
+            retcode_t f_return_code;
             std::string f_return_msg;
 
             mutable std::string f_return_buffer;
@@ -235,7 +249,7 @@ namespace dripline
             msg_alert();
             virtual ~msg_alert();
 
-            static msg_alert* create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static alert_ptr_t create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
@@ -250,11 +264,11 @@ namespace dripline
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            unsigned get_message_type() const;
-            static unsigned message_type();
+            msg_t get_message_type() const;
+            static msg_t message_type();
 
         private:
-            static unsigned f_message_type;
+            static msg_t f_message_type;
     };
 
     //********
@@ -280,14 +294,12 @@ namespace dripline
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            unsigned get_message_type() const;
-            static unsigned message_type();
+            msg_t get_message_type() const;
+            static msg_t message_type();
 
         private:
-            static unsigned f_message_type;
+            static msg_t f_message_type;
     };
-
-
 
 
     //***********
@@ -516,9 +528,9 @@ namespace dripline
         return true;
     }
 
-    inline msg_reply* msg_request::reply( unsigned a_ret_code, const std::string& a_ret_msg ) const
+    inline reply_ptr_t msg_request::reply( retcode_t a_ret_code, const std::string& a_ret_msg ) const
     {
-        msg_reply* t_reply = new msg_reply();
+        reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_ret_code );
         t_reply->set_return_message( a_ret_msg );
         t_reply->set_correlation_id( f_correlation_id );
@@ -559,13 +571,13 @@ namespace dripline
         return f_lockout_key_valid;
     }
 
-    inline void msg_request::set_message_op( unsigned a_op )
+    inline void msg_request::set_message_op( op_t a_op )
     {
         f_message_op = a_op;
         return;
     }
 
-    inline unsigned msg_request::get_message_op() const
+    inline op_t msg_request::get_message_op() const
     {
         return f_message_op;
     }
@@ -604,13 +616,13 @@ namespace dripline
         return true;
     }
 
-    inline void msg_reply::set_return_code( unsigned a_retcode )
+    inline void msg_reply::set_return_code( retcode_t a_retcode )
     {
         f_return_code = a_retcode;
         return;
     }
 
-    inline unsigned msg_reply::get_return_code() const
+    inline retcode_t msg_reply::get_return_code() const
     {
         return f_return_code;
     }

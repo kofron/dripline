@@ -7,12 +7,16 @@
 
 #include "service.hh"
 
+#include "dripline_error.hh"
+
 #include "authentication.hh"
 #include "logger.hh"
 
 using scarab::authentication;
 using scarab::param_node;
 using scarab::param_value;
+
+using std::static_pointer_cast;
 
 namespace dripline
 {
@@ -23,7 +27,7 @@ namespace dripline
             f_port( a_port ),
             f_exchange( a_exchange ),
             f_queue_name( a_queue_name ),
-            f_channel( NULL ),
+            f_channel(),
             f_consumer_tag()
     {
     }
@@ -34,9 +38,15 @@ namespace dripline
 
     bool service::start( bool authenticate )
     {
+        INFO( dlog, "Connecting to <" << f_address << ":" << f_port << ">" );
+
         if( ! open_channel( authenticate ) ) return false;
 
         if( ! setup_exchange() ) return false;
+
+        if( f_queue_name.empty() ) return true;
+
+        INFO( dlog, "Starting service on <" << f_queue_name << ">" );
 
         if( ! setup_queue() ) return false;
 
@@ -49,38 +59,90 @@ namespace dripline
 
     bool service::listen()
     {
+        INFO( dlog, "Listening for incoming messages on <" << f_queue_name << ">" );
+
         while( true )
         {
-            INFO( dlog, "Waiting for incoming messages" );
             amqp_envelope_ptr t_envelope = f_channel->BasicConsumeMessage( f_consumer_tag );
 
-            message* t_message = message::process_envelope( t_envelope, f_queue_name );
-
-            if( t_message->is_request() )
+            try
             {
-                msg_request* t_request = static_cast< msg_request* >( t_message );
+                message_ptr_t t_message = message::process_envelope( t_envelope, f_queue_name );
 
+                bool t_msg_handled = true;
+                if( t_message->is_request() )
+                {
+                    t_msg_handled = on_request_message( static_pointer_cast< msg_request >( t_message ) );
+                }
+                else if( t_message->is_alert() )
+                {
+                    t_msg_handled = on_alert_message( static_pointer_cast< msg_alert >( t_message ) );
+                }
+                else if( t_message->is_info() )
+                {
+                    t_msg_handled = on_info_message( static_pointer_cast< msg_info >( t_message ) );
+                }
+                else if( t_message->is_reply() )
+                {
+                    t_msg_handled = on_reply_message( static_pointer_cast< msg_reply >( t_message ) );
+                }
+                if( ! t_msg_handled )
+                {
+                    throw dripline_error() << retcode_t::message_error << "Unknown error while handling message";
+                }
             }
-            else if( t_message->is_alert() )
+            catch( dripline_error& e )
             {
-                msg_alert* t_alert = static_cast< msg_alert* >( t_message );
-
-            }
-            else if( t_message->is_info() )
-            {
-                msg_info* t_info = static_cast< msg_info* >( t_message );
-
-            }
-            else if( t_message->is_reply() )
-            {
-                msg_reply* t_reply = static_cast< msg_reply* >( t_message );
-
+                reply_ptr_t t_reply = msg_reply::create( e, t_envelope->Message()->ReplyTo(), f_queue_name, message::encoding::json );
+                try
+                {
+                    t_reply->do_publish( f_channel, f_exchange, f_consumer_tag );
+                }
+                catch( amqp_exception& e )
+                {
+                    ERROR( dlog, "AMQP exception caught while sending reply: (" << e.reply_code() << ") " << e.reply_text() );
+                }
+                catch( amqp_lib_exception& e )
+                {
+                    ERROR( dlog, "AMQP Library Exception caught while sending reply: (" << e.ErrorCode() << ") " << e.what() );
+                }
+                catch( std::exception& e )
+                {
+                    ERROR( dlog, "Standard exception caught while sending reply: " << e.what() );
+                }
             }
         }
     }
 
+    bool service::on_request_message( request_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle request messages";
+        return false;
+    }
+
+    bool service::on_reply_message( reply_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle reply messages";
+        return false;
+    }
+
+    bool service::on_alert_message( alert_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle alert messages";
+        return false;
+    }
+
+    bool service::on_info_message( info_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle info messages";
+        return false;
+    }
+
+
     bool service::stop()
     {
+        INFO( dlog, "Stopping service on <" << f_queue_name << ">" );
+
         if( ! stop_consuming() ) return false;
 
         return true;

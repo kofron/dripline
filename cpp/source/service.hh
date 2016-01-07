@@ -9,6 +9,7 @@
 #define DRIPLINE_SERVICE_HH_
 
 #include "amqp.hh"
+#include "message.hh"
 
 #include "member_variables.hh"
 
@@ -35,6 +36,12 @@ namespace dripline
             bool send( /* . . . */ );
 
             bool stop();
+
+        protected:
+            virtual bool on_request_message( request_ptr_t a_request );
+            virtual bool on_reply_message( reply_ptr_t a_reply );
+            virtual bool on_alert_message( alert_ptr_t a_alert );
+            virtual bool on_info_message( info_ptr_t a_info );
 
         private:
             bool open_channel( bool authenticate );

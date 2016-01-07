@@ -36,7 +36,7 @@ namespace dripline
     message::message() :
             f_routing_key(),
             f_correlation_id(),
-            f_encoding( k_json ),
+            f_encoding( encoding::json ),
             f_timestamp(),
             f_sender_info( new param_node() ),
             f_sender_package( "N/A" ),
@@ -72,18 +72,18 @@ namespace dripline
         delete f_payload;
     }
 
-    message* message::process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name )
+    message_ptr_t message::process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name )
     {
         param_node* t_msg_node = NULL;
         encoding t_encoding;
         if( a_envelope->Message()->ContentEncoding() == "application/json" )
         {
-            t_encoding = k_json;
+            t_encoding = encoding::json;
             t_msg_node = param_input_json::read_string( a_envelope->Message()->Body() );
         }
         else if( a_envelope->Message()->ContentEncoding() == "application/msgpack" )
         {
-            t_encoding = k_msgpack;
+            t_encoding = encoding::msgpack;
             t_msg_node = param_input_msgpack::read_string( a_envelope->Message()->Body() );
         }
         else
@@ -104,14 +104,14 @@ namespace dripline
                  "Routing key: " << t_routing_key <<
                  *t_msg_node );
 
-        message* t_message = NULL;
-        switch( t_msg_node->get_value< unsigned >( "msgtype" ) )
+        message_ptr_t t_message;
+        switch( t_msg_node->get_value< msg_t >( "msgtype" ) )
         {
-            case T_REQUEST:
+            case msg_t::request:
             {
-                msg_request* t_request = msg_request::create(
+                request_ptr_t t_request = msg_request::create(
                         t_msg_node->node_at( "payload" ),
-                        t_msg_node->get_value< unsigned >( "msgop", OP_UNKNOWN ),
+                        t_msg_node->get_value< op_t >( "msgop", op_t::unknown ),
                         t_routing_key,
                         a_queue_name,
                         t_encoding);
@@ -124,9 +124,22 @@ namespace dripline
                 t_message = t_request;
                 break;
             }
+            // TODO: handle reply, alert, info
+            case msg_t::reply:
+            {
+                throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle reply messages";
+            }
+            case msg_t::alert:
+            {
+                throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle alert messages";
+            }
+            case msg_t::info:
+            {
+                throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle info messages";
+            }
             default:
             {
-                WARN( dlog, "Message received with unhandled type: " << t_msg_node->get_value< unsigned >( "msgtype" ) );
+                WARN( dlog, "Message received with unhandled type: " << t_msg_node->get_value< msg_t >( "msgtype" ) );
                 return NULL;
                 break;
             }
@@ -191,7 +204,7 @@ namespace dripline
 
         switch( f_encoding )
         {
-            case k_json:
+            case encoding::json:
                 if( ! param_output_json::write_string( t_body_node, a_body, param_output_json::k_compact ) )
                 {
                     ERROR( dlog, "Could not convert message body to string" );
@@ -212,10 +225,10 @@ namespace dripline
     {
         switch( f_encoding )
         {
-            case k_json:
+            case encoding::json:
                 return std::string( "application/json" );
                 break;
-            case k_msgpack:
+            case encoding::msgpack:
                 return std::string( "application/msgpack" );
                 break;
             default:
@@ -234,7 +247,7 @@ namespace dripline
             f_reply_to(),
             f_lockout_key( generate_nil_uuid() ),
             f_lockout_key_valid( true ),
-            f_message_op( OP_UNKNOWN )
+            f_message_op( op_t::unknown )
     {
         f_correlation_id = string_from_uuid( generate_random_uuid() );
     }
@@ -244,19 +257,19 @@ namespace dripline
 
     }
 
-    unsigned msg_request::f_message_type = T_REQUEST;
-    unsigned msg_request::message_type()
+    msg_t msg_request::f_message_type = msg_t::request;
+    msg_t msg_request::message_type()
     {
         return msg_request::f_message_type;
     }
-    unsigned msg_request::get_message_type() const
+    msg_t msg_request::get_message_type() const
     {
         return msg_request::f_message_type;
     }
 
-    msg_request* msg_request::create( param_node* a_payload, unsigned a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
-        msg_request* t_request = new msg_request();
+        request_ptr_t t_request = make_shared< msg_request >();
         t_request->set_payload( a_payload );
         t_request->set_message_op( a_msg_op );
         t_request->set_routing_keys( a_routing_key, a_queue_name );
@@ -305,7 +318,7 @@ namespace dripline
 
     msg_reply::msg_reply() :
             message(),
-            f_return_code( R_SUCCESS ),
+            f_return_code( retcode_t::success ),
             f_return_msg(),
             f_return_buffer()
     {
@@ -316,22 +329,33 @@ namespace dripline
 
     }
 
-    unsigned msg_reply::f_message_type = T_REPLY;
-    unsigned msg_reply::message_type()
+    msg_t msg_reply::f_message_type = msg_t::reply;
+    msg_t msg_reply::message_type()
     {
         return msg_reply::f_message_type;
     }
-    unsigned msg_reply::get_message_type() const
+    msg_t msg_reply::get_message_type() const
     {
         return msg_reply::f_message_type;
     }
 
-    msg_reply* msg_reply::create( unsigned a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    reply_ptr_t msg_reply::create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
-        msg_reply* t_reply = new msg_reply();
+        reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_retcode );
         t_reply->set_return_message( a_ret_msg );
         t_reply->set_payload( a_payload );
+        t_reply->set_routing_keys( a_routing_key, a_queue_name );
+        t_reply->set_encoding( a_encoding );
+        return t_reply;
+    }
+
+    static reply_ptr_t msg_reply::create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    {
+        reply_ptr_t t_reply = make_shared< msg_reply >();
+        t_reply->set_return_code( a_error.retcode() );
+        t_reply->set_return_message( a_error.what() );
+        t_reply->set_payload( new param_node() );
         t_reply->set_routing_keys( a_routing_key, a_queue_name );
         t_reply->set_encoding( a_encoding );
         return t_reply;
@@ -367,9 +391,9 @@ namespace dripline
     // Alert
     //*********
 
-    msg_alert* msg_alert::create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    alert_ptr_t msg_alert::create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
-        msg_alert* t_alert = new msg_alert();
+        alert_ptr_t t_alert = make_shared< msg_alert >();
         t_alert->set_payload( a_payload );
         t_alert->set_routing_keys( a_routing_key, a_queue_name );
         t_alert->set_encoding( a_encoding );
@@ -387,12 +411,12 @@ namespace dripline
 
     }
 
-    unsigned msg_alert::f_message_type = T_ALERT;
-    unsigned msg_alert::message_type()
+    msg_t msg_alert::f_message_type = msg_t::alert;
+    msg_t msg_alert::message_type()
     {
         return msg_alert::f_message_type;
     }
-    unsigned msg_alert::get_message_type() const
+    msg_t msg_alert::get_message_type() const
     {
         return msg_alert::f_message_type;
     }
@@ -438,12 +462,12 @@ namespace dripline
 
     }
 
-    unsigned msg_info::f_message_type = T_INFO;
-    unsigned msg_info::message_type()
+    msg_t msg_info::f_message_type = msg_t::info;
+    msg_t msg_info::message_type()
     {
         return msg_info::f_message_type;
     }
-    unsigned msg_info::get_message_type() const
+    msg_t msg_info::get_message_type() const
     {
         return msg_info::f_message_type;
     }
