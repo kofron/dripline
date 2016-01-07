@@ -24,33 +24,42 @@ namespace dripline
     class service
     {
         public:
-            service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_name );
+            service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name = "" );
             virtual ~service();
 
         public:
-            bool initialize() = 0;
+            bool start( bool authenticate = true );
 
-        protected:
-            bool initialize( const vector< string >& a_keys, bool authenticate = true );
+            bool listen();
+
+            bool send( /* . . . */ );
+
+            bool stop();
 
         private:
             bool open_channel( bool authenticate );
 
             bool setup_exchange();
 
+            bool setup_queue();
+
             bool bind_keys( const vector< string >& a_keys );
 
             bool start_consuming();
+
+            bool stop_consuming();
 
         public:
             mv_referrable_const( string, address );
             mv_accessible_noset( unsigned, port );
             mv_referrable_const( string, exchange );
-            mv_referrable_const( string, name );
+            mv_referrable_const( string, queue_name );
 
             mv_referrable_const( amqp_channel_ptr, channel );
 
             mv_referrable_const( string, consumer_tag );
+
+            mv_referrable( vector< string >, keys );
     };
 
 } /* namespace dripline */
