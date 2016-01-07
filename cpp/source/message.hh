@@ -94,8 +94,8 @@ namespace dripline
             mv_referrable_const( string, sender_username );
 
         public:
-            // sets routing key and routing key specifier; the latter by removing the queue name from the beginning of the routing key
-            bool set_routing_keys( const std::string& a_rk, const std::string& a_queue_name);
+            // set the routing key specifier by removing the queue name from the beginning of the routing key
+            bool set_routing_key_specifier( const std::string& a_rk, const std::string& a_queue_name);
 
             virtual msg_t message_type() const = 0;
 
@@ -137,7 +137,7 @@ namespace dripline
             msg_request();
             virtual ~msg_request();
 
-            static request_ptr_t create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static request_ptr_t create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_reply_to, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
@@ -172,8 +172,8 @@ namespace dripline
             msg_reply();
             virtual ~msg_reply();
 
-            static reply_ptr_t create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
-            static reply_ptr_t create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static reply_ptr_t create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, message::encoding a_encoding );
+            static reply_ptr_t create( const dripline_error& a_error, const std::string& a_routing_key, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
@@ -206,7 +206,7 @@ namespace dripline
             msg_alert();
             virtual ~msg_alert();
 
-            static alert_ptr_t create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding );
+            static alert_ptr_t create( param_node* a_payload, const std::string& a_routing_key, message::encoding a_encoding );
 
             bool is_request() const;
             bool is_reply() const;
@@ -253,10 +253,9 @@ namespace dripline
     // Message
     //***********
 
-    inline bool message::set_routing_keys( const std::string& a_rk, const std::string& a_queue_name )
+    inline bool message::set_routing_key_specifier( const std::string& a_rk, const std::string& a_queue_name )
     {
         if( a_rk.find( a_queue_name ) != 0 ) return false;
-        f_routing_key = a_rk;
         f_routing_key_specifier = a_rk;
         f_routing_key_specifier.erase( 0, a_queue_name.size() + 1 ); // 1 added to remove the '.' that separates nodes
         return true;

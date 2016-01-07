@@ -51,9 +51,17 @@ namespace dripline
 
 
         protected:
+            /// Default request handler; throws a dripline_error.
+            /// Override this to enable handling of requests.
             virtual bool on_request_message( request_ptr_t a_request );
+            /// Default reply handler; throws a dripline_error.
+            /// Override this to enable handling of replies.
             virtual bool on_reply_message( reply_ptr_t a_reply );
+            /// Default alert handler; throws a dripline_error.
+            /// Override this to enable handling of alerts.
             virtual bool on_alert_message( alert_ptr_t a_alert );
+            /// Default info handler; throws a dripline_error.
+            /// Override this to enable handling of infos.
             virtual bool on_info_message( info_ptr_t a_info );
 
         private:

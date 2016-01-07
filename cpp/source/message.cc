@@ -116,9 +116,9 @@ namespace dripline
                         t_msg_node->node_at( "payload" ),
                         to_op_t( t_msg_node->get_value< uint32_t >( "msgop", to_uint( op_t::unknown ) ) ),
                         t_routing_key,
-                        a_queue_name,
+                        a_envelope->Message()->ReplyTo(),
                         t_encoding);
-                t_request->reply_to() = a_envelope->Message()->ReplyTo();
+                t_request->set_routing_key_specifier( t_routing_key, a_queue_name );
 
                 bool t_lockout_key_valid = true;
                 t_request->lockout_key() = uuid_from_string( t_msg_node->get_value( "lockout_key", "" ), t_lockout_key_valid );
@@ -127,15 +127,29 @@ namespace dripline
                 t_message = t_request;
                 break;
             }
-            // TODO: handle reply, alert, info
             case msg_t::reply:
             {
-                throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle reply messages";
+                request_ptr_t t_reply = msg_reply::create(
+                        to_retcode_t( t_msg_node->get_value< uint32_t >( "retcode" ) ),
+                        t_msg_node->get_value( "return_msg", "" ),
+                        t_msg_node->node_at( "payload" ),
+                        t_routing_key,
+                        t_encoding);
+
+                t_message = t_reply;
+                break;
             }
             case msg_t::alert:
             {
-                throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle alert messages";
+                request_ptr_t t_alert = msg_alert::create(
+                        t_msg_node->node_at( "payload" ),
+                        t_routing_key,
+                        t_encoding);
+
+                t_message = t_alert;
+                break;
             }
+            // TODO: handle info
             case msg_t::info:
             {
                 throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle info messages";
@@ -259,12 +273,12 @@ namespace dripline
 
     }
 
-    request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, message::encoding a_encoding )
     {
         request_ptr_t t_request = make_shared< msg_request >();
         t_request->set_payload( a_payload );
         t_request->set_message_op( a_msg_op );
-        t_request->set_routing_keys( a_routing_key, a_queue_name );
+        t_request->routing_key() = a_routing_key;
         t_request->set_encoding( a_encoding );
         return t_request;
     }
@@ -294,24 +308,24 @@ namespace dripline
 
     }
 
-    reply_ptr_t msg_reply::create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    reply_ptr_t msg_reply::create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, message::encoding a_encoding )
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_retcode );
         t_reply->return_msg() = a_ret_msg;
         t_reply->set_payload( a_payload );
-        t_reply->set_routing_keys( a_routing_key, a_queue_name );
+        t_reply->routing_key() = a_routing_key;
         t_reply->set_encoding( a_encoding );
         return t_reply;
     }
 
-    reply_ptr_t msg_reply::create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    reply_ptr_t msg_reply::create( const dripline_error& a_error, const std::string& a_routing_key, message::encoding a_encoding )
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_error.retcode() );
         t_reply->return_msg() = a_error.what();
         t_reply->set_payload( new param_node() );
-        t_reply->set_routing_keys( a_routing_key, a_queue_name );
+        t_reply->routing_key() = a_routing_key;
         t_reply->set_encoding( a_encoding );
         return t_reply;
     }
@@ -328,11 +342,11 @@ namespace dripline
     // Alert
     //*********
 
-    alert_ptr_t msg_alert::create( param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    alert_ptr_t msg_alert::create( param_node* a_payload, const std::string& a_routing_key, message::encoding a_encoding )
     {
         alert_ptr_t t_alert = make_shared< msg_alert >();
         t_alert->set_payload( a_payload );
-        t_alert->set_routing_keys( a_routing_key, a_queue_name );
+        t_alert->routing_key() = a_routing_key;
         t_alert->set_encoding( a_encoding );
         return t_alert;
     }
