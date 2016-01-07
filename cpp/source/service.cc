@@ -22,33 +22,54 @@ namespace dripline
 {
     LOGGER( dlog, "service" );
 
-    service::service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name ) :
+    service::service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name, bool a_authenticate ) :
             f_address( a_address ),
             f_port( a_port ),
+            f_username( "guest" ),
+            f_password( "guest" ),
             f_exchange( a_exchange ),
             f_queue_name( a_queue_name ),
             f_channel(),
             f_consumer_tag()
     {
+        if( a_authenticate )
+        {
+            authentication* t_auth = authentication::get_instance();
+            if( ! t_auth->is_loaded() )
+            {
+                throw scarab::error() << "Authentication file was not loaded";
+            }
+
+            const param_node* t_amqp_auth = t_auth->node_at( "amqp" );
+            if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
+            {
+                throw scarab::error() << "AMQP authentication is not available or is not complete";
+            }
+            f_username = t_amqp_auth->get_value( "username" );
+            f_password = t_amqp_auth->get_value( "password" );
+        }
     }
 
     service::~service()
     {
     }
 
-    bool service::start( bool authenticate )
+    bool service::start()
     {
+        if( f_queue_name.empty() )
+        {
+            WARN( dlog, "Service requires a queue name to be started" );
+            return false;
+        }
+
         INFO( dlog, "Connecting to <" << f_address << ":" << f_port << ">" );
 
-        if( ! open_channel( authenticate ) ) return false;
+        f_channel = open_channel();
+        if( ! f_channel ) return false;
 
-        if( ! setup_exchange() ) return false;
+        if( ! setup_exchange( f_channel, f_exchange ) ) return false;
 
-        if( f_queue_name.empty() ) return true;
-
-        INFO( dlog, "Starting service on <" << f_queue_name << ">" );
-
-        if( ! setup_queue() ) return false;
+        if( ! setup_queue( f_channel, f_queue_name ) ) return false;
 
         if( ! bind_keys( f_keys ) ) return false;
 
@@ -96,7 +117,7 @@ namespace dripline
                 reply_ptr_t t_reply = msg_reply::create( e, t_envelope->Message()->ReplyTo(), f_queue_name, message::encoding::json );
                 try
                 {
-                    t_reply->do_publish( f_channel, f_exchange, f_consumer_tag );
+                    send( t_reply );
                 }
                 catch( amqp_exception& e )
                 {
@@ -139,6 +160,108 @@ namespace dripline
     }
 
 
+    amqp_channel_ptr service::send( request_ptr_t a_request, string& a_reply_consumer_tag ) const
+    {
+        DEBUG( dlog, "Sending request with routing key <" << a_request->routing_key() << ">" );
+        return send_withreply( static_pointer_cast< message >( a_request ), a_reply_consumer_tag );
+    }
+
+    bool service::send( reply_ptr_t a_reply ) const
+    {
+        DEBUG( dlog, "Sending reply with routing key <" << a_reply->routing_key() << ">" );
+        return send_noreply( static_pointer_cast< message >( a_reply ) );
+    }
+
+    bool service::send( info_ptr_t a_info ) const
+    {
+        DEBUG( dlog, "Sending info with routing key <" << a_info->routing_key() << ">" );
+        return send_noreply( static_pointer_cast< message >( a_info ) );
+    }
+
+    bool service::send( alert_ptr_t a_alert ) const
+    {
+        DEBUG( dlog, "Sending alert with routing key <" << a_alert->routing_key() << ">" );
+        return send_noreply( static_pointer_cast< message >( a_alert ) );
+    }
+
+    amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag ) const
+    {
+        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
+
+        amqp_channel_ptr t_channel = open_channel();
+        if( ! t_channel )
+        {
+            ERROR( dlog, "Unable to open channel to send a message to <" << a_message->routing_key() << "> using broker <" << f_address << ":" << f_port << ">" );
+            return amqp_channel_ptr();
+        }
+
+        if( ! setup_exchange( t_channel, f_exchange ) )
+        {
+            ERROR( dlog, "Unable to setup the exchange <" << f_exchange << ">" );
+            return amqp_channel_ptr();
+        }
+
+        // create the reply-to queue, and bind the queue to the routing key over the given exchange
+        string t_reply_to = t_channel->DeclareQueue( "" );
+        t_channel->BindQueue( t_reply_to, f_exchange, t_reply_to );
+        a_message->reply_to() = t_reply_to;
+        DEBUG( dlog, "Reply-to for request: " << t_reply_to );
+
+        // begin consuming on the reply-to queue
+        a_reply_consumer_tag = t_channel->BasicConsume( t_reply_to );
+        DEBUG( dlog, "Consumer tag for reply: " << a_reply_consumer_tag );
+
+        try
+        {
+            t_channel->BasicPublish( f_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            return t_channel;
+        }
+        catch( AmqpClient::MessageReturnedException& e )
+        {
+            ERROR( dlog, "Request message could not be sent: " << e.what() );
+            return amqp_channel_ptr();
+        }
+        catch( std::exception& e )
+        {
+            ERROR( dlog, "Error publishing request to queue: " << e.what() );
+            return amqp_channel_ptr();
+        }
+    }
+
+    bool service::send_noreply( message_ptr_t a_message ) const
+    {
+        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
+
+        amqp_channel_ptr t_channel = open_channel();
+        if( ! t_channel )
+        {
+            ERROR( dlog, "Unable to open channel to send a message to <" << a_message->routing_key() << "> using broker <" << f_address << ":" << f_port << ">" );
+            return false;
+        }
+
+        if( ! setup_exchange( t_channel, f_exchange ) )
+        {
+            ERROR( dlog, "Unable to setup the exchange <" << f_exchange << ">" );
+            return false;
+        }
+
+        try
+        {
+            t_channel->BasicPublish( f_exchange, a_message->routing_key(), t_amqp_message, true, false );
+        }
+        catch( AmqpClient::MessageReturnedException& e )
+        {
+            ERROR( dlog, "Request message could not be sent: " << e.what() );
+            return false;
+        }
+        catch( std::exception& e )
+        {
+            ERROR( dlog, "Error publishing request to queue: " << e.what() );
+            return false;
+        }
+        return true;
+    }
+
     bool service::stop()
     {
         INFO( dlog, "Stopping service on <" << f_queue_name << ">" );
@@ -148,60 +271,37 @@ namespace dripline
         return true;
     }
 
-    bool service::open_channel( bool authenticate )
+    amqp_channel_ptr service::open_channel() const
     {
         try
         {
-            string t_username = "guest";
-            string t_password = "guest";
-            if( authenticate )
-            {
-                authentication* t_auth = authentication::get_instance();
-                if( ! t_auth->is_loaded() )
-                {
-                    ERROR( dlog, "Authentications were not loaded; create AMQP connection" );
-                    f_channel = AmqpClient::Channel::ptr_t();
-                    return false;
-                }
-                const param_node* t_amqp_auth = t_auth->node_at( "amqp" );
-                if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
-                {
-                    ERROR( dlog, "AMQP authentication is not available or is not complete" );
-                    f_channel = AmqpClient::Channel::ptr_t();
-                    return false;
-                }
-                t_username = t_amqp_auth->get_value( "username" );
-                t_password = t_amqp_auth->get_value( "password" );
-            }
             DEBUG( dlog, "Opening AMQP connection and creating channel to " << f_address << ":" << f_port );
-            DEBUG( dlog, "Using broker authentication: " << t_username << ":" << t_password );
-            f_channel = AmqpClient::Channel::Create( f_address, f_port, t_username, t_password );
-            return true;
+            DEBUG( dlog, "Using broker authentication: " << f_username << ":" << f_password );
+            return AmqpClient::Channel::Create( f_address, f_port, f_username, f_password );
         }
         catch( amqp_exception& e )
         {
-            ERROR( dlog, "AMQP exception caught while declaring exchange: (" << e.reply_code() << ") " << e.reply_text() );
-            return false;
+            ERROR( dlog, "AMQP exception caught while opening channel: (" << e.reply_code() << ") " << e.reply_text() );
+            return amqp_channel_ptr();
         }
         catch( amqp_lib_exception& e )
         {
             ERROR( dlog, "AMQP Library Exception caught while creating channel: (" << e.ErrorCode() << ") " << e.what() );
-            return false;
+            return amqp_channel_ptr();
         }
         catch( std::exception& e )
         {
             ERROR( dlog, "Standard exception caught while creating channel: " << e.what() );
-            return false;
+            return amqp_channel_ptr();
         }
-
     }
 
-    bool service::setup_exchange()
+    bool service::setup_exchange( amqp_channel_ptr a_channel, const string& a_exchange ) const
     {
         try
         {
-            DEBUG( dlog, "Declaring exchange <" << f_exchange << ">" );
-            f_channel->DeclareExchange( f_exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, false, false, false );
+            DEBUG( dlog, "Declaring exchange <" << a_exchange << ">" );
+            a_channel->DeclareExchange( a_exchange, AmqpClient::Channel::EXCHANGE_TYPE_TOPIC, false, false, false );
             return true;
         }
         catch( amqp_exception& e )
@@ -216,12 +316,12 @@ namespace dripline
         }
     }
 
-    bool service::setup_queue()
+    bool service::setup_queue( amqp_channel_ptr a_channel, const string& a_queue_name ) const
     {
         try
         {
-            DEBUG( dlog, "Declaring queue <" << f_queue_name << ">" );
-            f_channel->DeclareQueue( f_queue_name, false, false, true, true );
+            DEBUG( dlog, "Declaring queue <" << a_queue_name << ">" );
+            a_channel->DeclareQueue( a_queue_name, false, false, true, true );
             return true;
         }
         catch( amqp_exception& e )

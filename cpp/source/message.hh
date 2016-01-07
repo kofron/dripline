@@ -9,6 +9,7 @@
 #define DRIPLINE_MESSAGE_HH_
 
 #include "scarab_api.hh"
+#include "member_variables.hh"
 #include "param.hh"
 
 #include "amqp.hh"
@@ -20,6 +21,7 @@ using std::shared_ptr;
 using std::make_shared;
 
 #include <string>
+using std::string;
 
 using scarab::param_node;
 using scarab::param_value;
@@ -67,11 +69,9 @@ namespace dripline
             static message_ptr_t process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name );
 
             /// from message object to AMQP
-            virtual bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag ) = 0;
-
-        protected:
             amqp_message_ptr create_amqp_message() const;
 
+        protected:
             virtual bool derived_modify_amqp_message( amqp_message_ptr t_amqp_msg ) const = 0;
             virtual bool derived_modify_message_body( param_node& a_node ) const = 0;
 
@@ -79,68 +79,48 @@ namespace dripline
             std::string interpret_encoding() const;
 
         public:
-            // sets routing key and mantis routing key; the latter by removing the queue name from the beginning of the routing key
+            mv_referrable( string, routing_key );
+            mv_referrable( string, routing_key_specifier );
+            mv_referrable( string, correlation_id );
+            mv_referrable( string, reply_to );
+            mv_accessible( encoding, encoding );
+            mv_referrable( string, timestamp );
+
+            mv_referrable_const( string, sender_package );
+            mv_referrable_const( string, sender_exe );
+            mv_referrable_const( string, sender_version );
+            mv_referrable_const( string, sender_commit );
+            mv_referrable_const( string, sender_hostname );
+            mv_referrable_const( string, sender_username );
+
+        public:
+            // sets routing key and routing key specifier; the latter by removing the queue name from the beginning of the routing key
             bool set_routing_keys( const std::string& a_rk, const std::string& a_queue_name);
 
-            void set_routing_key( const std::string& a_rk );
-            const std::string& get_routing_key() const;
-
-            void set_mantis_routing_key( const std::string& a_mrk );
-            const std::string& get_mantis_routing_key() const;
-
-            void set_correlation_id( const std::string& a_id );
-            const std::string& get_correlation_id() const;
-
-            void set_encoding( encoding a_enc );
-            encoding get_encoding() const;
-
-            virtual msg_t get_message_type() const = 0;
-
-            void set_timestamp( const std::string& a_ts );
-            const std::string& get_timestamp() const;
+            virtual msg_t message_type() const = 0;
 
             void set_sender_info( param_node* a_payload );
             const param_node& get_sender_info() const;
             param_node& get_sender_info();
 
             void set_sender_package( const std::string& a_pkg );
-            const std::string& get_sender_package() const;
 
             void set_sender_exe( const std::string& a_exe );
-            const std::string& get_sender_exe() const;
 
             void set_sender_version( const std::string& a_vsn );
-            const std::string& get_sender_version() const;
 
             void set_sender_commit( const std::string& a_cmt );
-            const std::string& get_sender_commit() const;
 
             void set_sender_hostname( const std::string& a_host );
-            const std::string& get_sender_hostname() const;
 
             void set_sender_username( const std::string& a_user );
-            const std::string& get_sender_username() const;
 
             void set_payload( param_node* a_payload );
             const param_node& get_payload() const;
             param_node& get_payload();
 
         protected:
-            std::string f_routing_key;
-            std::string f_mantis_routing_key;
-            std::string f_correlation_id;
-            encoding f_encoding;
-
-            std::string f_timestamp;
-
             param_node* f_sender_info;
-            std::string f_sender_package;
-            std::string f_sender_exe;
-            std::string f_sender_version;
-            std::string f_sender_commit;
-            std::string f_sender_hostname;
-            std::string f_sender_username;
-
             param_node* f_payload;
     };
 
@@ -166,37 +146,19 @@ namespace dripline
 
             reply_ptr_t reply( retcode_t a_ret_code, const std::string& a_ret_msg ) const;
 
-        public:
-            bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag );
-
         private:
             bool derived_modify_amqp_message( amqp_message_ptr t_amqp_msg ) const;
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            msg_t get_message_type() const;
-            static msg_t message_type();
+            virtual msg_t message_type() const;
 
-            void set_reply_to( const std::string& a_rt );
-            const std::string& get_reply_to() const;
+            mv_accessible_static_noset( msg_t, message_type );
 
-            void set_lockout_key( const uuid_t& a_key );
-            const uuid_t& get_lockout_key() const;
+            mv_referrable( uuid_t, lockout_key );
+            mv_accessible( bool, lockout_key_valid );
+            mv_accessible( op_t, message_op );
 
-            void set_lockout_key_valid( bool a_flag );
-            bool get_lockout_key_valid() const;
-
-            void set_message_op( op_t a_op );
-            op_t get_message_op() const;
-
-        private:
-            std::string f_reply_to;
-            uuid_t f_lockout_key;
-            bool f_lockout_key_valid;
-
-            static msg_t f_message_type;
-
-            op_t f_message_op;
     };
 
 
@@ -218,29 +180,19 @@ namespace dripline
             bool is_alert() const;
             bool is_info() const;
 
-        public:
-            bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag );
-
         private:
             bool derived_modify_amqp_message( amqp_message_ptr t_amqp_msg ) const;
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            msg_t get_message_type() const;
-            static msg_t message_type();
+            virtual msg_t message_type() const;
 
-            void set_return_code( retcode_t a_retcode );
-            retcode_t get_return_code() const;
+            mv_accessible_static_noset( msg_t, message_type );
 
-            void set_return_message( const std::string& a_ret_msg );
-            const std::string& get_return_message() const;
+            mv_accessible( retcode_t, return_code );
+            mv_referrable( string, return_msg );
 
         private:
-            static msg_t f_message_type;
-
-            retcode_t f_return_code;
-            std::string f_return_msg;
-
             mutable std::string f_return_buffer;
     };
 
@@ -261,19 +213,14 @@ namespace dripline
             bool is_alert() const;
             bool is_info() const;
 
-        public:
-            bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag );
-
         private:
             bool derived_modify_amqp_message( amqp_message_ptr t_amqp_msg ) const;
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            msg_t get_message_type() const;
-            static msg_t message_type();
+            virtual msg_t message_type() const;
 
-        private:
-            static msg_t f_message_type;
+            mv_accessible_static_noset( msg_t, message_type );
     };
 
     //********
@@ -291,19 +238,14 @@ namespace dripline
             bool is_alert() const;
             bool is_info() const;
 
-        public:
-            bool do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag );
-
         private:
             bool derived_modify_amqp_message( amqp_message_ptr t_amqp_msg ) const;
             bool derived_modify_message_body( param_node& a_node ) const;
 
         public:
-            msg_t get_message_type() const;
-            static msg_t message_type();
+            virtual msg_t message_type() const;
 
-        private:
-            static msg_t f_message_type;
+            mv_accessible_static_noset( msg_t, message_type );
     };
 
 
@@ -315,66 +257,10 @@ namespace dripline
     {
         if( a_rk.find( a_queue_name ) != 0 ) return false;
         f_routing_key = a_rk;
-        f_mantis_routing_key = a_rk;
-        f_mantis_routing_key.erase( 0, a_queue_name.size() + 1 ); // 1 added to remove the '.' that separates nodes
+        f_routing_key_specifier = a_rk;
+        f_routing_key_specifier.erase( 0, a_queue_name.size() + 1 ); // 1 added to remove the '.' that separates nodes
         return true;
     }
-
-    inline void message::set_routing_key( const std::string& a_rk )
-    {
-        f_routing_key = a_rk;
-        return;
-    }
-
-    inline const std::string& message::get_routing_key() const
-    {
-        return f_routing_key;
-    }
-
-    inline void message::set_mantis_routing_key( const std::string& a_mrk )
-    {
-        f_mantis_routing_key = a_mrk;
-        return;
-    }
-
-    inline const std::string& message::get_mantis_routing_key() const
-    {
-        return f_mantis_routing_key;
-    }
-
-    inline void message::set_correlation_id( const std::string& a_id )
-    {
-        f_correlation_id = a_id;
-        return;
-    }
-
-    inline const std::string& message::get_correlation_id() const
-    {
-        return f_correlation_id;
-    }
-
-    inline void message::set_encoding( encoding a_enc )
-    {
-        f_encoding = a_enc;
-        return;
-    }
-
-    inline message::encoding message::get_encoding() const
-    {
-        return f_encoding;
-    }
-
-    inline void message::set_timestamp( const std::string& a_ts )
-    {
-        f_timestamp = a_ts;
-        return;
-    }
-
-    inline const std::string& message::get_timestamp() const
-    {
-        return f_timestamp;
-    }
-
 
     inline void message::set_sender_info( param_node* a_sender_info )
     {
@@ -411,24 +297,12 @@ namespace dripline
         return;
     }
 
-    inline const std::string& message::get_sender_package() const
-    {
-        return f_sender_package;
-    }
-
-
     inline void message::set_sender_exe( const std::string& a_exe )
     {
         f_sender_info->value_at( "exe" )->set( a_exe );
         f_sender_exe = a_exe;
         return;
     }
-
-    inline const std::string& message::get_sender_exe() const
-    {
-        return f_sender_exe;
-    }
-
 
     inline void message::set_sender_version( const std::string& a_vsn )
     {
@@ -437,24 +311,12 @@ namespace dripline
         return;
     }
 
-    inline const std::string& message::get_sender_version() const
-    {
-        return f_sender_version;
-    }
-
-
     inline void message::set_sender_commit( const std::string& a_cmt )
     {
         f_sender_info->value_at( "commit" )->set( a_cmt );
         f_sender_commit = a_cmt;
         return;
     }
-
-    inline const std::string& message::get_sender_commit() const
-    {
-        return f_sender_commit;
-    }
-
 
     inline void message::set_sender_hostname( const std::string& a_host )
     {
@@ -463,24 +325,12 @@ namespace dripline
         return;
     }
 
-    inline const std::string& message::get_sender_hostname() const
-    {
-        return f_sender_hostname;
-    }
-
-
     inline void message::set_sender_username( const std::string& a_user )
     {
         f_sender_info->value_at( "username" )->set( a_user );
         f_sender_username = a_user;
         return;
     }
-
-    inline const std::string& message::get_sender_username() const
-    {
-        return f_sender_username;
-    }
-
 
     inline void message::set_payload( param_node* a_payload )
     {
@@ -529,7 +379,7 @@ namespace dripline
     inline bool msg_request::derived_modify_message_body( param_node& a_node ) const
     {
         a_node.add( "msgop", new param_value( to_uint(f_message_op) ) );
-        a_node.add( "lockout_key", new param_value( string_from_uuid( get_lockout_key() ) ) );
+        a_node.add( "lockout_key", new param_value( string_from_uuid( lockout_key() ) ) );
         return true;
     }
 
@@ -537,54 +387,10 @@ namespace dripline
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_ret_code );
-        t_reply->set_return_message( a_ret_msg );
-        t_reply->set_correlation_id( f_correlation_id );
-        t_reply->set_routing_key( f_reply_to );
+        t_reply->return_msg() = a_ret_msg;
+        t_reply->correlation_id() = f_correlation_id;
+        t_reply->routing_key() = f_reply_to;
         return t_reply;
-    }
-
-    inline void msg_request::set_reply_to( const std::string& a_rt )
-    {
-        f_reply_to = a_rt;
-        return;
-    }
-
-    inline const std::string& msg_request::get_reply_to() const
-    {
-        return f_reply_to;
-    }
-
-    inline void msg_request::set_lockout_key( const uuid_t& a_key )
-    {
-        f_lockout_key = a_key;
-        return;
-    }
-
-    inline const uuid_t& msg_request::get_lockout_key() const
-    {
-        return f_lockout_key;
-    }
-
-    inline void msg_request::set_lockout_key_valid( bool a_flag )
-    {
-        f_lockout_key_valid = a_flag;
-        return;
-    }
-
-    inline bool msg_request::get_lockout_key_valid() const
-    {
-        return f_lockout_key_valid;
-    }
-
-    inline void msg_request::set_message_op( op_t a_op )
-    {
-        f_message_op = a_op;
-        return;
-    }
-
-    inline op_t msg_request::get_message_op() const
-    {
-        return f_message_op;
     }
 
 
@@ -620,29 +426,6 @@ namespace dripline
         a_node.add( "return_msg", new param_value( f_return_msg ) );
         return true;
     }
-
-    inline void msg_reply::set_return_code( retcode_t a_retcode )
-    {
-        f_return_code = a_retcode;
-        return;
-    }
-
-    inline retcode_t msg_reply::get_return_code() const
-    {
-        return f_return_code;
-    }
-
-    inline void msg_reply::set_return_message( const std::string& a_ret_msg )
-    {
-        f_return_msg = a_ret_msg;
-        return;
-    }
-
-    inline const std::string& msg_reply::get_return_message() const
-    {
-        return f_return_msg;
-    }
-
 
     //*********
     // Alert

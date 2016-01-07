@@ -38,15 +38,16 @@ namespace dripline
     message::message() :
             f_routing_key(),
             f_correlation_id(),
+            f_reply_to(),
             f_encoding( encoding::json ),
             f_timestamp(),
-            f_sender_info( new param_node() ),
             f_sender_package( "N/A" ),
             f_sender_exe( "N/A" ),
             f_sender_version( "N/A" ),
             f_sender_commit( "N/A" ),
             f_sender_hostname( "N/A" ),
             f_sender_username( "N/A" ),
+            f_sender_info( new param_node() ),
             f_payload( new param_node() )
     {
         // make sure the sender_info node is filled out correctly
@@ -117,10 +118,10 @@ namespace dripline
                         t_routing_key,
                         a_queue_name,
                         t_encoding);
-                t_request->set_reply_to( a_envelope->Message()->ReplyTo() );
+                t_request->reply_to() = a_envelope->Message()->ReplyTo();
 
                 bool t_lockout_key_valid = true;
-                t_request->set_lockout_key( uuid_from_string( t_msg_node->get_value( "lockout_key", "" ), t_lockout_key_valid ) );
+                t_request->lockout_key() = uuid_from_string( t_msg_node->get_value( "lockout_key", "" ), t_lockout_key_valid );
                 t_request->set_lockout_key_valid( t_lockout_key_valid );
 
                 t_message = t_request;
@@ -148,8 +149,8 @@ namespace dripline
         }
 
         // set message fields
-        t_message->set_correlation_id( a_envelope->Message()->CorrelationId() );
-        t_message->set_timestamp( t_msg_node->get_value( "timestamp", "" ) );
+        t_message->correlation_id() = a_envelope->Message()->CorrelationId();
+        t_message->timestamp() = t_msg_node->get_value( "timestamp", "" );
 
         t_message->set_sender_info( new param_node( *(t_msg_node->node_at( "sender_info" ) ) ) );
 
@@ -193,7 +194,7 @@ namespace dripline
     bool message::encode_message_body( std::string& a_body ) const
     {
         param_node t_body_node;
-        t_body_node.add( "msgtype", param_value( to_uint( get_message_type() ) ) );
+        t_body_node.add( "msgtype", param_value( to_uint( message_type() ) ) );
         t_body_node.add( "timestamp", param_value( scarab::get_absolute_time_string() ) );
         t_body_node.add( "sender_info", new param_node( *f_sender_info ) );
         t_body_node.add( "payload", f_payload->clone() ); // use a clone of f_payload
@@ -246,7 +247,6 @@ namespace dripline
 
     msg_request::msg_request() :
             message(),
-            f_reply_to(),
             f_lockout_key( generate_nil_uuid() ),
             f_lockout_key_valid( true ),
             f_message_op( op_t::unknown )
@@ -259,16 +259,6 @@ namespace dripline
 
     }
 
-    msg_t msg_request::f_message_type = msg_t::request;
-    msg_t msg_request::message_type()
-    {
-        return msg_request::f_message_type;
-    }
-    msg_t msg_request::get_message_type() const
-    {
-        return msg_request::f_message_type;
-    }
-
     request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
         request_ptr_t t_request = make_shared< msg_request >();
@@ -279,38 +269,11 @@ namespace dripline
         return t_request;
     }
 
-    bool msg_request::do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag )
+    msg_t msg_request::s_message_type = msg_t::request;
+
+    msg_t msg_request::message_type() const
     {
-        // create the reply-to queue, and bind the queue to the routing key over the given exchange
-        string t_reply_to = a_channel->DeclareQueue( "" );
-        a_channel->BindQueue( t_reply_to, a_exchange, t_reply_to );
-        set_reply_to( t_reply_to );
-        DEBUG( dlog, "Reply-to for request: " << t_reply_to );
-
-        // begin consuming on the reply-to queue
-        // TODO: is this where this should be done?
-        a_reply_consumer_tag = a_channel->BasicConsume( t_reply_to );
-        DEBUG( dlog, "Consumer tag for reply: " << a_reply_consumer_tag );
-
-        INFO( dlog, "Sending request with routing key <" << get_routing_key() << ">" );
-
-        amqp_message_ptr t_message = create_amqp_message();
-
-        try
-        {
-            a_channel->BasicPublish( a_exchange, f_routing_key, t_message, true, false );
-        }
-        catch( AmqpClient::MessageReturnedException& e )
-        {
-            ERROR( dlog, "Request message could not be sent: " << e.what() );
-            return false;
-        }
-        catch( std::exception& e )
-        {
-            ERROR( dlog, "Error publishing request to queue: " << e.what() );
-            return false;
-        }
-        return true;
+        return msg_request::s_message_type;
     }
 
 
@@ -331,21 +294,11 @@ namespace dripline
 
     }
 
-    msg_t msg_reply::f_message_type = msg_t::reply;
-    msg_t msg_reply::message_type()
-    {
-        return msg_reply::f_message_type;
-    }
-    msg_t msg_reply::get_message_type() const
-    {
-        return msg_reply::f_message_type;
-    }
-
     reply_ptr_t msg_reply::create( retcode_t a_retcode, const std::string& a_ret_msg, param_node* a_payload, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_retcode );
-        t_reply->set_return_message( a_ret_msg );
+        t_reply->return_msg() = a_ret_msg;
         t_reply->set_payload( a_payload );
         t_reply->set_routing_keys( a_routing_key, a_queue_name );
         t_reply->set_encoding( a_encoding );
@@ -356,36 +309,18 @@ namespace dripline
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_error.retcode() );
-        t_reply->set_return_message( a_error.what() );
+        t_reply->return_msg() = a_error.what();
         t_reply->set_payload( new param_node() );
         t_reply->set_routing_keys( a_routing_key, a_queue_name );
         t_reply->set_encoding( a_encoding );
         return t_reply;
     }
 
-    bool msg_reply::do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag )
+    msg_t msg_reply::s_message_type = msg_t::reply;
+
+    msg_t msg_reply::message_type() const
     {
-        INFO( dlog, "Sending reply with routing key <" << get_routing_key() << ">" );
-
-        a_reply_consumer_tag.clear(); // no reply expected
-
-        amqp_message_ptr t_message = create_amqp_message();
-
-        try
-        {
-            a_channel->BasicPublish( a_exchange, f_routing_key, t_message, true, false );
-        }
-        catch( AmqpClient::MessageReturnedException& e )
-        {
-            ERROR( dlog, "Request message could not be sent: " << e.what() );
-            return false;
-        }
-        catch( std::exception& e )
-        {
-            ERROR( dlog, "Error publishing request to queue: " << e.what() );
-            return false;
-        }
-        return true;
+        return msg_reply::s_message_type;
     }
 
 
@@ -413,39 +348,11 @@ namespace dripline
 
     }
 
-    msg_t msg_alert::f_message_type = msg_t::alert;
-    msg_t msg_alert::message_type()
+    msg_t msg_alert::s_message_type = msg_t::alert;
+
+    msg_t msg_alert::message_type() const
     {
-        return msg_alert::f_message_type;
-    }
-    msg_t msg_alert::get_message_type() const
-    {
-        return msg_alert::f_message_type;
-    }
-
-    bool msg_alert::do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag )
-    {
-        INFO( dlog, "Sending alert with routing key <" << get_routing_key() << ">" );
-
-        a_reply_consumer_tag.clear(); // no reply expected
-
-        amqp_message_ptr t_message = create_amqp_message();
-
-        try
-        {
-            a_channel->BasicPublish( a_exchange, f_routing_key, t_message, true, false );
-        }
-        catch( AmqpClient::MessageReturnedException& e )
-        {
-            ERROR( dlog, "Alert message could not be sent: " << e.what() );
-            return false;
-        }
-        catch( std::exception& e )
-        {
-            ERROR( dlog, "Error publishing alert to queue: " << e.what() );
-            return false;
-        }
-        return true;
+        return msg_alert::s_message_type;
     }
 
 
@@ -464,39 +371,11 @@ namespace dripline
 
     }
 
-    msg_t msg_info::f_message_type = msg_t::info;
-    msg_t msg_info::message_type()
+    msg_t msg_info::s_message_type = msg_t::info;
+
+    msg_t msg_info::message_type() const
     {
-        return msg_info::f_message_type;
-    }
-    msg_t msg_info::get_message_type() const
-    {
-        return msg_info::f_message_type;
-    }
-
-    bool msg_info::do_publish( amqp_channel_ptr a_channel, const std::string& a_exchange, std::string& a_reply_consumer_tag )
-    {
-        INFO( dlog, "Sending info with routing key <" << get_routing_key() << ">" );
-
-        a_reply_consumer_tag.clear(); // no reply expected
-
-        amqp_message_ptr t_message = create_amqp_message();
-
-        try
-        {
-            a_channel->BasicPublish( a_exchange, f_routing_key, t_message, true, false );
-        }
-        catch( AmqpClient::MessageReturnedException& e )
-        {
-            ERROR( dlog, "Request message could not be sent: " << e.what() );
-            return false;
-        }
-        catch( std::exception& e )
-        {
-            ERROR( dlog, "Error publishing request to queue: " << e.what() );
-            return false;
-        }
-        return true;
+        return msg_info::s_message_type;
     }
 
 
