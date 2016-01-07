@@ -10,13 +10,15 @@
 #include "message.hh"
 
 #include "dripline_constants.hh"
-//#include "mt_broker.hh"
+#include "dripline_error.hh"
 
 #include "logger.hh"
 #include "param_json.hh"
 #include "param_msgpack.hh"
 #include "time.hh"
 //#include "mt_version.hh"
+
+#include <map>
 
 using scarab::param_input_json;
 using scarab::param_output_json;
@@ -105,13 +107,13 @@ namespace dripline
                  *t_msg_node );
 
         message_ptr_t t_message;
-        switch( t_msg_node->get_value< msg_t >( "msgtype" ) )
+        switch( to_msg_t( t_msg_node->get_value< uint32_t >( "msgtype" ) ) )
         {
             case msg_t::request:
             {
                 request_ptr_t t_request = msg_request::create(
                         t_msg_node->node_at( "payload" ),
-                        t_msg_node->get_value< op_t >( "msgop", op_t::unknown ),
+                        to_op_t( t_msg_node->get_value< uint32_t >( "msgop", to_uint( op_t::unknown ) ) ),
                         t_routing_key,
                         a_queue_name,
                         t_encoding);
@@ -139,7 +141,7 @@ namespace dripline
             }
             default:
             {
-                WARN( dlog, "Message received with unhandled type: " << t_msg_node->get_value< msg_t >( "msgtype" ) );
+                WARN( dlog, "Message received with unhandled type: " << t_msg_node->get_value< uint32_t >( "msgtype" ) );
                 return NULL;
                 break;
             }
@@ -191,7 +193,7 @@ namespace dripline
     bool message::encode_message_body( std::string& a_body ) const
     {
         param_node t_body_node;
-        t_body_node.add( "msgtype", param_value( get_message_type() ) );
+        t_body_node.add( "msgtype", param_value( to_uint( get_message_type() ) ) );
         t_body_node.add( "timestamp", param_value( scarab::get_absolute_time_string() ) );
         t_body_node.add( "sender_info", new param_node( *f_sender_info ) );
         t_body_node.add( "payload", f_payload->clone() ); // use a clone of f_payload
@@ -350,7 +352,7 @@ namespace dripline
         return t_reply;
     }
 
-    static reply_ptr_t msg_reply::create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
+    reply_ptr_t msg_reply::create( const dripline_error& a_error, const std::string& a_routing_key, const std::string& a_queue_name, message::encoding a_encoding )
     {
         reply_ptr_t t_reply = make_shared< msg_reply >();
         t_reply->set_return_code( a_error.retcode() );
@@ -496,5 +498,14 @@ namespace dripline
         }
         return true;
     }
+
+
+
+    std::ostream& operator<<( std::ostream& a_os, message::encoding a_enc )
+    {
+        static std::map< message::encoding, string > s_enc_strings = { { message::encoding::json, "json" }, { message::encoding::msgpack, "msgpack" } };
+        return a_os << s_enc_strings[ a_enc ];
+    }
+
 
 } /* namespace mantis */

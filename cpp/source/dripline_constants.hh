@@ -8,16 +8,18 @@
 #ifndef DRIPLINE_CONSTANTS_HH_
 #define DRIPLINE_CONSTANTS_HH_
 
+#include <cstdint>
 #include <limits>
+#include <ostream>
 
 namespace dripline
 {
 
-// Dripline message constants
-// Conforming to the dripline wire protocol: https://github.com/project8/hardware/wiki/Wire-Protocol
-// Please be sure that these constants are kept in sync with the dripline constants.
+    // Dripline message constants
+    // Conforming to the dripline wire protocol: https://github.com/project8/hardware/wiki/Wire-Protocol
+    // Please be sure that these constants are kept in sync with the dripline constants.
 
-// Operation constants
+    // Operation constants
     enum class op_t:uint32_t {
             set = 0,
             get = 1,
@@ -25,8 +27,13 @@ namespace dripline
             send = 7,
             run = 8,
             cmd = 9,
-            unknown = std::numeric_limits::max< uint32_t >()
+            unknown = std::numeric_limits< uint32_t >::max()
     };
+
+    // Conversion functions for use when a numeric value is needed
+    uint32_t to_uint( op_t an_op );
+    op_t to_op_t( uint32_t an_op_uint );
+    std::ostream& operator<<( std::ostream& a_os, op_t an_op );
 
     // Message type constants
     enum class msg_t:uint32_t
@@ -36,6 +43,11 @@ namespace dripline
         alert = 4,
         info = 5
     };
+
+    // Conversion functions for use when a numeric value is needed
+    uint32_t to_uint( msg_t a_msg );
+    msg_t to_msg_t( uint32_t a_msg_uint );
+    std::ostream& operator<<( std::ostream& a_os, msg_t a_msg );
 
     // Return codes
     enum class retcode_t:uint32_t
@@ -62,6 +74,11 @@ namespace dripline
         message_error_access_denied = 307,
         message_error_invalid_key = 308
     };
+
+    // Conversion functions for use when a numeric value is needed
+    uint32_t to_uint( retcode_t a_ret );
+    retcode_t to_retcode_t( uint32_t a_ret_uint );
+    std::ostream& operator<<( std::ostream& a_os, retcode_t a_ret );
 
 } /* namespace dripline */
 

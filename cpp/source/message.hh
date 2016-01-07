@@ -12,6 +12,7 @@
 #include "param.hh"
 
 #include "amqp.hh"
+#include "dripline_constants.hh"
 #include "uuid.hh"
 
 #include <memory>
@@ -25,6 +26,8 @@ using scarab::param_value;
 
 namespace dripline
 {
+    class dripline_error;
+
     class message;
     class msg_request;
     class msg_reply;
@@ -91,7 +94,7 @@ namespace dripline
             void set_encoding( encoding a_enc );
             encoding get_encoding() const;
 
-            virtual unsigned get_message_type() const = 0;
+            virtual msg_t get_message_type() const = 0;
 
             void set_timestamp( const std::string& a_ts );
             const std::string& get_timestamp() const;
@@ -140,6 +143,8 @@ namespace dripline
 
             param_node* f_payload;
     };
+
+    std::ostream& operator<<( std::ostream& a_os, message::encoding a_enc );
 
 
     //***********
@@ -523,7 +528,7 @@ namespace dripline
 
     inline bool msg_request::derived_modify_message_body( param_node& a_node ) const
     {
-        a_node.add( "msgop", new param_value( f_message_op ) );
+        a_node.add( "msgop", new param_value( to_uint(f_message_op) ) );
         a_node.add( "lockout_key", new param_value( string_from_uuid( get_lockout_key() ) ) );
         return true;
     }
@@ -611,7 +616,7 @@ namespace dripline
 
     inline bool msg_reply::derived_modify_message_body( param_node& a_node ) const
     {
-        a_node.add( "retcode", new param_value( f_return_code ) );
+        a_node.add( "retcode", new param_value( to_uint(f_return_code) ) );
         a_node.add( "return_msg", new param_value( f_return_msg ) );
         return true;
     }

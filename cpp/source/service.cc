@@ -160,13 +160,15 @@ namespace dripline
                 if( ! t_auth->is_loaded() )
                 {
                     ERROR( dlog, "Authentications were not loaded; create AMQP connection" );
-                    return AmqpClient::Channel::ptr_t();
+                    f_channel = AmqpClient::Channel::ptr_t();
+                    return false;
                 }
                 const param_node* t_amqp_auth = t_auth->node_at( "amqp" );
                 if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
                 {
                     ERROR( dlog, "AMQP authentication is not available or is not complete" );
-                    return AmqpClient::Channel::ptr_t();
+                    f_channel = AmqpClient::Channel::ptr_t();
+                    return false;
                 }
                 t_username = t_amqp_auth->get_value( "username" );
                 t_password = t_amqp_auth->get_value( "password" );
@@ -283,7 +285,7 @@ namespace dripline
         try
         {
             DEBUG( dlog, "Stopping consuming messages" );
-            f_consumer_tag = f_channel->BasicCancel( f_consumer_tag );
+            f_channel->BasicCancel( f_consumer_tag );
             return true;
         }
         catch( amqp_exception& e )

@@ -1,7 +1,7 @@
 
 #define SCARAB_API_EXPORTS
 
-#include "error.hh"
+#include "dripline_error.hh"
 
 namespace dripline
 {
