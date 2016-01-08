@@ -11,23 +11,26 @@
 #include "scarab_api.hh"
 #include "member_variables.hh"
 #include "param.hh"
+#include "parsable.hh"
 
 #include "amqp.hh"
 #include "dripline_constants.hh"
 #include "uuid.hh"
 
 #include <memory>
-using std::shared_ptr;
-using std::make_shared;
 
 #include <string>
-using std::string;
-
-using scarab::param_node;
-using scarab::param_value;
 
 namespace dripline
 {
+    using std::shared_ptr;
+    using std::make_shared;
+    using std::string;
+
+    using scarab::param_node;
+    using scarab::param_value;
+    using scarab::parsable;
+
     class dripline_error;
 
     class message;
@@ -81,6 +84,7 @@ namespace dripline
         public:
             mv_referrable( string, routing_key );
             mv_referrable( string, routing_key_specifier );
+            mv_assignable( parsable, parsed_rks );
             mv_referrable( string, correlation_id );
             mv_referrable( string, reply_to );
             mv_accessible( encoding, encoding );
@@ -258,6 +262,7 @@ namespace dripline
         if( a_rk.find( a_queue_name ) != 0 ) return false;
         f_routing_key_specifier = a_rk;
         f_routing_key_specifier.erase( 0, a_queue_name.size() + 1 ); // 1 added to remove the '.' that separates nodes
+        this->set_parsed_rks( new parsable( f_routing_key_specifier ) );
         return true;
     }
 

@@ -22,7 +22,7 @@ namespace dripline
 {
     LOGGER( dlog, "service" );
 
-    service::service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name, bool a_authenticate ) :
+    service::service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name, const string& a_auth_file ) :
             f_address( a_address ),
             f_port( a_port ),
             f_username( "guest" ),
@@ -32,15 +32,15 @@ namespace dripline
             f_channel(),
             f_consumer_tag()
     {
-        if( a_authenticate )
+        if( ! a_auth_file.empty() )
         {
-            authentication* t_auth = authentication::get_instance();
-            if( ! t_auth->is_loaded() )
+            authentication t_auth( a_auth_file );
+            if( ! t_auth.get_is_loaded() )
             {
                 throw scarab::error() << "Authentication file was not loaded";
             }
 
-            const param_node* t_amqp_auth = t_auth->node_at( "amqp" );
+            const param_node* t_amqp_auth = t_auth.node_at( "amqp" );
             if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
             {
                 throw scarab::error() << "AMQP authentication is not available or is not complete";
@@ -114,7 +114,7 @@ namespace dripline
             }
             catch( dripline_error& e )
             {
-                reply_ptr_t t_reply = msg_reply::create( e, t_envelope->Message()->ReplyTo(), f_queue_name, message::encoding::json );
+                reply_ptr_t t_reply = msg_reply::create( e, t_envelope->Message()->ReplyTo(), message::encoding::json );
                 try
                 {
                     send( t_reply );
@@ -135,25 +135,25 @@ namespace dripline
         }
     }
 
-    bool service::on_request_message( request_ptr_t )
+    bool service::on_request_message( const request_ptr_t )
     {
         throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle request messages";
         return false;
     }
 
-    bool service::on_reply_message( reply_ptr_t )
+    bool service::on_reply_message( const reply_ptr_t )
     {
         throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle reply messages";
         return false;
     }
 
-    bool service::on_alert_message( alert_ptr_t )
+    bool service::on_alert_message( const alert_ptr_t )
     {
         throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle alert messages";
         return false;
     }
 
-    bool service::on_info_message( info_ptr_t )
+    bool service::on_info_message( const info_ptr_t )
     {
         throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle info messages";
         return false;
@@ -337,11 +337,11 @@ namespace dripline
 
     }
 
-    bool service::bind_keys( const vector< string >& a_keys )
+    bool service::bind_keys( const set< string >& a_keys )
     {
         try
         {
-            for( vector< string >::const_iterator t_key_it = a_keys.begin(); t_key_it != a_keys.end(); ++t_key_it )
+            for( set< string >::const_iterator t_key_it = a_keys.begin(); t_key_it != a_keys.end(); ++t_key_it )
             {
                 f_channel->BindQueue( f_queue_name, f_exchange, *t_key_it );
             }

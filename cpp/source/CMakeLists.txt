@@ -10,6 +10,7 @@ set( dripline_HEADERS
     ${dir}/amqp.hh
     ${dir}/dripline_constants.hh
     ${dir}/dripline_error.hh
+    ${dir}/hub.hh
     ${dir}/message.hh
     ${dir}/service.hh
     ${dir}/uuid.hh
@@ -18,6 +19,7 @@ set( dripline_HEADERS
 set( dripline_SOURCES
     ${dir}/dripline_constants.cc
     ${dir}/dripline_error.cc
+    ${dir}/hub.cc
     ${dir}/message.cc
     ${dir}/service.cc
     ${dir}/uuid.cc

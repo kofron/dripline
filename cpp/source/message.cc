@@ -20,15 +20,15 @@
 
 #include <map>
 
-using scarab::param_input_json;
-using scarab::param_output_json;
-using scarab::param_input_msgpack;
-using scarab::param_output_msgpack;
-
-using std::string;
-
 namespace dripline
 {
+    using scarab::param_input_json;
+    using scarab::param_output_json;
+    using scarab::param_input_msgpack;
+    using scarab::param_output_msgpack;
+
+    using std::string;
+
     LOGGER( dlog, "message" );
 
     //***********
@@ -37,6 +37,8 @@ namespace dripline
 
     message::message() :
             f_routing_key(),
+            f_routing_key_specifier(),
+            f_parsed_rks( new parsable() ),
             f_correlation_id(),
             f_reply_to(),
             f_encoding( encoding::json ),
@@ -129,7 +131,7 @@ namespace dripline
             }
             case msg_t::reply:
             {
-                request_ptr_t t_reply = msg_reply::create(
+                reply_ptr_t t_reply = msg_reply::create(
                         to_retcode_t( t_msg_node->get_value< uint32_t >( "retcode" ) ),
                         t_msg_node->get_value( "return_msg", "" ),
                         t_msg_node->node_at( "payload" ),
@@ -141,7 +143,7 @@ namespace dripline
             }
             case msg_t::alert:
             {
-                request_ptr_t t_alert = msg_alert::create(
+                alert_ptr_t t_alert = msg_alert::create(
                         t_msg_node->node_at( "payload" ),
                         t_routing_key,
                         t_encoding);
@@ -273,12 +275,13 @@ namespace dripline
 
     }
 
-    request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, message::encoding a_encoding )
+    request_ptr_t msg_request::create( param_node* a_payload, op_t a_msg_op, const std::string& a_routing_key, const std::string& a_reply_to, message::encoding a_encoding )
     {
         request_ptr_t t_request = make_shared< msg_request >();
         t_request->set_payload( a_payload );
         t_request->set_message_op( a_msg_op );
         t_request->routing_key() = a_routing_key;
+        t_request->reply_to() = a_reply_to;
         t_request->set_encoding( a_encoding );
         return t_request;
     }
