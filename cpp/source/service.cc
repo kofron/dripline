@@ -84,7 +84,8 @@ namespace dripline
 
         while( true )
         {
-            amqp_envelope_ptr t_envelope = f_channel->BasicConsumeMessage( f_consumer_tag );
+            amqp_envelope_ptr t_envelope;
+            bool t_channel_valid = listen_for_message( t_envelope, f_channel, f_consumer_tag, 0 );
 
             try
             {
@@ -132,31 +133,22 @@ namespace dripline
                     ERROR( dlog, "Standard exception caught while sending reply: " << e.what() );
                 }
             }
+
+            if( ! t_channel_valid )
+            {
+                ERROR( dlog, "Channel is no longer valid" );
+                return false;
+            }
         }
     }
 
-    bool service::on_request_message( const request_ptr_t )
+    bool service::stop()
     {
-        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle request messages";
-        return false;
-    }
+        INFO( dlog, "Stopping service on <" << f_queue_name << ">" );
 
-    bool service::on_reply_message( const reply_ptr_t )
-    {
-        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle reply messages";
-        return false;
-    }
+        if( ! stop_consuming() ) return false;
 
-    bool service::on_alert_message( const alert_ptr_t )
-    {
-        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle alert messages";
-        return false;
-    }
-
-    bool service::on_info_message( const info_ptr_t )
-    {
-        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle info messages";
-        return false;
+        return true;
     }
 
 
@@ -183,6 +175,86 @@ namespace dripline
         DEBUG( dlog, "Sending alert with routing key <" << a_alert->routing_key() << ">" );
         return send_noreply( static_pointer_cast< message >( a_alert ) );
     }
+
+    reply_ptr_t service::wait_for_reply( amqp_channel_ptr a_channel, const string& a_consumer_tag, int a_timeout_ms ) const
+    {
+        bool t_temp;
+        return wait_for_reply( a_channel, a_consumer_tag, t_temp, a_timeout_ms );
+    }
+
+    reply_ptr_t service::wait_for_reply( amqp_channel_ptr a_channel, const string& a_consumer_tag, bool& a_chan_valid, int a_timeout_ms ) const
+    {
+        DEBUG( dlog, "Waiting for a reply" );
+
+        amqp_envelope_ptr t_envelope;
+        a_chan_valid = listen_for_message( t_envelope, a_channel, a_consumer_tag, a_timeout_ms );
+
+        try
+        {
+            message_ptr_t t_message = message::process_envelope( t_envelope, "" );
+
+            if( t_message->is_reply() )
+            {
+                return static_pointer_cast< msg_reply >( t_message );
+            }
+            else
+            {
+                ERROR( dlog, "Non-reply message received");
+                return reply_ptr_t();
+            }
+        }
+        catch( dripline_error& e )
+        {
+            ERROR( dlog, "There was a problem processing the message: " << e.what() );
+            return reply_ptr_t();
+        }
+    }
+
+    bool service::close_channel( amqp_channel_ptr a_channel ) const
+    {
+        try
+        {
+            DEBUG( dlog, "Stopping consuming messages" );
+            f_channel->BasicCancel( f_consumer_tag );
+        }
+        catch( amqp_exception& e )
+        {
+            ERROR( dlog, "AMQP exception caught while canceling the channel: (" << e.reply_code() << ") " << e.reply_text() );
+        }
+        catch( amqp_lib_exception& e )
+        {
+            ERROR( dlog, "AMQP library exception caught while canceling the channel: (" << e.ErrorCode() << ") " << e.what() );
+        }
+
+        a_channel.reset();
+        return true;
+    }
+
+
+    bool service::on_request_message( const request_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle request messages";
+        return false;
+    }
+
+    bool service::on_reply_message( const reply_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle reply messages";
+        return false;
+    }
+
+    bool service::on_alert_message( const alert_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle alert messages";
+        return false;
+    }
+
+    bool service::on_info_message( const info_ptr_t )
+    {
+        throw dripline_error() << retcode_t::message_error_invalid_method << "Base service does not handle info messages";
+        return false;
+    }
+
 
     amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag ) const
     {
@@ -259,15 +331,6 @@ namespace dripline
             ERROR( dlog, "Error publishing request to queue: " << e.what() );
             return false;
         }
-        return true;
-    }
-
-    bool service::stop()
-    {
-        INFO( dlog, "Stopping service on <" << f_queue_name << ">" );
-
-        if( ! stop_consuming() ) return false;
-
         return true;
     }
 
@@ -377,6 +440,48 @@ namespace dripline
         {
             ERROR( dlog, "AMQP library exception caught while starting consuming messages: (" << e.ErrorCode() << ") " << e.what() );
             return false;
+        }
+    }
+
+    bool service::listen_for_message( amqp_envelope_ptr& a_envelope, amqp_channel_ptr a_channel, const string& a_consumer_tag, int a_timeout_ms ) const
+    {
+        while( true )
+        {
+            try
+            {
+                if( a_timeout_ms > 0 )
+                {
+                    if( ! a_channel->BasicConsumeMessage( a_consumer_tag, a_envelope, a_timeout_ms ) )
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    a_envelope = a_channel->BasicConsumeMessage( a_consumer_tag );
+                    return true;
+                }
+            }
+            catch( AmqpClient::ConnectionClosedException& e )
+            {
+                ERROR( dlog, "Fatal AMQP exception encountered: " << e.what() );
+                return false;
+            }
+            catch( AmqpClient::ConsumerCancelledException& e )
+            {
+                ERROR( dlog, "Fatal AMQP exception encountered: " << e.what() );
+                return false;
+            }
+            catch( AmqpClient::AmqpException& e )
+            {
+                if( e.is_soft_error() )
+                {
+                    WARN( dlog, "Non-fatal AMQP exception encountered: " << e.reply_text() );
+                    return true;
+                }
+                ERROR( dlog, "Fatal AMQP exception encountered: " << e.reply_text() );
+                return false;
+            }
         }
     }
 

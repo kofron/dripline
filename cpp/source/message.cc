@@ -93,14 +93,12 @@ namespace dripline
         }
         else
         {
-            ERROR( dlog, "Unable to parse message with content type <" << a_envelope->Message()->ContentEncoding() << ">" );
-            return NULL;
+            throw dripline_error() << retcode_t::message_error_decoding_fail << "Unable to parse message with content type <" << a_envelope->Message()->ContentEncoding() << ">";
         }
 
         if( t_msg_node == NULL )
         {
-            ERROR( dlog, "Message body could not be parsed; skipping request" );
-            return NULL;
+            throw dripline_error() << retcode_t::message_error_decoding_fail << "Message body could not be parsed; skipping request";
         }
 
         string t_routing_key = a_envelope->RoutingKey();
@@ -155,11 +153,11 @@ namespace dripline
             case msg_t::info:
             {
                 throw dripline_error() << retcode_t::message_error_invalid_method << "message::process_envelope does not handle info messages";
+                break;
             }
             default:
             {
-                WARN( dlog, "Message received with unhandled type: " << t_msg_node->get_value< uint32_t >( "msgtype" ) );
-                return NULL;
+                throw dripline_error() << retcode_t::message_error_invalid_method << "Message received with unhandled type: " << t_msg_node->get_value< uint32_t >( "msgtype" );
                 break;
             }
         }
