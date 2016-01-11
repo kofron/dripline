@@ -30,12 +30,17 @@ class Interface(Service):
         Service.__init__(self, amqp_url, exchange='requests', keys='', name=name)
         self._confirm_retcode = confirm_retcodes
     
-    def _send_request(self, target, msgop, payload, lockout_key=False):
+    def _send_request(self, target, msgop, payload, timeout=None, lockout_key=False):
         request = RequestMessage(msgop=msgop, payload=payload)
+        request_kwargs = {'target':target,
+                          'request':request,
+                         }
+        if timeout is not None:
+            request_kwargs.update({'timeout':timeout})
         if lockout_key:
             request.lockout_key = lockout_key
         try:
-            reply = self.send_request(target, request)
+            reply = self.send_request(**request_kwargs)#target, request)
         except DriplineTimeoutError as err:
             reply = ReplyMessage(retcode=DriplineTimeoutError.retcode, payload=str(err))
         if self._confirm_retcode:
@@ -43,10 +48,16 @@ class Interface(Service):
                 raise exception_map[reply.retcode](reply.return_msg)
         return reply
 
-    def get(self, endpoint):
+    def get(self, endpoint, timeout=None):
         msgop = OP_GET
         payload = {'values':[]}
-        reply = self._send_request(target=endpoint, msgop=msgop, payload=payload)
+        request_args = {'target': endpoint,
+                        'msgop':msgop,
+                        'payload':payload
+                       }
+        if timeout is not None:
+            request_args.update({'timeout':timeout})
+        reply = self._send_request(**request_args)
         return reply
 
     def set(self, endpoint, value, lockout_key=False, **kwargs):
