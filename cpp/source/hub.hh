@@ -19,14 +19,6 @@ namespace dripline
     class SCARAB_API hub : public service
     {
         public:
-            hub( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name = "", const string& a_auth_file = "" );
-            virtual ~hub();
-
-        protected:
-            /// Handle request messages
-            virtual bool on_request_message( const request_ptr_t a_request );
-
-        protected:
             struct reply_package
             {
                 const weak_ptr< service > f_service_ptr;
@@ -42,6 +34,17 @@ namespace dripline
                 bool send_reply( retcode_t a_return_code, const std::string& a_return_msg ) const;
                 bool send_reply( const dripline_error& an_error ) const;
             };
+
+        public:
+            hub();
+            hub( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name = "", const string& a_auth_file = "" );
+            virtual ~hub();
+
+            bool dripline_setup( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name = "", const string& a_auth_file = "" );
+
+        private:
+            /// Handle request messages
+            virtual bool on_request_message( const request_ptr_t a_request );
 
             //*****************************
             // Default request distributors

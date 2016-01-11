@@ -22,6 +22,18 @@ namespace dripline
 {
     LOGGER( dlog, "service" );
 
+    service::service() :
+            f_address(),
+            f_port(),
+            f_username( "guest" ),
+            f_password( "guest" ),
+            f_exchange(),
+            f_queue_name(),
+            f_channel(),
+            f_consumer_tag(),
+            f_canceled( false )
+    {}
+
     service::service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name, const string& a_auth_file ) :
             f_address( a_address ),
             f_port( a_port ),
@@ -30,23 +42,15 @@ namespace dripline
             f_exchange( a_exchange ),
             f_queue_name( a_queue_name ),
             f_channel(),
-            f_consumer_tag()
+            f_consumer_tag(),
+            f_canceled( false )
     {
         if( ! a_auth_file.empty() )
         {
-            authentication t_auth( a_auth_file );
-            if( ! t_auth.get_is_loaded() )
+            if( ! use_auth_file( a_auth_file ) )
             {
-                throw scarab::error() << "Authentication file was not loaded";
+                throw scarab::error() << "An error occurred while using authorization file <" << a_auth_file << ">";
             }
-
-            const param_node* t_amqp_auth = t_auth.node_at( "amqp" );
-            if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
-            {
-                throw scarab::error() << "AMQP authentication is not available or is not complete";
-            }
-            f_username = t_amqp_auth->get_value( "username" );
-            f_password = t_amqp_auth->get_value( "password" );
         }
     }
 
@@ -75,17 +79,25 @@ namespace dripline
 
         if( ! start_consuming() ) return false;
 
+        f_canceled.store( false );
+
         return true;
     }
 
-    bool service::listen()
+    bool service::listen( int a_timeout_ms )
     {
         INFO( dlog, "Listening for incoming messages on <" << f_queue_name << ">" );
 
         while( true )
         {
             amqp_envelope_ptr t_envelope;
-            bool t_channel_valid = listen_for_message( t_envelope, f_channel, f_consumer_tag, 0 );
+            bool t_channel_valid = listen_for_message( t_envelope, f_channel, f_consumer_tag, a_timeout_ms );
+
+            if( f_canceled.load() )
+            {
+                DEBUG( dlog, "Service canceled" );
+                return true;
+            }
 
             try
             {
@@ -138,6 +150,12 @@ namespace dripline
             {
                 ERROR( dlog, "Channel is no longer valid" );
                 return false;
+            }
+
+            if( f_canceled.load() )
+            {
+                DEBUG( dlog, "Service canceled" );
+                return true;
             }
         }
     }
@@ -451,16 +469,13 @@ namespace dripline
             {
                 if( a_timeout_ms > 0 )
                 {
-                    if( ! a_channel->BasicConsumeMessage( a_consumer_tag, a_envelope, a_timeout_ms ) )
-                    {
-                        return true;
-                    }
+                    a_channel->BasicConsumeMessage( a_consumer_tag, a_envelope, a_timeout_ms );
                 }
                 else
                 {
                     a_envelope = a_channel->BasicConsumeMessage( a_consumer_tag );
-                    return true;
-                }
+                 }
+                return true;
             }
             catch( AmqpClient::ConnectionClosedException& e )
             {
@@ -505,5 +520,24 @@ namespace dripline
         }
     }
 
+    bool service::use_auth_file( const string& a_auth_file )
+    {
+        authentication t_auth( a_auth_file );
+        if( ! t_auth.get_is_loaded() )
+        {
+            ERROR( dlog, "Authentication file <" << a_auth_file << "> could not be loaded" );
+            return false;
+        }
+
+        const param_node* t_amqp_auth = t_auth.node_at( "amqp" );
+        if( t_amqp_auth == NULL || ! t_amqp_auth->has( "username" ) || ! t_amqp_auth->has( "password" ) )
+        {
+            ERROR( dlog, "AMQP authentication is not available or is not complete" );
+            return false;
+        }
+        f_username = t_amqp_auth->get_value( "username" );
+        f_password = t_amqp_auth->get_value( "password" );
+        return true;
+    }
 
 } /* namespace dripline */

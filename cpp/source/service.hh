@@ -12,7 +12,9 @@
 #include "message.hh"
 
 #include "member_variables.hh"
+#include "scarab_api.hh"
 
+#include <atomic>
 #include <string>
 #include <set>
 
@@ -21,9 +23,10 @@ namespace dripline
     using std::string;
     using std::set;
 
-    class service
+    class SCARAB_API service
     {
         public:
+            service();
             service( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name = "", const string& a_auth_file = "" );
             virtual ~service();
 
@@ -34,7 +37,7 @@ namespace dripline
 
             /// Starts listening on the queue for receiving messages.
             /// If no queue was created, this does nothing.
-            bool listen();
+            bool listen( int a_timeout_ms = 0 );
 
             /// Stops receiving messages and closes the connection to the broker.
             /// If no queue was created, this does nothing.
@@ -64,7 +67,7 @@ namespace dripline
             bool close_channel( amqp_channel_ptr a_channel ) const;
 
 
-        protected:
+        private:
             /// Default request handler; throws a dripline_error.
             /// Override this to enable handling of requests.
             virtual bool on_request_message( const request_ptr_t a_request );
@@ -102,19 +105,24 @@ namespace dripline
             bool send_noreply( message_ptr_t a_message ) const;
 
         public:
-            mv_referrable_const( string, address );
-            mv_accessible_noset( unsigned, port );
-            mv_referrable_const( string, username );
-            mv_referrable_const( string, password );
+            bool use_auth_file( const string& a_auth_file );
 
-            mv_referrable_const( string, exchange );
-            mv_referrable_const( string, queue_name );
+            mv_referrable( string, address );
+            mv_accessible( unsigned, port );
+            mv_referrable( string, username );
+            mv_referrable( string, password );
+
+            mv_referrable( string, exchange );
+            mv_referrable( string, queue_name );
 
             mv_referrable_const( amqp_channel_ptr, channel );
 
             mv_referrable_const( string, consumer_tag );
 
             mv_referrable( set< string >, keys );
+
+        protected:
+            std::atomic_bool f_canceled;
     };
 
 } /* namespace dripline */
