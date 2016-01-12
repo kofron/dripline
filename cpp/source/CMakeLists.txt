@@ -12,6 +12,7 @@ set( dripline_HEADERS
     ${dir}/dripline_error.hh
     ${dir}/hub.hh
     ${dir}/message.hh
+    ${dir}/relayer.hh
     ${dir}/service.hh
     ${dir}/uuid.hh
 )
@@ -21,6 +22,7 @@ set( dripline_SOURCES
     ${dir}/dripline_error.cc
     ${dir}/hub.cc
     ${dir}/message.cc
+    ${dir}/relayer.cc
     ${dir}/service.cc
     ${dir}/uuid.cc
 )

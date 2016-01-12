@@ -170,42 +170,45 @@ namespace dripline
     }
 
 
-    amqp_channel_ptr service::send( request_ptr_t a_request, string& a_reply_consumer_tag ) const
+    rr_pkg_ptr service::send( request_ptr_t a_request, const string& a_exchange ) const
     {
         DEBUG( dlog, "Sending request with routing key <" << a_request->routing_key() << ">" );
-        return send_withreply( static_pointer_cast< message >( a_request ), a_reply_consumer_tag );
+        rr_pkg_ptr t_receive_reply = std::make_shared< receive_reply_pkg >();
+        t_receive_reply->f_channel = send_withreply( static_pointer_cast< message >( a_request ), t_receive_reply->f_consumer_tag, a_exchange );
+        t_receive_reply->f_successful_send = t_receive_reply->f_channel;
+        return t_receive_reply;
     }
 
-    bool service::send( reply_ptr_t a_reply ) const
+    bool service::send( reply_ptr_t a_reply, const string& a_exchange ) const
     {
         DEBUG( dlog, "Sending reply with routing key <" << a_reply->routing_key() << ">" );
-        return send_noreply( static_pointer_cast< message >( a_reply ) );
+        return send_noreply( static_pointer_cast< message >( a_reply ), a_exchange );
     }
 
-    bool service::send( info_ptr_t a_info ) const
+    bool service::send( info_ptr_t a_info, const string& a_exchange ) const
     {
         DEBUG( dlog, "Sending info with routing key <" << a_info->routing_key() << ">" );
-        return send_noreply( static_pointer_cast< message >( a_info ) );
+        return send_noreply( static_pointer_cast< message >( a_info ), a_exchange );
     }
 
-    bool service::send( alert_ptr_t a_alert ) const
+    bool service::send( alert_ptr_t a_alert, const string& a_exchange ) const
     {
         DEBUG( dlog, "Sending alert with routing key <" << a_alert->routing_key() << ">" );
-        return send_noreply( static_pointer_cast< message >( a_alert ) );
+        return send_noreply( static_pointer_cast< message >( a_alert ), a_exchange );
     }
 
-    reply_ptr_t service::wait_for_reply( amqp_channel_ptr a_channel, const string& a_consumer_tag, int a_timeout_ms ) const
+    reply_ptr_t service::wait_for_reply( const rr_pkg_ptr a_receive_reply, int a_timeout_ms ) const
     {
         bool t_temp;
-        return wait_for_reply( a_channel, a_consumer_tag, t_temp, a_timeout_ms );
+        return wait_for_reply( a_receive_reply, t_temp, a_timeout_ms );
     }
 
-    reply_ptr_t service::wait_for_reply( amqp_channel_ptr a_channel, const string& a_consumer_tag, bool& a_chan_valid, int a_timeout_ms ) const
+    reply_ptr_t service::wait_for_reply( const rr_pkg_ptr a_receive_reply, bool& a_chan_valid, int a_timeout_ms ) const
     {
         DEBUG( dlog, "Waiting for a reply" );
 
         amqp_envelope_ptr t_envelope;
-        a_chan_valid = listen_for_message( t_envelope, a_channel, a_consumer_tag, a_timeout_ms );
+        a_chan_valid = listen_for_message( t_envelope, a_receive_reply->f_channel, a_receive_reply->f_consumer_tag, a_timeout_ms );
 
         try
         {
@@ -274,9 +277,14 @@ namespace dripline
     }
 
 
-    amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag ) const
+    amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag, const string& a_exchange ) const
     {
         amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
+
+        if( a_exchange.empty() )
+        {
+            a_exchange = f_exchange;
+        }
 
         amqp_channel_ptr t_channel = open_channel();
         if( ! t_channel )
@@ -285,15 +293,15 @@ namespace dripline
             return amqp_channel_ptr();
         }
 
-        if( ! setup_exchange( t_channel, f_exchange ) )
+        if( ! setup_exchange( t_channel, a_exchange ) )
         {
-            ERROR( dlog, "Unable to setup the exchange <" << f_exchange << ">" );
+            ERROR( dlog, "Unable to setup the exchange <" << a_exchange << ">" );
             return amqp_channel_ptr();
         }
 
         // create the reply-to queue, and bind the queue to the routing key over the given exchange
         string t_reply_to = t_channel->DeclareQueue( "" );
-        t_channel->BindQueue( t_reply_to, f_exchange, t_reply_to );
+        t_channel->BindQueue( t_reply_to, a_exchange, t_reply_to );
         a_message->reply_to() = t_reply_to;
         DEBUG( dlog, "Reply-to for request: " << t_reply_to );
 
@@ -303,12 +311,12 @@ namespace dripline
 
         try
         {
-            t_channel->BasicPublish( f_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            t_channel->BasicPublish( a_exchange, a_message->routing_key(), t_amqp_message, true, false );
             return t_channel;
         }
         catch( AmqpClient::MessageReturnedException& e )
         {
-            ERROR( dlog, "Request message could not be sent: " << e.what() );
+            ERROR( dlog, "Message could not be sent: " << e.what() );
             return amqp_channel_ptr();
         }
         catch( std::exception& e )
@@ -318,9 +326,14 @@ namespace dripline
         }
     }
 
-    bool service::send_noreply( message_ptr_t a_message ) const
+    bool service::send_noreply( message_ptr_t a_message, const string& a_exchange ) const
     {
         amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
+
+        if( a_exchange.empty() )
+        {
+            a_exchange = f_exchange;
+        }
 
         amqp_channel_ptr t_channel = open_channel();
         if( ! t_channel )
@@ -329,19 +342,19 @@ namespace dripline
             return false;
         }
 
-        if( ! setup_exchange( t_channel, f_exchange ) )
+        if( ! setup_exchange( t_channel, a_exchange ) )
         {
-            ERROR( dlog, "Unable to setup the exchange <" << f_exchange << ">" );
+            ERROR( dlog, "Unable to setup the exchange <" << a_exchange << ">" );
             return false;
         }
 
         try
         {
-            t_channel->BasicPublish( f_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            t_channel->BasicPublish( a_exchange, a_message->routing_key(), t_amqp_message, true, false );
         }
         catch( AmqpClient::MessageReturnedException& e )
         {
-            ERROR( dlog, "Request message could not be sent: " << e.what() );
+            ERROR( dlog, "Message could not be sent: " << e.what() );
             return false;
         }
         catch( std::exception& e )
