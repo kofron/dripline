@@ -54,8 +54,7 @@ namespace dripline
         public:
             enum class encoding
             {
-                json,
-                msgpack
+                json
             };
 
        public:

@@ -14,7 +14,6 @@
 
 #include "logger.hh"
 #include "param_json.hh"
-#include "param_msgpack.hh"
 #include "time.hh"
 //#include "mt_version.hh"
 
@@ -24,8 +23,6 @@ namespace dripline
 {
     using scarab::param_input_json;
     using scarab::param_output_json;
-    using scarab::param_input_msgpack;
-    using scarab::param_output_msgpack;
 
     using std::string;
 
@@ -85,11 +82,6 @@ namespace dripline
         {
             t_encoding = encoding::json;
             t_msg_node = param_input_json::read_string( a_envelope->Message()->Body() );
-        }
-        else if( a_envelope->Message()->ContentEncoding() == "application/msgpack" )
-        {
-            t_encoding = encoding::msgpack;
-            t_msg_node = param_input_msgpack::read_string( a_envelope->Message()->Body() );
         }
         else
         {
@@ -245,9 +237,6 @@ namespace dripline
             case encoding::json:
                 return std::string( "application/json" );
                 break;
-            case encoding::msgpack:
-                return std::string( "application/msgpack" );
-                break;
             default:
                 return std::string( "Unknown" );
         }
@@ -397,7 +386,7 @@ namespace dripline
 
     std::ostream& operator<<( std::ostream& a_os, message::encoding a_enc )
     {
-        static std::map< message::encoding, string > s_enc_strings = { { message::encoding::json, "json" }, { message::encoding::msgpack, "msgpack" } };
+        static std::map< message::encoding, string > s_enc_strings = { { message::encoding::json, "json" } };
         return a_os << s_enc_strings[ a_enc ];
     }
 
