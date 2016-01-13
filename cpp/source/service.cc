@@ -170,12 +170,12 @@ namespace dripline
     }
 
 
-    rr_pkg_ptr service::send( request_ptr_t a_request, const string& a_exchange ) const
+    service::rr_pkg_ptr service::send( request_ptr_t a_request, const string& a_exchange ) const
     {
         DEBUG( dlog, "Sending request with routing key <" << a_request->routing_key() << ">" );
         rr_pkg_ptr t_receive_reply = std::make_shared< receive_reply_pkg >();
         t_receive_reply->f_channel = send_withreply( static_pointer_cast< message >( a_request ), t_receive_reply->f_consumer_tag, a_exchange );
-        t_receive_reply->f_successful_send = t_receive_reply->f_channel;
+        t_receive_reply->f_successful_send = t_receive_reply->f_channel.get() != nullptr;
         return t_receive_reply;
     }
 
@@ -281,9 +281,10 @@ namespace dripline
     {
         amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
 
-        if( a_exchange.empty() )
+        string t_exchange = a_exchange;
+        if( t_exchange.empty() )
         {
-            a_exchange = f_exchange;
+            t_exchange = f_exchange;
         }
 
         amqp_channel_ptr t_channel = open_channel();
@@ -293,15 +294,15 @@ namespace dripline
             return amqp_channel_ptr();
         }
 
-        if( ! setup_exchange( t_channel, a_exchange ) )
+        if( ! setup_exchange( t_channel, t_exchange ) )
         {
-            ERROR( dlog, "Unable to setup the exchange <" << a_exchange << ">" );
+            ERROR( dlog, "Unable to setup the exchange <" << t_exchange << ">" );
             return amqp_channel_ptr();
         }
 
         // create the reply-to queue, and bind the queue to the routing key over the given exchange
         string t_reply_to = t_channel->DeclareQueue( "" );
-        t_channel->BindQueue( t_reply_to, a_exchange, t_reply_to );
+        t_channel->BindQueue( t_reply_to, t_exchange, t_reply_to );
         a_message->reply_to() = t_reply_to;
         DEBUG( dlog, "Reply-to for request: " << t_reply_to );
 
@@ -311,7 +312,7 @@ namespace dripline
 
         try
         {
-            t_channel->BasicPublish( a_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            t_channel->BasicPublish( t_exchange, a_message->routing_key(), t_amqp_message, true, false );
             return t_channel;
         }
         catch( AmqpClient::MessageReturnedException& e )
@@ -330,9 +331,10 @@ namespace dripline
     {
         amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
 
-        if( a_exchange.empty() )
+        string t_exchange = a_exchange;
+        if( t_exchange.empty() )
         {
-            a_exchange = f_exchange;
+            t_exchange = f_exchange;
         }
 
         amqp_channel_ptr t_channel = open_channel();
@@ -342,15 +344,15 @@ namespace dripline
             return false;
         }
 
-        if( ! setup_exchange( t_channel, a_exchange ) )
+        if( ! setup_exchange( t_channel, t_exchange ) )
         {
-            ERROR( dlog, "Unable to setup the exchange <" << a_exchange << ">" );
+            ERROR( dlog, "Unable to setup the exchange <" << t_exchange << ">" );
             return false;
         }
 
         try
         {
-            t_channel->BasicPublish( a_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            t_channel->BasicPublish( t_exchange, a_message->routing_key(), t_amqp_message, true, false );
         }
         catch( AmqpClient::MessageReturnedException& e )
         {

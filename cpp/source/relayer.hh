@@ -6,7 +6,11 @@
 
 #include "service.hh"
 
+#include "concurrent_queue.hh"
 #include "member_variables.hh"
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread.hpp>
 
 #include <atomic>
 #include <string>
@@ -71,8 +75,8 @@ namespace dripline
             /// If the timeout is <= 0 ms, there will be no timeout
             /// This function can be called multiple times to receive multiple replies
             /// The optional bool argument a_chan_valid will return whether or not the channel is still valid for use
-            virtual reply_ptr_t wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, int a_timeout_ms = 0 ) const;
-            virtual reply_ptr_t wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, bool& a_chan_valid, int a_timeout_ms = 0 ) const;
+            reply_ptr_t wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, int a_timeout_ms = 0 ) const;
+            reply_ptr_t wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, bool& a_chan_valid, int a_timeout_ms = 0 ) const;
 
         public:
             mv_referrable( string, request_exchange );

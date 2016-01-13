@@ -9,7 +9,9 @@
 
 namespace dripline
 {
+    using std::make_shared;
     using std::string;
+    using std::static_pointer_cast;
 
     using scarab::param_node;
 
@@ -42,7 +44,7 @@ namespace dripline
             switch( t_mar->f_message->message_type() )
             {
                 case msg_t::request:
-                    t_mar->f_receive_reply = service::send( static_pointer_cast< dripline::msg_request >( t_mar->f_message ), f_request_exchange );
+                    *t_mar->f_receive_reply = *service::send( static_pointer_cast< dripline::msg_request >( t_mar->f_message ), f_request_exchange );
                     t_mar->f_receive_reply->f_condition_var.notify_one();
                     break;
                 case msg_t::alert:
@@ -82,13 +84,15 @@ namespace dripline
         if( f_canceled.load() )
         {
             WARN( dlog, "Relayer has been canceled; request not sent" );
-            return false;
+            cc_rr_pkg_ptr t_return;
+            t_return->f_successful_send = false;
+            return t_return;
         }
         DEBUG( dlog, "Sending request to <" << a_request->routing_key() << ">" );
-        mar_ptr t_mar = std::make_shared< message_and_reply >();
+        mar_ptr t_mar = make_shared< message_and_reply >();
         scoped_lock lock( t_mar->f_receive_reply->f_mutex );
         t_mar->f_message = static_pointer_cast< dripline::message >( a_request );
-        t_mar->f_receive_reply = std::make_shared< receive_reply_pkg >();
+        t_mar->f_receive_reply = make_shared< cc_receive_reply_pkg >();
         f_queue.push( t_mar );
         return t_mar->f_receive_reply;
     }
@@ -101,7 +105,7 @@ namespace dripline
             return false;
         }
         DEBUG( dlog, "Sending request to <" << a_alert->routing_key() << ">" );
-        mar_ptr t_mar = std::make_shared< message_and_reply >();
+        mar_ptr t_mar = make_shared< message_and_reply >();
         t_mar->f_message = static_pointer_cast< dripline::message >( a_alert );
         f_queue.push( t_mar );
         return true;
@@ -121,17 +125,17 @@ namespace dripline
         return true;
     }
 
-    reply_ptr_t relayer::wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, int a_timeout_ms = 0 ) const
+    reply_ptr_t relayer::wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, int a_timeout_ms ) const
     {
         bool t_temp;
         return wait_for_reply( a_receive_reply, t_temp, a_timeout_ms );
     }
 
-    reply_ptr_t relayer::wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, bool& a_chan_valid, int a_timeout_ms = 0 ) const
+    reply_ptr_t relayer::wait_for_reply( const cc_rr_pkg_ptr a_receive_reply, bool& a_chan_valid, int a_timeout_ms ) const
     {
         scoped_lock lock( a_receive_reply->f_mutex );
         // TODO: wait on condition (timed?)
-        return service::wait_on_reply( static_pointer_cast< receive_reply_pkg >( a_receive_reply ), a_chan_valid, a_timeout_ms );
+        return service::wait_for_reply( static_pointer_cast< receive_reply_pkg >( a_receive_reply ), a_chan_valid, a_timeout_ms );
     }
 
 }
