@@ -5,7 +5,7 @@
  *      Author: nsoblath
  */
 
-#define SCARAB_API_EXPORTS
+#define DRIPLINE_API_EXPORTS
 
 #include "uuid.hh"
 
@@ -16,19 +16,19 @@
 
 namespace dripline
 {
-    uuid_t SCARAB_API generate_random_uuid()
+    uuid_t DRIPLINE_API generate_random_uuid()
     {
         static boost::uuids::random_generator t_gen;
 
         return t_gen();
     }
 
-    uuid_t SCARAB_API generate_nil_uuid()
+    uuid_t DRIPLINE_API generate_nil_uuid()
     {
         return boost::uuids::nil_uuid();
     }
 
-    uuid_t SCARAB_API uuid_from_string( const std::string& a_id_str )
+    uuid_t DRIPLINE_API uuid_from_string( const std::string& a_id_str )
     {
         static boost::uuids::string_generator t_gen;
 
@@ -44,7 +44,7 @@ namespace dripline
         }
     }
 
-    uuid_t SCARAB_API uuid_from_string( const char* a_id_str )
+    uuid_t DRIPLINE_API uuid_from_string( const char* a_id_str )
     {
         static boost::uuids::string_generator t_gen;
 
@@ -60,7 +60,7 @@ namespace dripline
         }
     }
 
-    uuid_t SCARAB_API uuid_from_string( const std::string& a_id_str, bool& a_valid_flag )
+    uuid_t DRIPLINE_API uuid_from_string( const std::string& a_id_str, bool& a_valid_flag )
     {
         a_valid_flag = true;
         try
@@ -74,7 +74,7 @@ namespace dripline
         }
     }
 
-    uuid_t SCARAB_API uuid_from_string( const char* a_id_str, bool& a_valid_flag )
+    uuid_t DRIPLINE_API uuid_from_string( const char* a_id_str, bool& a_valid_flag )
     {
         a_valid_flag = true;
         try
@@ -89,7 +89,7 @@ namespace dripline
     }
 
 
-    std::string SCARAB_API string_from_uuid( const uuid_t& a_id )
+    std::string DRIPLINE_API string_from_uuid( const uuid_t& a_id )
     {
         return boost::uuids::to_string( a_id );
     }

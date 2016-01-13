@@ -5,7 +5,7 @@
  *      Author: nsoblath
  */
 
-#define SCARAB_API_EXPORTS
+#define DRIPLINE_API_EXPORTS
 
 #include "message.hh"
 

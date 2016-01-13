@@ -1,5 +1,5 @@
 
-#define SCARAB_API_EXPORTS
+#define DRIPLINE_API_EXPORTS
 
 #include "dripline_error.hh"
 

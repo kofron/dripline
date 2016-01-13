@@ -1,4 +1,4 @@
-#define SCARAB_API_EXPORTS
+#define DRIPLINE_API_EXPORTS
 
 #include "relayer.hh"
 

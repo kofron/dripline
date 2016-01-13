@@ -6,12 +6,12 @@
 
 #include "dripline_constants.hh"
 
-#include "scarab_api.hh"
+#include "dripline_api.hh"
 
 namespace dripline
 {
 
-    class SCARAB_API dripline_error : public ::std::exception
+    class DRIPLINE_API dripline_error : public ::std::exception
     {
         public:
             dripline_error();

@@ -12,7 +12,7 @@
 #include "message.hh"
 
 #include "member_variables.hh"
-#include "scarab_api.hh"
+#include "dripline_api.hh"
 
 #include <atomic>
 #include <memory>
@@ -25,7 +25,7 @@ namespace dripline
     using std::string;
     using std::set;
 
-    class SCARAB_API service
+    class DRIPLINE_API service
     {
         public:
             service();

@@ -16,7 +16,7 @@ namespace dripline
 {
     using std::weak_ptr;
 
-    class SCARAB_API hub : public service
+    class DRIPLINE_API hub : public service
     {
         public:
             struct reply_package

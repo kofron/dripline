@@ -2,7 +2,7 @@
 #define DRIPLINE_AMQP_RELAYER_HH_
 
 
-#include "scarab_api.hh"
+#include "dripline_api.hh"
 
 #include "service.hh"
 
@@ -30,7 +30,7 @@ namespace dripline
     using dripline::info_ptr_t;
     using dripline::message_ptr_t;
 
-    class SCARAB_API relayer : public service
+    class DRIPLINE_API relayer : public service
     {
         public:
             relayer();

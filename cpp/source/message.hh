@@ -8,7 +8,6 @@
 #ifndef DRIPLINE_MESSAGE_HH_
 #define DRIPLINE_MESSAGE_HH_
 
-#include "scarab_api.hh"
 #include "member_variables.hh"
 #include "param.hh"
 #include "parsable.hh"
@@ -20,6 +19,7 @@
 #include <memory>
 
 #include <string>
+#include "dripline_api.hh"
 
 namespace dripline
 {
@@ -49,7 +49,7 @@ namespace dripline
     // Message
     //***********
 
-    class SCARAB_API message
+    class DRIPLINE_API message
     {
         public:
             enum class encoding
@@ -134,7 +134,7 @@ namespace dripline
     // Request
     //***********
 
-    class SCARAB_API msg_request : public message
+    class DRIPLINE_API msg_request : public message
     {
         public:
             msg_request();
@@ -169,7 +169,7 @@ namespace dripline
     // Reply
     //*********
 
-    class SCARAB_API msg_reply : public message
+    class DRIPLINE_API msg_reply : public message
     {
         public:
             msg_reply();
@@ -203,7 +203,7 @@ namespace dripline
     // Alert
     //*********
 
-    class SCARAB_API msg_alert : public message
+    class DRIPLINE_API msg_alert : public message
     {
         public:
             msg_alert();
@@ -230,7 +230,7 @@ namespace dripline
     // Info
     //********
 
-    class SCARAB_API msg_info : public message
+    class DRIPLINE_API msg_info : public message
     {
         public:
             msg_info();
