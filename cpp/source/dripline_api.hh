@@ -12,9 +12,18 @@
 
 namespace dripline
 {
-#define DRIPLINE_API_EXPORT SCARAB_API_EXPORT
-#define DRIPLINE_API SCARAB_API
-#define DRIPLINE_EXIMP_TEMPLATE SCARAB_EXIMP_TEMPLATE
+    // API export macros for windows
+#ifdef _WIN32
+#  ifdef DRIPLINE_API_EXPORTS
+#    define DRIPLINE_API __declspec(dllexport)
+#    define DRIPLINE_EXPIMP_TEMPLATE
+#  else
+#    define DRIPLINE_API __declspec(dllimport)
+#    define DRIPLINE_EXPIMP_TEMPLATE extern
+#  endif
+#else
+#  define DRIPLINE_API
+#endif
 }
 
 #endif /* DRIPLINE_API_HH_ */

@@ -18,6 +18,12 @@
 
 #include <string>
 
+
+
+#define set_version( version_namespace, version_class ) \
+    static dripline::version_setter s_vsetter_##version_namespace##_##version_class( new version_namespace::version_class() );
+
+
 namespace dripline
 {
     using std::string;
@@ -91,6 +97,14 @@ namespace dripline
             scarab::version_semver* f_imp;
     };
 
+
+    struct DRIPLINE_API version_setter
+    {
+            version_setter( scarab::version_semver* a_ver )
+            {
+                version_wrapper::get_instance()->set_imp( a_ver );
+            }
+    };
 
 } // namespace dripline
 
