@@ -1,0 +1,44 @@
+/*
+ * mt_version.cc
+ *
+ *  Created on: Mar 21, 2014
+ *      Author: nsoblath
+ */
+
+#define DRIPLINE_API_EXPORTS
+
+#include "dripline_version.hh"
+
+#include "logger.hh"
+
+namespace dripline
+{
+    version::version() :
+            version_semver()
+    {
+        f_major_ver = @dripline_VERSION_MAJOR@;
+        f_minor_ver = @dripline_VERSION_MINOR@;
+        f_patch_ver = @dripline_VERSION_PATCH@;
+        f_version = TOSTRING(@dripline_VERSION@);
+        f_package = TOSTRING(@dripline_PACKAGE_NAME@);
+        f_commit = TOSTRING(@dripline_GIT_COMMIT@);
+    }
+
+    version::~version()
+    {
+    }
+
+
+    version_wrapper::version_wrapper() :
+        version_ifc(),
+        f_imp( nullptr )
+    {
+    }
+
+    version_wrapper::~version_wrapper()
+    {
+    }
+
+} /* DRIPLINE_VERSION_HH_ */
+
+
