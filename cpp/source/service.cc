@@ -31,6 +31,8 @@ namespace dripline
             f_queue_name(),
             f_channel(),
             f_consumer_tag(),
+            f_keys(),
+            f_broadcast_key( "broadcast.#" ),
             f_canceled( false )
     {}
 
@@ -43,6 +45,8 @@ namespace dripline
             f_queue_name( a_queue_name ),
             f_channel(),
             f_consumer_tag(),
+            f_keys(),
+            f_broadcast_key( "broadcast.#" ),
             f_canceled( false )
     {
         if( ! a_auth_file.empty() )
@@ -441,6 +445,7 @@ namespace dripline
             {
                 f_channel->BindQueue( f_queue_name, f_exchange, *t_key_it );
             }
+            f_channel->BindQueue( f_queue_name, f_exchange, f_broadcast_key );
             return true;
         }
         catch( amqp_exception& e )

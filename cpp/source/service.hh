@@ -130,6 +130,7 @@ namespace dripline
             mv_referrable_const( string, consumer_tag );
 
             mv_referrable( set< string >, keys );
+            mv_referrable( string, broadcast_key );
 
         protected:
             std::atomic_bool f_canceled;
