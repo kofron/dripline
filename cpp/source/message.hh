@@ -95,6 +95,7 @@ namespace dripline
             mv_referrable_const( string, sender_commit );
             mv_referrable_const( string, sender_hostname );
             mv_referrable_const( string, sender_username );
+            mv_referrable_const( string, sender_service_name );
 
         public:
             // set the routing key specifier by removing the queue name from the beginning of the routing key
@@ -117,6 +118,8 @@ namespace dripline
             void set_sender_hostname( const std::string& a_host );
 
             void set_sender_username( const std::string& a_user );
+
+            void set_sender_service_name( const std::string& a_service );
 
             void set_payload( param_node* a_payload );
             const param_node& get_payload() const;
@@ -281,6 +284,8 @@ namespace dripline
         f_sender_hostname = f_sender_info->get_value( "hostname" );
         if( ! f_sender_info->has( "username" ) ) f_sender_info->add( "username", new param_value( "N/A" ) );
         f_sender_username = f_sender_info->get_value( "username" );
+        if( ! f_sender_info->has( "service_name" ) ) f_sender_info->add( "service_name", new param_value( "N/A" ) );
+        f_sender_service_name = f_sender_info->get_value( "service_name" );
     }
 
     inline const param_node& message::get_sender_info() const
@@ -332,6 +337,13 @@ namespace dripline
     {
         f_sender_info->value_at( "username" )->set( a_user );
         f_sender_username = a_user;
+        return;
+    }
+
+    inline void message::set_sender_service_name( const std::string& a_service )
+    {
+        f_sender_info->value_at( "service_name" )->set( a_service );
+        f_sender_service_name = a_service;
         return;
     }
 

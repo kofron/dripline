@@ -56,6 +56,7 @@ namespace dripline
         f_sender_info->add( "commit", new param_value( "N/A" ) );
         f_sender_info->add( "hostname", new param_value( "N/A" ) );
         f_sender_info->add( "username", new param_value( "N/A" ) );
+        f_sender_info->add( "service_name", new param_value( "N/A" ) );
 
         // set the sender_info correctly for the server software
         version_wrapper* t_version = version_wrapper::get_instance();
@@ -65,6 +66,7 @@ namespace dripline
         set_sender_exe( t_version->exe_name() );
         set_sender_hostname( t_version->hostname() );
         set_sender_username( t_version->username() );
+        set_sender_service_name( "unknown" );
     }
 
     message::~message()

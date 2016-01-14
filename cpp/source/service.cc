@@ -289,6 +289,8 @@ namespace dripline
 
     amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag, const string& a_exchange ) const
     {
+        a_message->set_sender_service_name( f_queue_name );
+
         string t_exchange = a_exchange;
         if( t_exchange.empty() )
         {
@@ -340,7 +342,7 @@ namespace dripline
 
     bool service::send_noreply( message_ptr_t a_message, const string& a_exchange ) const
     {
-        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
+        a_message->set_sender_service_name( f_queue_name );
 
         string t_exchange = a_exchange;
         if( t_exchange.empty() )
@@ -360,6 +362,8 @@ namespace dripline
             ERROR( dlog, "Unable to setup the exchange <" << t_exchange << ">" );
             return false;
         }
+
+        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
 
         try
         {
