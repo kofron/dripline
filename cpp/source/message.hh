@@ -375,7 +375,6 @@ namespace dripline
 
     inline bool msg_request::derived_modify_amqp_message( amqp_message_ptr a_amqp_msg ) const
     {
-        a_amqp_msg->ReplyTo( f_reply_to );
         return true;
     }
 

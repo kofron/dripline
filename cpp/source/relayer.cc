@@ -38,8 +38,9 @@ namespace dripline
         {
             mar_ptr t_mar;
             bool t_have_message = f_queue.timed_wait_and_pop( t_mar ); // blocking call for next message to send; timed so that cancellation can be rechecked
-            scoped_lock lock( t_mar->f_receive_reply->f_mutex );
             if( ! t_have_message ) continue;
+
+            scoped_lock lock( t_mar->f_receive_reply->f_mutex );
 
             switch( t_mar->f_message->message_type() )
             {

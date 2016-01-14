@@ -11,11 +11,11 @@
 
 #include "dripline_constants.hh"
 #include "dripline_error.hh"
+#include "dripline_version.hh"
 
 #include "logger.hh"
 #include "param_json.hh"
 #include "time.hh"
-//#include "mt_version.hh"
 
 #include <map>
 
@@ -58,15 +58,13 @@ namespace dripline
         f_sender_info->add( "username", new param_value( "N/A" ) );
 
         // set the sender_info correctly for the server software
-        /*
-        version_global* t_version = version_global::get_instance();
+        version_wrapper* t_version = version_wrapper::get_instance();
         set_sender_commit( t_version->commit() );
         set_sender_version( t_version->version_str() );
         set_sender_package( t_version->package() );
         set_sender_exe( t_version->exe_name() );
         set_sender_hostname( t_version->hostname() );
         set_sender_username( t_version->username() );
-        */
     }
 
     message::~message()
@@ -76,7 +74,11 @@ namespace dripline
 
     message_ptr_t message::process_envelope( amqp_envelope_ptr a_envelope, const std::string& a_queue_name )
     {
-        param_node* t_msg_node = NULL;
+        if( ! a_envelope )
+        {
+            throw dripline_error() << retcode_t::amqp_error << "Empty envelope received";
+        }
+        param_node* t_msg_node = nullptr;
         encoding t_encoding;
         if( a_envelope->Message()->ContentEncoding() == "application/json" )
         {
@@ -192,6 +194,7 @@ namespace dripline
         amqp_message_ptr t_message = AmqpClient::BasicMessage::Create( t_body );
         t_message->ContentEncoding( interpret_encoding() );
         t_message->CorrelationId( f_correlation_id );
+        t_message->ReplyTo( f_reply_to );
         this->derived_modify_amqp_message( t_message );
 
         return t_message;
@@ -391,4 +394,4 @@ namespace dripline
     }
 
 
-} /* namespace mantis */
+} /* namespace dripline */

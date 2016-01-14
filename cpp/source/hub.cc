@@ -18,11 +18,15 @@ namespace dripline
 
 
     hub::hub() :
-            service()
+            service(),
+            f_lockout_tag(),
+            f_lockout_key( generate_nil_uuid() )
     {}
 
     hub::hub( const string& a_address, unsigned a_port, const string& a_exchange, const string& a_queue_name, const string& a_auth_file ) :
-            service( a_address, a_port, a_exchange, a_queue_name, a_auth_file)
+            service( a_address, a_port, a_exchange, a_queue_name, a_auth_file),
+            f_lockout_tag(),
+            f_lockout_key( generate_nil_uuid() )
     {
         if( ! a_queue_name.empty() )
         {
@@ -63,7 +67,7 @@ namespace dripline
 
     bool hub::on_request_message( const request_ptr_t a_request )
     {
-        reply_package t_reply_pkg( shared_ptr< service >( this ), a_request );
+        reply_package t_reply_pkg( this, a_request );
 
         // the lockout key must be valid
         if( ! a_request->get_lockout_key_valid() )
@@ -198,7 +202,7 @@ namespace dripline
         //WARN( mtlog, "uuid string: " << a_request->get_payload().get_value( "key", "") << ", uuid: " << uuid_from_string( a_request->get_payload().get_value( "key", "") ) );
         // this condition includes the exception for the unlock instruction that allows us to force the unlock regardless of the key.
         // disable_key() checks the lockout key if it's not forced, so it's okay that we bypass this call to authenticate() for the unlock instruction.
-        if( ! authenticate( a_request->lockout_key() ) && t_instruction != "unlock" )
+        if( ! authenticate( a_request->lockout_key() ) && t_instruction != "unlock" && t_instruction != "ping" )
         {
             std::stringstream t_conv;
             t_conv << a_request->lockout_key();
@@ -271,22 +275,21 @@ namespace dripline
 
     bool hub::reply_package::send_reply( retcode_t a_return_code, const std::string& a_return_msg ) const
     {
+        if( f_service_ptr == nullptr )
+        {
+            WARN( dlog, "Service pointer is null; Unable to send reply" );
+            return false;
+        }
+
         reply_ptr_t t_reply = msg_reply::create( a_return_code, a_return_msg, new param_node( f_payload ), f_reply_to, message::encoding::json );
         t_reply->correlation_id() = f_correlation_id;
 
-        DEBUG( dlog, "Sending reply message:\n" <<
+        DEBUG( dlog, "Sending reply message to <" << f_reply_to << ">:\n" <<
                  "Return code: " << t_reply->get_return_code() << '\n' <<
                  "Return message: " << t_reply->return_msg() <<
                  f_payload );
 
-        const shared_ptr< service > t_service = f_service_ptr.lock();
-        if( ! t_service )
-        {
-            WARN( dlog, "Unable to send reply; it appears that the AMQP service no longer exists" );
-            return false;
-        }
-
-        if( ! t_service->send( t_reply ) )
+        if( ! f_service_ptr->send( t_reply ) )
         {
             WARN( dlog, "Something went wrong while sending the reply" );
             return false;

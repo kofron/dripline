@@ -92,7 +92,7 @@ namespace dripline
     {
         INFO( dlog, "Listening for incoming messages on <" << f_queue_name << ">" );
 
-        while( true )
+        while( ! f_canceled.load()  )
         {
             amqp_envelope_ptr t_envelope;
             bool t_channel_valid = listen_for_message( t_envelope, f_channel, f_consumer_tag, a_timeout_ms );
@@ -101,6 +101,11 @@ namespace dripline
             {
                 DEBUG( dlog, "Service canceled" );
                 return true;
+            }
+
+            if( ! t_envelope && t_channel_valid )
+            {
+                continue;
             }
 
             try
@@ -162,6 +167,7 @@ namespace dripline
                 return true;
             }
         }
+        return true;
     }
 
     bool service::stop()
@@ -283,8 +289,6 @@ namespace dripline
 
     amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag, const string& a_exchange ) const
     {
-        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
-
         string t_exchange = a_exchange;
         if( t_exchange.empty() )
         {
@@ -308,11 +312,14 @@ namespace dripline
         string t_reply_to = t_channel->DeclareQueue( "" );
         t_channel->BindQueue( t_reply_to, t_exchange, t_reply_to );
         a_message->reply_to() = t_reply_to;
-        DEBUG( dlog, "Reply-to for request: " << t_reply_to );
 
         // begin consuming on the reply-to queue
         a_reply_consumer_tag = t_channel->BasicConsume( t_reply_to );
+        DEBUG( dlog, "Reply-to for request: " << t_reply_to );
         DEBUG( dlog, "Consumer tag for reply: " << a_reply_consumer_tag );
+
+        // convert the dripline::message object to an AMQP message
+        amqp_message_ptr t_amqp_message = a_message->create_amqp_message();
 
         try
         {
@@ -494,7 +501,8 @@ namespace dripline
                 else
                 {
                     a_envelope = a_channel->BasicConsumeMessage( a_consumer_tag );
-                 }
+                }
+                if( a_envelope ) a_channel->BasicAck( a_envelope );
                 return true;
             }
             catch( AmqpClient::ConnectionClosedException& e )

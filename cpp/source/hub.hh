@@ -21,11 +21,11 @@ namespace dripline
         public:
             struct reply_package
             {
-                const weak_ptr< service > f_service_ptr;
+                const service* f_service_ptr;
                 string f_reply_to;
                 string f_correlation_id;
                 param_node f_payload;
-                reply_package( const shared_ptr< service >&  a_service, request_ptr_t a_request ) :
+                reply_package( const service* a_service, request_ptr_t a_request ) :
                     f_service_ptr( a_service ),
                     f_reply_to( a_request->reply_to() ),
                     f_correlation_id( a_request->correlation_id() ),
