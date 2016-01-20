@@ -98,8 +98,7 @@ namespace dripline
             mv_referrable_const( string, sender_service_name );
 
         public:
-            // set the routing key specifier by removing the queue name from the beginning of the routing key
-            bool set_routing_key_specifier( const std::string& a_rk, const std::string& a_queue_name);
+            bool set_routing_key_specifier( const std::string& a_rks, parsable* a_parsed_rks );
 
             virtual msg_t message_type() const = 0;
 
@@ -258,15 +257,6 @@ namespace dripline
     //***********
     // Message
     //***********
-
-    inline bool message::set_routing_key_specifier( const std::string& a_rk, const std::string& a_queue_name )
-    {
-        if( a_rk.find( a_queue_name ) != 0 ) return false;
-        f_routing_key_specifier = a_rk;
-        f_routing_key_specifier.erase( 0, a_queue_name.size() + 1 ); // 1 added to remove the '.' that separates nodes
-        this->set_parsed_rks( new parsable( f_routing_key_specifier ) );
-        return true;
-    }
 
     inline void message::set_sender_info( param_node* a_sender_info )
     {

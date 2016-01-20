@@ -94,6 +94,11 @@ namespace dripline
             /// Override this to enable handling of infos.
             virtual bool on_info_message( const info_ptr_t a_info );
 
+        protected:
+            // set the routing key specifier by removing the queue name or broadcast key from the beginning of the routing key
+            bool set_routing_key_specifier( message_ptr_t a_message ) const;
+
+
         private:
             amqp_channel_ptr open_channel() const;
 

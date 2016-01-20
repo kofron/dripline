@@ -32,7 +32,7 @@ namespace dripline
             f_channel(),
             f_consumer_tag(),
             f_keys(),
-            f_broadcast_key( "broadcast.#" ),
+            f_broadcast_key( "broadcast" ),
             f_canceled( false )
     {}
 
@@ -115,6 +115,11 @@ namespace dripline
                 bool t_msg_handled = true;
                 if( t_message->is_request() )
                 {
+                    if( ! set_routing_key_specifier( t_message ) )
+                    {
+                        throw dripline_error() << retcode_t::message_error_decoding_fail << "Unable to determine the routing-key specifier; routing key: <" << t_message->routing_key() << ">";
+                    }
+
                     t_msg_handled = on_request_message( static_pointer_cast< msg_request >( t_message ) );
                 }
                 else if( t_message->is_alert() )
@@ -289,6 +294,39 @@ namespace dripline
     }
 
 
+    bool service::set_routing_key_specifier( message_ptr_t a_message ) const
+    {
+        std::cout << "$$$ looking for <" << f_queue_name << "> or <" << f_broadcast_key << "> at the beginning of <" << a_message->routing_key() << ">" << std::endl;
+        string t_rk( a_message->routing_key() );
+        string t_prefix;
+        if( t_rk.find( f_queue_name ) == 0 ) t_prefix = f_queue_name;
+        else if( t_rk.find( f_broadcast_key ) == 0 ) t_prefix = f_broadcast_key;
+        else
+        {
+            WARN( dlog, "Routing key not formatted properly; it does not start with either the queue name (" << f_queue_name << ") or the broadcast key (" << f_broadcast_key << "): <" << t_rk << ">" );
+            return false;
+        }
+
+        if( t_rk == t_prefix )
+        {
+            std::cout << "$$$ blank RKS" << std::endl;
+            a_message->set_routing_key_specifier( "", new parsable() );
+        }
+
+        if( t_rk[ t_prefix.size() ] != '.' )
+        {
+            WARN( dlog, "Routing key not formatted properly; a single '.' does not follow the prefix: <" << t_rk << ">" );
+            return false;
+        }
+
+        t_rk.erase( 0, t_prefix.size() + 1 ); // 1 added to remove the '.' that separates nodes
+        std::cout << "$$$ RKS: <" << t_rk << ">" << std::endl;
+        a_message->set_routing_key_specifier( t_rk, new parsable( t_rk ) );
+        std::cout << "$$$ parsed RKS:\n" << *(a_message->get_parsed_rks()) << std::endl;
+        return true;
+    }
+
+
     amqp_channel_ptr service::send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag, const string& a_exchange ) const
     {
         a_message->set_sender_service_name( f_queue_name );
@@ -328,6 +366,7 @@ namespace dripline
         try
         {
             t_channel->BasicPublish( t_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            DEBUG( dlog, "Message sent" );
             return t_channel;
         }
         catch( AmqpClient::MessageReturnedException& e )
@@ -370,6 +409,7 @@ namespace dripline
         try
         {
             t_channel->BasicPublish( t_exchange, a_message->routing_key(), t_amqp_message, true, false );
+            DEBUG( dlog, "Message sent" );
         }
         catch( AmqpClient::MessageReturnedException& e )
         {
@@ -458,7 +498,7 @@ namespace dripline
             {
                 f_channel->BindQueue( f_queue_name, f_exchange, *t_key_it );
             }
-            f_channel->BindQueue( f_queue_name, f_exchange, f_broadcast_key );
+            f_channel->BindQueue( f_queue_name, f_exchange, f_broadcast_key + ".#" );
             return true;
         }
         catch( amqp_exception& e )

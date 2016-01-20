@@ -114,7 +114,6 @@ namespace dripline
                         t_routing_key,
                         a_envelope->Message()->ReplyTo(),
                         t_encoding);
-                t_request->set_routing_key_specifier( t_routing_key, a_queue_name );
 
                 bool t_lockout_key_valid = true;
                 t_request->lockout_key() = uuid_from_string( t_msg_node->get_value( "lockout_key", "" ), t_lockout_key_valid );
@@ -245,6 +244,13 @@ namespace dripline
             default:
                 return std::string( "Unknown" );
         }
+    }
+
+    bool message::set_routing_key_specifier( const std::string& a_rks, parsable* a_parsed_rks )
+    {
+        routing_key_specifier() = a_rks;
+        set_parsed_rks( a_parsed_rks );
+        return true;
     }
 
 
