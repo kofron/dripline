@@ -136,7 +136,7 @@ namespace dripline
                 }
                 if( ! t_msg_handled )
                 {
-                    throw dripline_error() << retcode_t::message_error << "Unknown error while handling message";
+                    throw dripline_error() << retcode_t::message_error << "Message could not be handled";
                 }
             }
             catch( dripline_error& e )
@@ -296,7 +296,6 @@ namespace dripline
 
     bool service::set_routing_key_specifier( message_ptr_t a_message ) const
     {
-        std::cout << "$$$ looking for <" << f_queue_name << "> or <" << f_broadcast_key << "> at the beginning of <" << a_message->routing_key() << ">" << std::endl;
         string t_rk( a_message->routing_key() );
         string t_prefix;
         if( t_rk.find( f_queue_name ) == 0 ) t_prefix = f_queue_name;
@@ -309,7 +308,6 @@ namespace dripline
 
         if( t_rk == t_prefix )
         {
-            std::cout << "$$$ blank RKS" << std::endl;
             a_message->set_routing_key_specifier( "", new parsable() );
         }
 
@@ -320,9 +318,7 @@ namespace dripline
         }
 
         t_rk.erase( 0, t_prefix.size() + 1 ); // 1 added to remove the '.' that separates nodes
-        std::cout << "$$$ RKS: <" << t_rk << ">" << std::endl;
         a_message->set_routing_key_specifier( t_rk, new parsable( t_rk ) );
-        std::cout << "$$$ parsed RKS:\n" << *(a_message->get_parsed_rks()) << std::endl;
         return true;
     }
 

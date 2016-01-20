@@ -72,9 +72,8 @@ namespace dripline
         // the lockout key must be valid
         if( ! a_request->get_lockout_key_valid() )
         {
-            t_reply_pkg.send_reply( retcode_t::message_error_invalid_key, "Lockout key could not be parsed" );
             WARN( dlog, "Message had an invalid lockout key" );
-            return false;
+            return t_reply_pkg.send_reply( retcode_t::message_error_invalid_key, "Lockout key could not be parsed" );;
         }
         else
         {
@@ -105,8 +104,7 @@ namespace dripline
                     t_error_stream << "Unrecognized message operation: <" << a_request->get_message_type() << ">";
                     string t_error_msg( t_error_stream.str() );
                     WARN( dlog, t_error_msg );
-                    t_reply_pkg.send_reply( retcode_t::message_error_invalid_method, t_error_msg );
-                    return false;
+                    return t_reply_pkg.send_reply( retcode_t::message_error_invalid_method, t_error_msg );;
                     break;
             } // end switch on message type
         }
@@ -147,8 +145,7 @@ namespace dripline
             t_conv << a_request->lockout_key();
             string t_message( "Request denied due to lockout (key used: " + t_conv.str() + ")" );
             INFO( dlog, t_message );
-            a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );
-            return false;
+            return a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );;
         }
 
         return do_run_request( a_request, a_reply_pkg );
@@ -182,8 +179,7 @@ namespace dripline
             t_conv << a_request->lockout_key();
             string t_message( "Request denied due to lockout (key used: " + t_conv.str() + ")" );
             INFO( dlog, t_message );
-            a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );
-            return false;
+            return a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );;
         }
 
         return do_set_request( a_request, a_reply_pkg );
@@ -208,8 +204,7 @@ namespace dripline
             t_conv << a_request->lockout_key();
             string t_message( "Request denied due to lockout (key used: " + t_conv.str() + ")" );
             INFO( dlog, t_message );
-            a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );
-            return false;
+            return a_reply_pkg.send_reply( retcode_t::message_error_access_denied, t_message );;
         }
 
         if( t_instruction == "lock" )
@@ -233,8 +228,7 @@ namespace dripline
         uuid_t t_new_key = enable_lockout( a_request->get_sender_info(), a_request->lockout_key() );
         if( t_new_key.is_nil() )
         {
-            a_reply_pkg.send_reply( retcode_t::device_error, "Unable to lock server" );
-            return false;
+            return a_reply_pkg.send_reply( retcode_t::device_error, "Unable to lock server" );;
         }
 
         a_reply_pkg.f_payload.add( "key", new param_value( string_from_uuid( t_new_key ) ) );
@@ -254,8 +248,7 @@ namespace dripline
         {
             return a_reply_pkg.send_reply( retcode_t::success, "Server unlocked" );
         }
-        a_reply_pkg.send_reply( retcode_t::device_error, "Failed to unlock server" );
-        return false;
+        return a_reply_pkg.send_reply( retcode_t::device_error, "Failed to unlock server" );;
     }
 
     bool hub::handle_is_locked_request( const request_ptr_t, hub::reply_package& a_reply_pkg )
