@@ -72,7 +72,8 @@ namespace dripline
         message_error_timeout = 305,
         message_error_invalid_method = 306,
         message_error_access_denied = 307,
-        message_error_invalid_key = 308
+        message_error_invalid_key = 308,
+        message_error_dripline_deprecated = 309
     };
 
     // Conversion functions for use when a numeric value is needed
