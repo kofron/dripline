@@ -110,6 +110,8 @@ namespace dripline
 
             bool stop_consuming();
 
+            bool remove_queue();
+
             amqp_channel_ptr send_withreply( message_ptr_t a_message, string& a_reply_consumer_tag, const string& a_exchange = "" ) const;
 
             bool send_noreply( message_ptr_t a_message, const string& a_exchange = "" ) const;

@@ -176,6 +176,8 @@ namespace dripline
 
         if( ! stop_consuming() ) return false;
 
+        if( ! remove_queue() ) return false;
+
         return true;
     }
 
@@ -529,6 +531,16 @@ namespace dripline
                 ERROR( dlog, "Fatal AMQP exception encountered: " << e.reply_text() );
                 return false;
             }
+            catch( std::exception& e )
+            {
+                ERROR( dlog, "Standard exception caught: " << e.what() );
+                return false;
+            }
+            catch(...)
+            {
+                ERROR( dlog, "Unknown exception caught" );
+                return false;
+            }
         }
     }
 
@@ -536,8 +548,9 @@ namespace dripline
     {
         try
         {
-            DEBUG( dlog, "Stopping consuming messages" );
+            DEBUG( dlog, "Stopping consuming messages (consumer " << f_consumer_tag << ")" );
             f_channel->BasicCancel( f_consumer_tag );
+            f_consumer_tag.clear();
             return true;
         }
         catch( amqp_exception& e )
@@ -550,6 +563,53 @@ namespace dripline
             ERROR( dlog, "AMQP library exception caught while stopping consuming messages: (" << e.ErrorCode() << ") " << e.what() );
             return false;
         }
+        catch( AmqpClient::ConsumerTagNotFoundException& e )
+        {
+            ERROR( dlog, "Fatal AMQP exception encountered: " << e.what() );
+            return false;
+        }
+        catch( std::exception& e )
+        {
+            ERROR( dlog, "Standard exception caught: " << e.what() );
+            return false;
+        }
+        catch(...)
+        {
+            ERROR( dlog, "Unknown exception caught" );
+            return false;
+        }
+    }
+
+    bool service::remove_queue()
+    {
+        try
+        {
+            DEBUG( dlog, "Deleting queue <" << f_queue_name << ">" );
+            f_channel->DeleteQueue( f_queue_name, false );
+            f_queue_name.clear();
+        }
+        catch( AmqpClient::ConnectionClosedException& e )
+        {
+            ERROR( dlog, "Fatal AMQP exception encountered: " << e.what() );
+            return false;
+        }
+        catch( amqp_lib_exception& e )
+        {
+            ERROR( dlog, "AMQP library exception caught while removing queue: (" << e.ErrorCode() << ") " << e.what() );
+            return false;
+        }
+        catch( std::exception& e )
+        {
+            ERROR( dlog, "Standard exception caught: " << e.what() );
+            return false;
+        }
+        catch(...)
+        {
+            ERROR( dlog, "Unknown exception caught" );
+            return false;
+        }
+
+        return true;
     }
 
     bool service::use_auth_file( const string& a_auth_file )
