@@ -1,0 +1,20 @@
+nodename: run_table_service
+broker: localhost
+providers:
+  - name: run_table_interface
+    module: RunDBInterface
+    database_name: p8_sc_db_debug
+    database_server: localhost
+    tables: 
+      - run_table
+    endpoints:
+      - name: run_table
+        module: InsertDBEndpoint
+        table_name: run_table
+        required_insert_names:
+          - run_name
+        return_col_names:
+          - run_id
+        default_insert_values:
+          daq_id: 1
+
